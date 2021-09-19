@@ -1,0 +1,27 @@
+[package]
+version = "0.1.0"
+name = "FightLines"
+repository = "https://github.com/Chadtech/FightLines"
+authors = ["Chadtech"]
+description = "A video game about military combat; specifically keeping your forces in combat and well supplied"
+categories = ["category"]
+license = "MIT"
+readme = "./README.md"
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3.18"
+
+[dependencies]
+seed = "0.8.0"
+
+[profile.release]
+lto = true
+opt-level = 'z'
+codegen-units = 1
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-Os']
