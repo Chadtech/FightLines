@@ -1,0 +1,1 @@
+/Users/ct/code/FightLines/server/target/debug/basics: /Users/ct/code/FightLines/server/src/assets/index.html /Users/ct/code/FightLines/server/src/assets/package.js /Users/ct/code/FightLines/server/src/assets/package_bg.wasm /Users/ct/code/FightLines/server/src/main.rs
