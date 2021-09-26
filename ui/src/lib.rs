@@ -2,18 +2,31 @@
 
 mod global;
 mod page;
+mod route;
+mod view;
 
+use page::title;
 use page::Page;
+use route::Route;
 use seed::{prelude::*, *};
 
 ///////////////////////////////////////////////////////////////
 // Init
 ///////////////////////////////////////////////////////////////
 
-fn init(_: Url, _: &mut impl Orders<Msg>) -> Model {
+fn init(url: Url, _: &mut impl Orders<Msg>) -> Model {
+    let maybe_route = Route::from_url(url);
+
+    let page = match maybe_route {
+        None => Page::NotFound,
+        Some(route) => match route {
+            Route::Title => Page::Title(title::init()),
+        },
+    };
+
     Model {
-        page: Page::Welcome,
-        global: global::Model::init(),
+        page,
+        global: global::init(),
     }
 }
 
@@ -48,11 +61,17 @@ fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
 
 // `view` describes what to display.
 fn view(model: &Model) -> Node<Msg> {
-    div![
-        "This is a counter: ",
-        C!["counter"],
-        // button![model.counter, ev(Ev::Click, |_| Msg::Increment),],
-    ]
+    let body: Vec<Box<Msg>> = match &model.page {
+        Page::Title(sub_model) => title::view(sub_model),
+        Page::NotFound => Vec::new(),
+    };
+    // div![
+    //     "This is a counter: ",
+    //     C!["counter"],
+    //     // button![model.counter, ev(Ev::Click, |_| Msg::Increment),],
+    // ]
+
+    div![nodes![body]].map_msg()
 }
 
 ///////////////////////////////////////////////////////////////
