@@ -1,1 +1,0 @@
-{"rustc":10368881109578526382,"features":"[]","target":3578796908107356718,"profile":10017580474031740910,"path":5462696238173263289,"deps":[[14763899473716704660,"wasm_bindgen",false,9685559326208263102]],"local":[{"CheckDepInfo":{"dep_info":"debug/.fingerprint/js-sys-2d7ce1d943debde3/dep-lib-js-sys"}}],"rustflags":[],"metadata":1700232890120119260,"config":0,"compile_kind":0}
