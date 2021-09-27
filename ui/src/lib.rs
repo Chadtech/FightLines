@@ -16,7 +16,6 @@ use seed::{prelude::*, *};
 
 fn init(url: Url, _: &mut impl Orders<Msg>) -> Model {
     let maybe_route = Route::from_url(url);
-
     let page = match maybe_route {
         None => Page::NotFound,
         Some(route) => match route {
