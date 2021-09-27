@@ -1,7 +1,30 @@
+mod flags;
+
+use crate::flags::Flags;
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+
+////////////////////////////////////////////////////////////////////////////////
+// TYPES //
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone)]
+struct Model {
+    pub ip_address: String,
+    pub admin_password: String,
+    pub port_number: u64,
+    pub setting: Setting,
+}
+
+#[derive(Clone)]
+enum Setting {
+    Prod(ProdModelka),
+    Dev(DevModelka),
+}
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    let flags = Flags::get()?;
+
     HttpServer::new(|| {
         App::new()
             .route("/package.js", web::get().to(js_asset_route))

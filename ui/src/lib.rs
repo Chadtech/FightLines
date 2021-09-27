@@ -42,7 +42,7 @@ struct Model {
 // (Remove the line below once any of your `Msg` variants doesn't implement `Copy`.)
 #[derive(Copy, Clone)]
 enum Msg {
-    Msg,
+    TitleMsg(title::Msg),
 }
 
 ///////////////////////////////////////////////////////////////
@@ -51,7 +51,11 @@ enum Msg {
 
 fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
     match msg {
-        Msg::Msg => {}
+        Msg::TitleMsg(sub_msg) => {
+            if let Page::Title(mut sub_model) = &model.page {
+                page::title::update(sub_msg, &mut sub_model);
+            }
+        }
     }
 }
 
@@ -59,10 +63,12 @@ fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
 // View
 ///////////////////////////////////////////////////////////////
 
-// `view` describes what to display.
 fn view(model: &Model) -> Node<Msg> {
-    let body: Vec<Box<Msg>> = match &model.page {
-        Page::Title(sub_model) => title::view(sub_model),
+    let body: Vec<Node<Msg>> = match &model.page {
+        Page::Title(sub_model) => title::view(sub_model)
+            .into_iter()
+            .map(|el| el.map_msg(Msg::TitleMsg))
+            .collect::<Vec<Node<Msg>>>(),
         Page::NotFound => Vec::new(),
     };
     // div![
@@ -71,7 +77,7 @@ fn view(model: &Model) -> Node<Msg> {
     //     // button![model.counter, ev(Ev::Click, |_| Msg::Increment),],
     // ]
 
-    div![nodes![body]].map_msg()
+    div![nodes![body]]
 }
 
 ///////////////////////////////////////////////////////////////
