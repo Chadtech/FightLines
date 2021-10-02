@@ -30,5 +30,5 @@ pub fn update(msg: Msg, model: &mut Model) {}
 ///////////////////////////////////////////////////////////////
 
 pub fn view(model: &Model) -> Vec<Node<Msg>> {
-    vec![text("Hello")]
+    vec![text("Hellddo")]
 }

@@ -1,3 +1,4 @@
+mod dev;
 mod flags;
 
 use crate::flags::Flags;
@@ -5,6 +6,7 @@ use actix_cors::Cors;
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use notify::{raw_watcher, RecursiveMode, Watcher};
 use std::fs;
+use std::process::Command;
 use std::sync::mpsc::channel;
 use std::thread;
 ////////////////////////////////////////////////////////////////////////////////
@@ -159,7 +161,32 @@ fn watch_and_recompile_ui(setting: &Setting) {
                     let file_extension = filepath.extension().and_then(|ext| ext.to_str());
 
                     match file_extension {
-                        Some("rs") => Ok(()),
+                        Some("rs") => {
+                            dev::log("Building frontend..");
+
+                            let build_result = Command::new("cargo")
+                                .current_dir("../ui")
+                                .args(&["make", "build"])
+                                .output();
+
+                            match build_result {
+                                Ok(output) => {
+                                    if output.status.success() {
+                                        dev::succeed("Done");
+                                        Ok(())
+                                    } else {
+                                        let mut buf =
+                                            "failed to compiled frontend with status code : "
+                                                .to_string();
+
+                                        buf.push_str(output.status.to_string().as_str());
+
+                                        Err(buf)
+                                    }
+                                }
+                                Err(err) => Err(err.to_string()),
+                            }
+                        }
                         _ => Ok(()),
                     }
                 }
