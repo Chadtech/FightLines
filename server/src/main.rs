@@ -3,7 +3,7 @@ mod flags;
 
 use crate::flags::Flags;
 use actix_cors::Cors;
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{web, App, HttpResponse, HttpServer};
 use notify::{raw_watcher, RecursiveMode, Watcher};
 use std::fs;
 use std::process::Command;
@@ -68,7 +68,7 @@ async fn main() -> Result<(), String> {
 
     if setting.is_dev() {
         thread::spawn(move || {
-            watch_and_recompile_ui(&setting);
+            watch_and_recompile_ui();
         });
     };
 
@@ -127,24 +127,11 @@ async fn frontend() -> HttpResponse {
     HttpResponse::Ok().body(include_str!("assets/index.html"))
 }
 
-// async fn wasm_asset_route(modelka: web::Data<Modelka>) -> HttpResponse {
-//     match &modelka.get_ref().okoli {
-//         Okoli::Dev(_) => match read_elm_file() {
-//             Ok(elm_file) => HttpResponse::Ok().body(elm_file),
-//             Err(error) => HttpResponse::InternalServerError().body(error.to_string()),
-//         },
-//         Okoli::Prod(prod_model) => match &prod_model.elm_file {
-//             Ok(file_str) => HttpResponse::Ok().body(file_str),
-//             Err(_) => HttpResponse::InternalServerError().body("elm file was missing"),
-//         },
-//     }
-// }
-
 ////////////////////////////////////////////////////////////////////////////////
 // DEV //
 ////////////////////////////////////////////////////////////////////////////////
 
-fn watch_and_recompile_ui(setting: &Setting) {
+fn watch_and_recompile_ui() {
     let (sender, receiver) = channel();
 
     let mut watcher = raw_watcher(sender).unwrap();
@@ -175,13 +162,30 @@ fn watch_and_recompile_ui(setting: &Setting) {
                                         dev::succeed("Done");
                                         Ok(())
                                     } else {
-                                        let mut buf =
-                                            "failed to compiled frontend with status code : "
-                                                .to_string();
+                                        match output.status.code() {
+                                            Some(1) => {
+                                                match std::str::from_utf8(output.stderr.as_slice())
+                                                {
+                                                    Ok(str) => {
+                                                        let mut buf = "\n".to_string();
+                                                        buf.push_str(str);
 
-                                        buf.push_str(output.status.to_string().as_str());
+                                                        dev::log(buf.as_str());
+                                                        Ok(())
+                                                    }
+                                                    Err(error) => Err(error.to_string()),
+                                                }
+                                            }
+                                            _ => {
+                                                let mut buf =
+                                                    "failed to compiled frontend with status code : "
+                                                        .to_string();
 
-                                        Err(buf)
+                                                buf.push_str(output.status.to_string().as_str());
+
+                                                Err(buf)
+                                            }
+                                        }
                                     }
                                 }
                                 Err(err) => Err(err.to_string()),
@@ -195,7 +199,7 @@ fn watch_and_recompile_ui(setting: &Setting) {
         };
 
         if let Err(err) = result {
-            panic!("{}", err);
+            dev::error(err.as_str());
         };
     }
 }

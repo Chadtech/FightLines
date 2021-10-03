@@ -1,3 +1,5 @@
+pub mod component_library;
+pub mod not_found;
 pub mod title;
 
 ///////////////////////////////////////////////////////////////
@@ -6,5 +8,7 @@ pub mod title;
 
 pub enum Page {
     Title(title::Model),
+    ComponentLibrary(component_library::Model),
     NotFound,
+    Blank,
 }

@@ -1,4 +1,4 @@
-use seed::prelude::*;
+use seed::prelude::Node;
 use seed::virtual_dom::Text;
 
 pub fn text<Msg>(str: &str) -> Node<Msg> {

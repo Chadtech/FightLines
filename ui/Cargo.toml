@@ -1,6 +1,6 @@
 [package]
 version = "0.1.0"
-name = "FightLines"
+name = "fightlines"
 repository = "https://github.com/Chadtech/FightLines"
 authors = ["Chadtech"]
 description = "A video game about military combat; specifically keeping your forces in combat and well supplied"

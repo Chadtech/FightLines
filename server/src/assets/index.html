@@ -6,10 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <link rel="modulepreload" href="/package.js" as="script" type="text/javascript">
     <link rel="preload" href="/package_bg.wasm" as="fetch" type="application/wasm" crossorigin="anonymous">
+    <style>
+        @font-face {
+          font-family: HFNSS;
+          src: url("https://cdn.rawgit.com/Chadtech-Online-1/Chadtech-Online-1.github.io/master/HFNSS.ttf");
+        }
+    </style>
 </head>
 
-<body>
-<section id="app"></section>
+<body id="app">
+<!--<section ></section>-->
 <script type="module">
         import init from '/package.js';
         init('/package_bg.wasm');
