@@ -39,9 +39,14 @@ const STRING_TAG_NAME: &str = "string";
 ////////////////////////////////////////////////////////////////
 
 impl<Msg: 'static> Row<Msg> {
+    pub fn none() -> Row<Msg> {
+        Row(Cell::none())
+    }
+
     fn to_cell(self) -> Cell<Msg> {
         self.0
     }
+
     pub fn from_cells(mut styles: Vec<Style>, cells: Vec<Cell<Msg>>) -> Row<Msg> {
         styles.push(Style::FlexRow);
 
@@ -60,6 +65,7 @@ impl<Msg: 'static> Cell<Msg> {
     pub fn none() -> Cell<Msg> {
         Cell::None
     }
+
     pub fn to_html(self) -> Node<Msg> {
         match self {
             Cell::None => text(""),

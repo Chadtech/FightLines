@@ -1,3 +1,4 @@
+use crate::style::Style::Batch;
 use crate::view::text::text;
 use seed::dom_entity_names::Tag;
 use seed::prelude::{El, Node};
@@ -19,6 +20,10 @@ pub enum Style {
 }
 
 impl Style {
+    pub fn none() -> Style {
+        Batch(vec![])
+    }
+
     pub fn to_css_classes(self) -> Vec<&'static str> {
         match self {
             Style::FlexCol => vec!["flex-col"],

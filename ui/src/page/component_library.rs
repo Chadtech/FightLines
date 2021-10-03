@@ -51,7 +51,6 @@ impl Section {
 ///////////////////////////////////////////////////////////////
 
 pub fn view<Msg: 'static + Clone>(model: &Model) -> Vec<Row<Msg>> {
-    // vec![text("Fightlines")]
     vec![Row::from_cells(
         vec![Style::Grow],
         vec![
