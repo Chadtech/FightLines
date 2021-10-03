@@ -54,6 +54,7 @@ fn handle_url_change(url: Url, model: &mut Model) {
         None => {
             model.page = Page::NotFound;
         }
+
         Some(route) => handle_route_change(route, model),
     };
 }
