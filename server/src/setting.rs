@@ -1,0 +1,34 @@
+use crate::dev;
+
+////////////////////////////////////////////////////////////////////////////////
+// Types //
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone)]
+pub enum Setting {
+    Prod(ProdModel),
+    Dev(dev::Model),
+}
+
+#[derive(Clone)]
+struct ProdModel;
+
+////////////////////////////////////////////////////////////////////////////////
+// Api //
+////////////////////////////////////////////////////////////////////////////////
+
+impl Setting {
+    pub fn init_dev() -> Setting {
+        Setting::Dev(dev::Model::init())
+    }
+
+    pub fn init_prod() -> Setting {
+        Setting::Prod(ProdModel)
+    }
+    pub fn is_dev(&self) -> bool {
+        match self {
+            Setting::Dev(_) => true,
+            _ => false,
+        }
+    }
+}

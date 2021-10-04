@@ -1,4 +1,5 @@
 use crate::route;
+use crate::style::Style;
 use crate::view::button::Click::NoClick;
 use crate::view::cell::Cell;
 use crate::view::text::text;
@@ -18,6 +19,7 @@ pub struct Button<Msg: 'static> {
     on_click: Click<Msg>,
     active: bool,
     variant: Variant,
+    full_width: bool,
 }
 
 enum Variant {
@@ -55,7 +57,12 @@ impl<Msg: 'static> Button<Msg> {
             on_click: NoClick,
             active: false,
             variant,
+            full_width: false,
         }
+    }
+    pub fn full_width(mut self) -> Button<Msg> {
+        self.full_width = true;
+        self
     }
     pub fn primary(label: &str) -> Button<Msg> {
         Button::from_variant(label, Variant::Primary)
@@ -88,6 +95,12 @@ impl<Msg: 'static> Button<Msg> {
 
         if self.active {
             element.add_class("active");
+        }
+
+        if self.full_width {
+            for class in Style::WFull.to_css_classes() {
+                element.add_class(class);
+            }
         }
 
         element.children.push(text(self.label.as_str()));

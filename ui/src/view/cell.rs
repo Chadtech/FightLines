@@ -87,6 +87,16 @@ impl<Msg: 'static> Cell<Msg> {
         }
     }
 
+    pub fn with_styles(mut self, mut styles: Vec<Style>) -> Cell<Msg> {
+        match self {
+            Cell::None => Cell::None,
+            Cell::Model(mut model) => {
+                model.styles.append(&mut styles);
+                Cell::Model(model)
+            }
+        }
+    }
+
     pub fn from_html(styles: Vec<Style>, html: Vec<Node<Msg>>) -> Cell<Msg> {
         Cell::new(styles, html, DEFAULT_TAG_NAME)
     }

@@ -31,7 +31,6 @@ pub fn update(_msg: Msg, _model: &mut Model) {}
 ///////////////////////////////////////////////////////////////
 
 pub fn view(_model: &Model) -> Vec<Row<Msg>> {
-    // vec![text("Fightlines")]
     vec![
         Row::from_cells(
             vec![Style::JustifyCenter],
@@ -39,11 +38,30 @@ pub fn view(_model: &Model) -> Vec<Row<Msg>> {
         ),
         Row::from_cells(
             vec![Style::JustifyCenter],
-            vec![Button::simple("New Game").to_cell()],
+            vec![Button::primary("start game")
+                .full_width()
+                .to_cell()
+                .with_styles(vec![Style::W8])],
+        ),
+        Row::from_cells(
+            vec![Style::JustifyCenter],
+            vec![Button::simple("join game")
+                .full_width()
+                .to_cell()
+                .with_styles(vec![Style::W8])],
+        ),
+        Row::from_cells(
+            vec![Style::JustifyCenter],
+            vec![Button::simple("custom game")
+                .full_width()
+                .to_cell()
+                .with_styles(vec![Style::W8])],
         ),
     ]
 }
 
 pub fn parent_styles() -> Vec<Style> {
-    vec![Style::JustifyCenter, Style::G3]
+    vec![Style::JustifyCenter, GAP_SIZE]
 }
+
+const GAP_SIZE: Style = Style::G3;

@@ -1,64 +1,21 @@
-mod dev;
-mod flags;
-
-use crate::flags::Flags;
-use actix_cors::Cors;
-use actix_web::{web, App, HttpResponse, HttpServer};
-use notify::{raw_watcher, RecursiveMode, Watcher};
 use std::fs;
 use std::process::Command;
 use std::sync::mpsc::channel;
 use std::thread;
-////////////////////////////////////////////////////////////////////////////////
-// TYPES //
-////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone)]
-struct Model {
-    pub ip_address: String,
-    pub admin_password: String,
-    pub port_number: u64,
-    pub setting: Setting,
-}
+use actix_cors::Cors;
+use actix_web::{web, App, HttpResponse, HttpServer};
+use notify::{raw_watcher, RecursiveMode, Watcher};
 
-impl Model {
-    fn init() -> Result<Model, String> {
-        let flags = Flags::get()?;
+use crate::model::Model;
 
-        let setting: Setting = if flags.dev_mode {
-            Setting::Dev(DevModel)
-        } else {
-            Setting::Prod(ProdModel)
-        };
-
-        Ok(Model {
-            ip_address: flags.ip_address,
-            admin_password: flags.admin_password,
-            port_number: flags.port_number,
-            setting,
-        })
-    }
-}
-
-#[derive(Clone)]
-enum Setting {
-    Prod(ProdModel),
-    Dev(DevModel),
-}
-impl Setting {
-    pub fn is_dev(&self) -> bool {
-        match self {
-            Setting::Dev(_) => true,
-            _ => false,
-        }
-    }
-}
-
-#[derive(Clone)]
-struct DevModel;
-
-#[derive(Clone)]
-struct ProdModel;
+mod dev;
+mod flags;
+mod lobby;
+mod model;
+mod player;
+mod route;
+mod setting;
 
 #[actix_web::main]
 async fn main() -> Result<(), String> {
@@ -68,6 +25,7 @@ async fn main() -> Result<(), String> {
 
     if setting.is_dev() {
         thread::spawn(move || {
+            build_frontend().unwrap();
             watch_and_recompile_ui();
         });
     };
@@ -82,6 +40,9 @@ async fn main() -> Result<(), String> {
             .app_data(web_model.clone())
             .route("/package.js", web::get().to(js_asset_route))
             .route("/package_bg.wasm", web::get().to(wasm_asset_route))
+            .service(
+                web::scope("/api/").route("/lobby/create", web::post().to(route::create_lobby)),
+            )
             .default_service(web::get().to(frontend))
     })
     .bind("127.0.0.1:8080")
@@ -131,6 +92,45 @@ async fn frontend() -> HttpResponse {
 // DEV //
 ////////////////////////////////////////////////////////////////////////////////
 
+fn build_frontend() -> Result<(), String> {
+    dev::log("Building frontend..");
+
+    let build_result = Command::new("cargo")
+        .current_dir("../ui")
+        .args(&["make", "build"])
+        .output();
+
+    match build_result {
+        Ok(output) => {
+            if output.status.success() {
+                dev::succeed("Done");
+                Ok(())
+            } else {
+                match output.status.code() {
+                    Some(1) => match std::str::from_utf8(output.stderr.as_slice()) {
+                        Ok(str) => {
+                            let mut buf = "\n".to_string();
+                            buf.push_str(str);
+
+                            dev::log(buf.as_str());
+                            Ok(())
+                        }
+                        Err(error) => Err(error.to_string()),
+                    },
+                    _ => {
+                        let mut buf = "failed to compiled frontend with status code : ".to_string();
+
+                        buf.push_str(output.status.to_string().as_str());
+
+                        Err(buf)
+                    }
+                }
+            }
+        }
+        Err(err) => Err(err.to_string()),
+    }
+}
+
 fn watch_and_recompile_ui() {
     let (sender, receiver) = channel();
 
@@ -148,49 +148,8 @@ fn watch_and_recompile_ui() {
                     let file_extension = filepath.extension().and_then(|ext| ext.to_str());
 
                     match file_extension {
-                        Some("rs") => {
-                            dev::log("Building frontend..");
-
-                            let build_result = Command::new("cargo")
-                                .current_dir("../ui")
-                                .args(&["make", "build"])
-                                .output();
-
-                            match build_result {
-                                Ok(output) => {
-                                    if output.status.success() {
-                                        dev::succeed("Done");
-                                        Ok(())
-                                    } else {
-                                        match output.status.code() {
-                                            Some(1) => {
-                                                match std::str::from_utf8(output.stderr.as_slice())
-                                                {
-                                                    Ok(str) => {
-                                                        let mut buf = "\n".to_string();
-                                                        buf.push_str(str);
-
-                                                        dev::log(buf.as_str());
-                                                        Ok(())
-                                                    }
-                                                    Err(error) => Err(error.to_string()),
-                                                }
-                                            }
-                                            _ => {
-                                                let mut buf =
-                                                    "failed to compiled frontend with status code : "
-                                                        .to_string();
-
-                                                buf.push_str(output.status.to_string().as_str());
-
-                                                Err(buf)
-                                            }
-                                        }
-                                    }
-                                }
-                                Err(err) => Err(err.to_string()),
-                            }
-                        }
+                        Some("rs") => build_frontend(),
+                        Some("css") => build_frontend(),
                         _ => Ok(()),
                     }
                 }

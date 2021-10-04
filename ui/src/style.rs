@@ -17,6 +17,8 @@ pub enum Style {
     G3,
     TextImportant4,
     TextContent5,
+    W8,
+    WFull,
 }
 
 impl Style {
@@ -41,6 +43,8 @@ impl Style {
                 .concat(),
             Style::TextImportant4 => vec!["text-important-4"],
             Style::TextContent5 => vec!["text-content-5"],
+            Style::W8 => vec!["w-8"],
+            Style::WFull => vec!["w-full"],
         }
     }
 }

@@ -4,5 +4,5 @@ members = [
     "server",
     "ui",
 #    "code-gen",
-#    "shared"
+    "shared"
 ]
