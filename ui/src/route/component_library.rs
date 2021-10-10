@@ -15,7 +15,7 @@ pub enum Route {
 
 const LANDING: Route = Route::Button;
 
-const BUTTON_PATH: &'static str = "button";
+const BUTTON_PATH: &str = "button";
 
 ///////////////////////////////////////////////////////////////
 // Api //
@@ -30,7 +30,7 @@ impl ToString for Route {
 }
 
 impl Route {
-    fn to_pieces(&self) -> Vec<String> {
+    fn to_pieces(self) -> Vec<String> {
         match self {
             Route::Button => vec![BUTTON_PATH.to_string()],
         }

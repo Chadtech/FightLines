@@ -26,7 +26,7 @@ impl Style {
         Batch(vec![])
     }
 
-    pub fn to_css_classes(self) -> Vec<&'static str> {
+    pub fn css_classes(self) -> Vec<&'static str> {
         match self {
             Style::FlexCol => vec!["flex-col"],
             Style::FlexRow => vec!["flex-row"],
@@ -38,7 +38,7 @@ impl Style {
             Style::G3 => vec!["g-3"],
             Style::Batch(styles) => styles
                 .into_iter()
-                .map(|style| style.to_css_classes())
+                .map(|style| style.css_classes())
                 .collect::<Vec<Vec<&'static str>>>()
                 .concat(),
             Style::TextImportant4 => vec!["text-important-4"],

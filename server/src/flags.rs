@@ -101,8 +101,9 @@ impl Flags {
         Ok(Flags {
             ip_address,
             admin_password,
-            dev_mode,
             port_number,
+            dev_mode,
+
             show_elm_output,
         })
     }

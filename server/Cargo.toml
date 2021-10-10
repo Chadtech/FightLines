@@ -14,4 +14,3 @@ actix-cors = "0.5.4"
 notify = "4.0.15"
 hex = "0.4.2"
 shared = { path = "../shared" }
-rand = "0.3"

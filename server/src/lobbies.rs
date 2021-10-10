@@ -1,6 +1,6 @@
 use crate::lobby::Lobby;
 use shared::id::Id;
-use shared::rng::RandGen;
+use shared::rng::{RandGen, RandSeed};
 use std::collections::HashMap;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 pub struct Lobbies {
     lobbies: HashMap<Id, Lobby>,
-    random_seed: usize,
+    random_seed: RandSeed,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -17,7 +17,7 @@ pub struct Lobbies {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl Lobbies {
-    pub fn init(random_seed: usize) -> Lobbies {
+    pub fn init(random_seed: RandSeed) -> Lobbies {
         Lobbies {
             lobbies: HashMap::new(),
             random_seed,
@@ -29,13 +29,13 @@ impl Lobbies {
     }
 
     pub fn new_lobby(&mut self, lobby: Lobby) -> Id {
-        let mut rand_gen = RandGen::from_usize(self.random_seed);
+        let mut rand_gen = RandGen::from_seed(self.random_seed.clone());
 
         let new_id: Id = rand_gen.gen();
 
         self.insert_lobby(new_id.clone(), lobby);
 
-        let new_seed: usize = rand_gen.gen();
+        let new_seed: RandSeed = rand_gen.gen();
 
         self.random_seed = new_seed;
 

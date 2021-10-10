@@ -30,7 +30,7 @@ impl Request {
 // Response //
 ////////////////////////////////////////////////////////////////
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Response {
     lobby_id: Id,
 }

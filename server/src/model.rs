@@ -1,6 +1,7 @@
 use crate::flags::Flags;
 use crate::lobbies::Lobbies;
 use crate::setting::Setting;
+use shared::rng::{RandGen, RandSeed};
 use std::sync::Mutex;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -30,9 +31,14 @@ impl Model {
             Setting::init_prod()
         };
 
-        let random_seed: usize = 0;
+        let random_seed: RandSeed = RandSeed::from_bytes([
+            125, 106, 161, 45, 228, 43, 117, 234, 218, 111, 245, 253, 177, 14, 76, 151, 40, 229,
+            183, 121, 69, 23, 25, 227, 72, 149, 42, 114, 251, 186, 158, 131,
+        ]);
 
-        let lobbies_seed: usize = random_seed + 1;
+        let mut rand_gen: RandGen = RandGen::from_seed(random_seed);
+
+        let lobbies_seed: RandSeed = rand_gen.gen();
 
         Ok(Model {
             ip_address: flags.ip_address,

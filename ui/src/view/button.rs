@@ -38,7 +38,7 @@ enum Click<Msg> {
 ////////////////////////////////////////////////////////////////
 
 impl Variant {
-    fn to_css_class(self) -> &'static str {
+    fn to_css_class(&self) -> &'static str {
         match self {
             Variant::Simple => "button-simple",
             Variant::Primary => "button-primary",
@@ -74,14 +74,21 @@ impl<Msg: 'static> Button<Msg> {
         self.active = active;
         self
     }
+    pub fn on_click(
+        mut self,
+        msg: impl FnOnce(MouseEvent) -> Msg + Clone + 'static,
+    ) -> Button<Msg> {
+        self.on_click = Click::Handler(Rc::new(move |event| msg.clone()(event)));
+        self
+    }
     pub fn route(mut self, route: route::Route) -> Button<Msg> {
         self.on_click = Click::Route(route);
         self
     }
-    pub fn to_cell(self) -> Cell<Msg> {
-        Cell::from_html(vec![], vec![self.to_html()])
+    pub fn cell(self) -> Cell<Msg> {
+        Cell::from_html(vec![], vec![self.html()])
     }
-    pub fn to_html(self) -> Node<Msg> {
+    pub fn html(self) -> Node<Msg> {
         let tag = match self.on_click {
             Click::Route(_) => "a",
             _ => "button",
@@ -98,7 +105,7 @@ impl<Msg: 'static> Button<Msg> {
         }
 
         if self.full_width {
-            for class in Style::WFull.to_css_classes() {
+            for class in Style::WFull.css_classes() {
                 element.add_class(class);
             }
         }

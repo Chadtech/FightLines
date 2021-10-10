@@ -72,7 +72,7 @@ fn nav_bar<Msg: 'static>(model: &Model) -> Vec<Row<Msg>> {
             vec![],
             vec![Button::simple(section.to_label())
                 .active(section.clone() == model.active_section)
-                .to_cell()],
+                .cell()],
         );
 
         ret_rows.push(section_row);

@@ -8,6 +8,7 @@ use actix_web::{web, App, HttpResponse, HttpServer};
 use notify::{raw_watcher, RecursiveMode, Watcher};
 
 use crate::model::Model;
+use shared::api::endpoint;
 
 mod dev;
 mod flags;
@@ -41,9 +42,10 @@ async fn main() -> Result<(), String> {
             .app_data(web_model.clone())
             .route("/package.js", web::get().to(js_asset_route))
             .route("/package_bg.wasm", web::get().to(wasm_asset_route))
-            .service(
-                web::scope("/api/").route("/lobby/create", web::post().to(route::create_lobby)),
-            )
+            .service(web::scope(endpoint::ROOT).route(
+                endpoint::CREATE_LOBBY,
+                web::post().to(route::create_lobby::handle),
+            ))
             .default_service(web::get().to(frontend))
     })
     .bind("127.0.0.1:8080")

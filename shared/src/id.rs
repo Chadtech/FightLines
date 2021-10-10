@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 // Types //
 ////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Id {
     bytes: [u8; N],
 }

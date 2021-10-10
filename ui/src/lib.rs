@@ -1,5 +1,6 @@
 #![allow(clippy::wildcard_imports)]
 
+mod core_ext;
 mod global;
 mod page;
 mod route;
@@ -25,7 +26,7 @@ struct Model {
 
 #[derive(Clone)]
 enum Msg {
-    TitleMsg(title::Msg),
+    Title(title::Msg),
     UrlChanged(subs::UrlChanged),
 }
 
@@ -36,11 +37,11 @@ enum Msg {
 fn init(url: Url, orders: &mut impl Orders<Msg>) -> Model {
     orders
         .subscribe(Msg::UrlChanged)
-        .notify(subs::UrlChanged(url.clone()));
+        .notify(subs::UrlChanged(url));
 
     Model {
         page: Page::Blank,
-        global: global::init(),
+        global: global::Model::init(),
     }
 }
 
@@ -74,11 +75,16 @@ fn handle_route_change(route: Route, model: &mut Model) {
 // Update //
 ///////////////////////////////////////////////////////////////
 
-fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
+fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
     match msg {
-        Msg::TitleMsg(sub_msg) => {
+        Msg::Title(sub_msg) => {
             if let Page::Title(mut sub_model) = &model.page {
-                page::title::update(sub_msg, &mut sub_model);
+                page::title::update(
+                    &model.global,
+                    sub_msg,
+                    &mut sub_model,
+                    &mut orders.proxy(Msg::Title),
+                );
             }
         }
         Msg::UrlChanged(subs::UrlChanged(url)) => {
@@ -95,7 +101,7 @@ fn view(model: &Model) -> Node<Msg> {
     let body: Vec<Row<Msg>> = match &model.page {
         Page::Title(sub_model) => title::view(sub_model)
             .into_iter()
-            .map(|row| row.map_msg(Msg::TitleMsg))
+            .map(|row| row.map_msg(Msg::Title))
             .collect(),
         Page::NotFound => not_found::view(),
         Page::ComponentLibrary(sub_model) => component_library::view(sub_model),
@@ -116,7 +122,7 @@ fn view(model: &Model) -> Node<Msg> {
     div![
         C!["page-container"],
         style::global_html(),
-        Cell::from_rows(page_styles, body).to_html()
+        Cell::from_rows(page_styles, body).html()
     ]
 }
 

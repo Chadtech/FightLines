@@ -43,7 +43,7 @@ impl<Msg: 'static> Row<Msg> {
         Row(Cell::none())
     }
 
-    fn to_cell(self) -> Cell<Msg> {
+    fn cell(self) -> Cell<Msg> {
         self.0
     }
 
@@ -66,14 +66,14 @@ impl<Msg: 'static> Cell<Msg> {
         Cell::None
     }
 
-    pub fn to_html(self) -> Node<Msg> {
+    pub fn html(self) -> Node<Msg> {
         match self {
             Cell::None => text(""),
             Cell::Model(model) => {
                 let mut element: El<Msg> = El::empty(Tag::Custom(Cow::Borrowed(model.tag_name)));
 
                 for style in model.styles {
-                    for class in style.to_css_classes() {
+                    for class in style.css_classes() {
                         element.add_class(class);
                     }
                 }
@@ -102,7 +102,7 @@ impl<Msg: 'static> Cell<Msg> {
     }
 
     pub fn from_rows(mut styles: Vec<Style>, rows: Vec<Row<Msg>>) -> Cell<Msg> {
-        let row_cells = rows.into_iter().map(|row| row.to_cell()).collect();
+        let row_cells = rows.into_iter().map(|row| row.cell()).collect();
 
         styles.push(Style::FlexCol);
 
@@ -110,7 +110,7 @@ impl<Msg: 'static> Cell<Msg> {
     }
 
     pub fn group(styles: Vec<Style>, children: Vec<Cell<Msg>>) -> Cell<Msg> {
-        let html_children = children.into_iter().map(|cell| cell.to_html()).collect();
+        let html_children = children.into_iter().map(|cell| cell.html()).collect();
 
         Cell::new(styles, html_children, DEFAULT_TAG_NAME)
     }
@@ -120,7 +120,7 @@ impl<Msg: 'static> Cell<Msg> {
         children: Vec<Cell<Msg>>,
         tag_name: &'static str,
     ) -> Cell<Msg> {
-        let html_children = children.into_iter().map(|cell| cell.to_html()).collect();
+        let html_children = children.into_iter().map(|cell| cell.html()).collect();
 
         Cell::Model(Model {
             styles,

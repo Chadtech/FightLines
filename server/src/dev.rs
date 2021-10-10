@@ -46,12 +46,12 @@ fn log_proto(maybe_sentiment: Option<Sentiment>, str: &str) {
     if let Some(ref sentiment) = maybe_sentiment {
         buf.push_str("\u{001b}[");
         buf.push_str(sentiment.terminal_code());
-        buf.push_str("m");
+        buf.push('m');
     }
 
     buf.push_str(str);
 
-    if let Some(_) = maybe_sentiment {
+    if maybe_sentiment.is_some() {
         buf.push_str("\u{001b}[0m");
     }
 

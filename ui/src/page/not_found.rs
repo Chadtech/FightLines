@@ -20,7 +20,7 @@ pub fn view<Msg: 'static>() -> Vec<Row<Msg>> {
             vec![Style::JustifyCenter],
             vec![Button::primary("go to title screen")
                 .route(Route::Title)
-                .to_cell()],
+                .cell()],
         ),
     ]
 }

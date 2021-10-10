@@ -3,7 +3,7 @@ use crate::view::button::Button;
 use crate::view::cell::Row;
 
 pub fn view<Msg: 'static + Clone>() -> Vec<Row<Msg>> {
-    let row = |button: Button<Msg>| Row::from_cells(vec![], vec![button.to_cell()]);
+    let row = |button: Button<Msg>| Row::from_cells(vec![], vec![button.cell()]);
 
     vec![
         vec![row(Button::simple("button"))],
