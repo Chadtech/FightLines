@@ -9,4 +9,5 @@ edition = "2018"
 [dependencies]
 serde= "1.0"
 bincode = "1.0"
-rand = "0.3"
+rand = "0.8.4"
+rand_pcg = "0.3.1"

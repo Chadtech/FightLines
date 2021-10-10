@@ -32,16 +32,16 @@ impl Request {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Response {
-    lobby_id: u64,
+    lobby_id: Id,
 }
 
 impl Response {
-    pub fn init(lobby_id: u64) -> Response {
+    pub fn init(lobby_id: Id) -> Response {
         Response { lobby_id }
     }
 
-    pub fn get_lobby_id(&self) -> u64 {
-        self.lobby_id
+    pub fn get_lobby_id(&self) -> Id {
+        self.lobby_id.clone()
     }
 
     pub fn to_bytes(&self) -> bincode::Result<Vec<u8>> {

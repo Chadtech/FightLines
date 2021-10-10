@@ -11,6 +11,7 @@ use crate::model::Model;
 
 mod dev;
 mod flags;
+mod lobbies;
 mod lobby;
 mod model;
 mod player;
