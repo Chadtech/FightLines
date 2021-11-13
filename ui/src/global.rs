@@ -27,13 +27,11 @@ impl Model {
 
         let viewer_id_result: Result<Id, WebStorageError> = LocalStorage::get(VIEWER_ID_KEY);
 
-        let viewer_id = viewer_id_result.unwrap_or_else(|_err| {
-            let id: Id = rand_gen.gen();
+        let new_viewer_id: Id = Id::new(&mut rand_gen);
 
-            id
-        });
+        let viewer_id = viewer_id_result.unwrap_or_else(|_err| new_viewer_id);
 
-        let random_seed: RandSeed = rand_gen.gen();
+        let random_seed: RandSeed = RandSeed::next(&mut rand_gen);
 
         Model {
             viewer_id,

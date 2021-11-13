@@ -52,3 +52,10 @@ impl Response {
         bincode::deserialize(&byte_data[..])
     }
 }
+
+#[cfg(test)]
+mod test_fmt {
+
+    #[test]
+    fn response_encodes_and_decodes() {}
+}

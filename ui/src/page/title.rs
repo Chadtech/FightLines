@@ -5,6 +5,7 @@ use crate::{core_ext, global};
 use seed::log;
 use seed::prelude::{fetch, Method, Orders, Request};
 use shared::api::create_lobby;
+use shared::api::create_lobby::Response;
 use shared::api::endpoint::Endpoint;
 
 ///////////////////////////////////////////////////////////////
@@ -62,9 +63,12 @@ pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut 
                 Err(err) => {}
             };
         }
-        Msg::LoadedLobby(result) => {
-            log!(result);
-        }
+        Msg::LoadedLobby(result) => match result {
+            Ok(response) => {
+                log!(response.get_lobby_id().to_display_string());
+            }
+            Err(_) => {}
+        },
     }
 }
 

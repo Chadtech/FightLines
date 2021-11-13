@@ -31,11 +31,13 @@ impl Lobbies {
     pub fn new_lobby(&mut self, lobby: Lobby) -> Id {
         let mut rand_gen = RandGen::from_seed(self.random_seed.clone());
 
-        let new_id: Id = rand_gen.gen();
+        let new_id: Id = Id::new(&mut rand_gen);
+
+        println!("New Lobby Id {}", new_id);
 
         self.insert_lobby(new_id.clone(), lobby);
 
-        let new_seed: RandSeed = rand_gen.gen();
+        let new_seed: RandSeed = RandSeed::next(&mut rand_gen);
 
         self.random_seed = new_seed;
 

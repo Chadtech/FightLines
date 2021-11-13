@@ -38,7 +38,7 @@ impl Model {
 
         let mut rand_gen: RandGen = RandGen::from_seed(random_seed);
 
-        let lobbies_seed: RandSeed = rand_gen.gen();
+        let lobbies_seed: RandSeed = RandSeed::next(&mut rand_gen);
 
         Ok(Model {
             ip_address: flags.ip_address,
