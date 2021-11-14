@@ -1,6 +1,4 @@
-use rand::distributions::uniform::{
-    SampleBorrow, SampleUniform, UniformFloat, UniformInt, UniformSampler,
-};
+use rand::distributions::uniform::{SampleBorrow, SampleUniform, UniformInt, UniformSampler};
 use rand::distributions::{Distribution, Standard, Uniform};
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg64;
@@ -103,8 +101,6 @@ impl UniformSampler for UniformRandSeed {
         ];
 
         let next = RandSeed { bytes };
-
-        dbg!(bytes);
 
         next
     }

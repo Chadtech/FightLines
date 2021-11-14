@@ -54,6 +54,4 @@ fn log_proto(maybe_sentiment: Option<Sentiment>, str: &str) {
     if maybe_sentiment.is_some() {
         buf.push_str("\u{001b}[0m");
     }
-
-    println!("{}", buf.as_str());
 }

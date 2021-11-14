@@ -41,15 +41,17 @@ pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut 
 
             let lobby_request = create_lobby::Request::init(global.viewer_id());
             match lobby_request.to_bytes() {
-                Ok(bytes) => {
+                Ok(request_bytes) => {
                     // model.waiting();
                     orders.skip().perform_cmd({
                         async {
-                            let result = match send_request(url, bytes).await {
-                                Ok(bytes) => match create_lobby::Response::from_bytes(bytes) {
-                                    Ok(response) => Ok(response),
-                                    Err(error) => Err(error.to_string()),
-                                },
+                            let result = match send_request(url, request_bytes).await {
+                                Ok(response_bytes) => {
+                                    match create_lobby::Response::from_bytes(response_bytes) {
+                                        Ok(response) => Ok(response),
+                                        Err(error) => Err(error.to_string()),
+                                    }
+                                }
                                 Err(error) => {
                                     let fetch_error = core_ext::http::fetch_error_to_string(error);
                                     Err(fetch_error)

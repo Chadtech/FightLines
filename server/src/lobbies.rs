@@ -33,8 +33,6 @@ impl Lobbies {
 
         let new_id: Id = Id::new(&mut rand_gen);
 
-        println!("New Lobby Id {}", new_id);
-
         self.insert_lobby(new_id.clone(), lobby);
 
         let new_seed: RandSeed = RandSeed::next(&mut rand_gen);
