@@ -1,5 +1,4 @@
 use crate::rng::RandGen;
-use hex;
 use rand::distributions::uniform::{SampleBorrow, SampleUniform, UniformInt, UniformSampler};
 use rand::distributions::{Distribution, Standard};
 use rand::Rng;
@@ -55,6 +54,12 @@ impl Id {
         }
 
         buf
+    }
+
+    pub fn from_int_test_only(n: u8) -> Id {
+        Id {
+            bytes: [n, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        }
     }
 }
 

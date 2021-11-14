@@ -30,7 +30,7 @@ impl Request {
 // Response //
 ////////////////////////////////////////////////////////////////
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Response {
     lobby_id: Id,
 }
@@ -54,8 +54,20 @@ impl Response {
 }
 
 #[cfg(test)]
-mod test_fmt {
+mod test_create_lobby {
+    use crate::api::create_lobby::Response;
+    use crate::id::Id;
 
     #[test]
-    fn response_encodes_and_decodes() {}
+    fn response_encodes_and_decodes() {
+        let id = Id::from_int_test_only(0);
+
+        let response = Response::init(id);
+
+        let bytes = response.to_bytes().unwrap();
+
+        let decoded_response = Response::from_bytes(bytes).unwrap();
+
+        assert_eq!(response, decoded_response);
+    }
 }
