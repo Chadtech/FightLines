@@ -7,7 +7,7 @@ use rand_pcg::Pcg64;
 // Types //
 ////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq,)]
 pub struct RandSeed {
     pub bytes: [u8; N],
 }
@@ -23,19 +23,9 @@ pub struct UniformRandSeed(UniformInt<u8>);
 // Helpers //
 ////////////////////////////////////////////////////////////////////////////////
 
-const LOW_SEED: RandSeed = RandSeed {
-    bytes: [
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0,
-    ],
-};
+const LOW_SEED: RandSeed = RandSeed { bytes: [0; N] };
 
-const HIGH_SEED: RandSeed = RandSeed {
-    bytes: [
-        255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-        255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-    ],
-};
+const HIGH_SEED: RandSeed = RandSeed { bytes: [255; N] };
 
 const N: usize = 32;
 
@@ -153,8 +143,6 @@ impl RandGen {
         let uniform = Uniform::new(low, high);
         let val: T = uniform.sample(&mut rng);
 
-        // let val: T = rng.gen();
-
         self.seed = next_seed;
 
         val
@@ -178,4 +166,15 @@ impl AsMut<[u8]> for RandSeed {
     fn as_mut(&mut self) -> &mut [u8] {
         &mut self.bytes
     }
+}
+
+
+#[cfg(test)]
+mod test_rng {
+    use crate::rng::{RandSeed, N};
+
+    fn more_than_255_seeds() {
+        let seed = RandSeed::from_bytes([0; N])
+    }
+
 }
