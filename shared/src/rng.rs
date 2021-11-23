@@ -2,12 +2,13 @@ use rand::distributions::uniform::{SampleBorrow, SampleUniform, UniformInt, Unif
 use rand::distributions::{Distribution, Standard, Uniform};
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg64;
+use std::fmt;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Types //
 ////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, PartialEq, Eq,)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct RandSeed {
     pub bytes: [u8; N],
 }
@@ -28,6 +29,12 @@ const LOW_SEED: RandSeed = RandSeed { bytes: [0; N] };
 const HIGH_SEED: RandSeed = RandSeed { bytes: [255; N] };
 
 const N: usize = 32;
+
+impl fmt::Display for RandSeed {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.to_display_string())
+    }
+}
 
 impl Distribution<RandSeed> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> RandSeed {
@@ -112,6 +119,18 @@ impl RandSeed {
 
         new_seed
     }
+
+    pub fn to_display_string(&self) -> String {
+        let mut buf = String::new();
+
+        for byte in self.bytes {
+            let hex: String = format!("{:02X}", byte);
+
+            buf.push_str(hex.as_str());
+        }
+
+        buf
+    }
 }
 
 impl RandGen {
@@ -139,7 +158,6 @@ impl RandGen {
 
         let mut rng = Pcg64::from_seed(bytes.clone());
 
-        // let (low, high) = (LOW_SEED, HIGH_SEED);
         let uniform = Uniform::new(low, high);
         let val: T = uniform.sample(&mut rng);
 
@@ -168,13 +186,48 @@ impl AsMut<[u8]> for RandSeed {
     }
 }
 
-
 #[cfg(test)]
 mod test_rng {
-    use crate::rng::{RandSeed, N};
+    use crate::rng::{RandGen, RandSeed, N};
+    use std::ops::Index;
 
+    #[test]
     fn more_than_255_seeds() {
-        let seed = RandSeed::from_bytes([0; N])
-    }
+        let seeds_count = 1024;
+        let mut seeds: Vec<RandSeed> = Vec::with_capacity(seeds_count);
+        seeds.push(RandSeed::from_bytes([0; N]));
 
+        let mut index = 0;
+
+        while index < (seeds_count - 1) {
+            let mut rng = RandGen::from_seed(seeds[index].clone());
+
+            let next_seed: RandSeed = RandSeed::next(&mut rng);
+
+            seeds.push(next_seed);
+
+            index += 1;
+        }
+
+        index = 0;
+
+        while index < seeds_count {
+            let mut j = index + 1;
+            let this_seed = seeds[index].clone();
+
+            while j < seeds_count {
+                let next_seed = seeds[j].clone();
+
+                if (this_seed == next_seed) {
+                    for (i, seed) in seeds.iter().enumerate() {
+                        println!("index {},  {}", i, seed);
+                    }
+                    panic!("Seeds are the same {} {} {}", index, j, this_seed);
+                }
+                j += 1;
+            }
+
+            index += 1;
+        }
+    }
 }
