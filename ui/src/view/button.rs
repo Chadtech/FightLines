@@ -44,6 +44,13 @@ impl Variant {
             Variant::Primary => "button-primary",
         }
     }
+
+    fn to_styles(&self) -> Vec<Style> {
+        match self {
+            Variant::Simple => vec![Style::Inset],
+            Variant::Primary => vec![],
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////
@@ -99,6 +106,12 @@ impl<Msg: 'static> Button<Msg> {
         element.add_class("button");
 
         element.add_class(self.variant.to_css_class());
+
+        for style in self.variant.to_styles() {
+            for class in style.css_classes() {
+                element.add_class(class);
+            }
+        }
 
         if self.active {
             element.add_class("active");

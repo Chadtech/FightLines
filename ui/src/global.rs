@@ -10,6 +10,11 @@ use shared::rng::{RandGen, RandSeed};
 pub struct Model {
     viewer_id: Id,
     random_seed: RandSeed,
+    errors: Vec<Error>,
+}
+
+enum Error {
+    Error(String),
 }
 
 ///////////////////////////////////////////////////////////////
@@ -36,6 +41,7 @@ impl Model {
         Model {
             viewer_id,
             random_seed,
+            errors: Vec::new(),
         }
     }
 

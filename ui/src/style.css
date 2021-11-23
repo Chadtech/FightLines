@@ -45,6 +45,13 @@ body {
 
 }
 
+
+.inset {
+    border-right: var(--s-1) solid var(--content-0);
+    border-bottom: var(--s-1) solid var(--content-0);
+    border-top: var(--s-1) solid var(--content-2);
+    border-left: var(--s-1) solid var(--content-2);
+}
 .page-container {
     height: 100%;
     display: flex;
@@ -64,10 +71,7 @@ a.button {
 .button.button-simple {
     background-color: var(--content-1);
 
-    border-right: var(--s-1) solid var(--content-0);
-    border-bottom: var(--s-1) solid var(--content-0);
-    border-top: var(--s-1) solid var(--content-2);
-    border-left: var(--s-1) solid var(--content-2);
+
 }
 
 .button.button-primary {
@@ -125,6 +129,10 @@ a.button {
     padding: var(--s-3);
 }
 
+.p-4 {
+    padding: var(--s-4);
+}
+
 .g-3 {
     gap: var(--s-3);
 }
@@ -143,4 +151,12 @@ a.button {
 
 .w-full {
     width: 100%;
+}
+
+.bg-content-0 {
+    background-color: var(--content-0);
+}
+
+.bg-content-1 {
+    background-color: var(--content-1);
 }

@@ -78,11 +78,11 @@ fn handle_route_change(route: Route, model: &mut Model) {
 fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
     match msg {
         Msg::Title(sub_msg) => {
-            if let Page::Title(mut sub_model) = &model.page {
+            if let Page::Title(sub_model) = &mut model.page {
                 page::title::update(
                     &model.global,
                     sub_msg,
-                    &mut sub_model,
+                    sub_model,
                     &mut orders.proxy(Msg::Title),
                 );
             }

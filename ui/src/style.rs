@@ -14,11 +14,14 @@ pub enum Style {
     BorderR,
     P2,
     P3,
+    P4,
     G3,
     TextImportant4,
     TextContent5,
     W8,
     WFull,
+    BgContent1,
+    Inset,
 }
 
 impl Style {
@@ -35,6 +38,7 @@ impl Style {
             Style::BorderR => vec!["border-r"],
             Style::P2 => vec!["p-2"],
             Style::P3 => vec!["p-3"],
+            Style::P4 => vec!["p-4"],
             Style::G3 => vec!["g-3"],
             Style::Batch(styles) => styles
                 .into_iter()
@@ -45,6 +49,8 @@ impl Style {
             Style::TextContent5 => vec!["text-content-5"],
             Style::W8 => vec!["w-8"],
             Style::WFull => vec!["w-full"],
+            Style::BgContent1 => vec!["bg-content-1"],
+            Style::Inset => vec!["inset"],
         }
     }
 }
