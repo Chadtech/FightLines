@@ -29,6 +29,8 @@ body {
     --important-1: #302507;
     --important-0: #161303;
 
+    --s-neg-7: -128px;
+
     --s-0: 0px;
     --s-1: 2px;
     --s-2: 4px;
@@ -38,6 +40,7 @@ body {
     --s-6: 64px;
     --s-7: 128px;
     --s-8: 256px;
+    --s-9: 512px;
 
     background-color: var(--bg-1);
 
@@ -46,12 +49,20 @@ body {
 }
 
 
-.inset {
+.outset {
     border-right: var(--s-1) solid var(--content-0);
     border-bottom: var(--s-1) solid var(--content-0);
     border-top: var(--s-1) solid var(--content-2);
     border-left: var(--s-1) solid var(--content-2);
 }
+
+.inset {
+    border-right: var(--s-1) solid var(--content-2);
+    border-bottom: var(--s-1) solid var(--content-2);
+    border-top: var(--s-1) solid var(--content-0);
+    border-left: var(--s-1) solid var(--content-0);
+}
+
 .page-container {
     height: 100%;
     display: flex;
@@ -70,8 +81,6 @@ a.button {
 
 .button.button-simple {
     background-color: var(--content-1);
-
-
 }
 
 .button.button-primary {
@@ -113,6 +122,10 @@ a.button {
     justify-content: center;
 }
 
+.justify-end {
+    justify-content: flex-end;
+}
+
 .grow {
     flex: 1;
 }
@@ -137,6 +150,10 @@ a.button {
     gap: var(--s-3);
 }
 
+.g-4 {
+    gap: var(--s-4);
+}
+
 .text-important-4 {
     color: var(--important-4);
 }
@@ -145,8 +162,16 @@ a.button {
     color: var(--content-5);
 }
 
+.w-7 {
+    width: var(--s-7);
+}
+
 .w-8 {
     width: var(--s-8);
+}
+
+.w-9 {
+    width: var(--s-9);
 }
 
 .w-full {
@@ -157,6 +182,69 @@ a.button {
     background-color: var(--content-0);
 }
 
+.bg-content-4 {
+    background-color: var(--content-4);
+}
+
 .bg-content-1 {
     background-color: var(--content-1);
+}
+
+.bg-background-0 {
+    background-color: var(--bg-0);
+}
+
+.bg-background-1 {
+    background-color: var(--bg-1);
+}
+
+.relative {
+    position: relative;
+}
+
+.absolute {
+    position: absolute;
+}
+
+.overflow-hidden {
+    overflow: hidden;
+}
+
+spinner {
+    animation: slideby 1s infinite;
+    animation-timing-function: linear;
+    top: 0px;
+}
+
+@keyframes slideby {
+    from {
+       left: var(--s-neg-7);
+    }
+    to {
+        left: var(--s-8);
+    }
+}
+
+.h-4 {
+    height: var(--s-4);
+}
+
+.h-5 {
+    height: var(--s-5);
+}
+
+.h-8 {
+    height: var(--s-8);
+}
+
+.h-full {
+    height: 100%;
+}
+
+.outline-none {
+    outline: none;
+}
+
+.pointer {
+    cursor: pointer;
 }

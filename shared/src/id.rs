@@ -22,7 +22,7 @@ pub struct UniformId(UniformInt<u8>);
 
 impl Id {
     pub fn new(rng: &mut RandGen) -> Id {
-        let id_bytes: [u8; 16] = [
+        let id_bytes: [u8; N] = [
             rng.gen::<u8>(0, 255),
             rng.gen::<u8>(0, 255),
             rng.gen::<u8>(0, 255),
@@ -44,6 +44,29 @@ impl Id {
         let new_id = Id { bytes: id_bytes };
 
         new_id
+    }
+
+    pub fn from_string(s: String) -> Option<Id> {
+        match hex::decode(s) {
+            Ok(bytes) => {
+                if bytes.len() == N {
+                    let mut new_id = Id::empty();
+
+                    for (i, byte) in bytes.iter().enumerate() {
+                        new_id.bytes[i] = byte.clone();
+                    }
+
+                    Some(new_id)
+                } else {
+                    None
+                }
+            }
+            Err(_) => None,
+        }
+    }
+
+    fn empty() -> Id {
+        Id { bytes: [0; N] }
     }
 
     pub fn to_display_string(&self) -> String {
@@ -126,3 +149,39 @@ impl SampleUniform for Id {
 }
 
 const N: usize = 16;
+
+#[cfg(test)]
+mod test_id {
+    use crate::id::Id;
+
+    #[test]
+    fn can_make_id_from_string() {
+        let maybe_id = Id::from_string("6D5B5DBFF37475EFE4C09C075A968A54".to_string());
+
+        if maybe_id.is_none() {
+            panic!("Could not make id from string");
+        }
+    }
+
+    #[test]
+    fn cannot_make_id_from_short_string() {
+        if Id::from_string("6D5B5DBFF37475EFE4C09C075A968A5".to_string()).is_some() {
+            panic!("Could make id from string");
+        }
+
+        if Id::from_string("6D5B5DBFF37475EFE4C09C075A968A".to_string()).is_some() {
+            panic!("Could make id from string");
+        }
+    }
+
+    #[test]
+    fn cannot_make_id_from_long_string() {
+        if Id::from_string("6D5B5DBFF37475EFE4C09C075A968A5FF".to_string()).is_some() {
+            panic!("Could make id from string");
+        }
+
+        if Id::from_string("6D5B5DBFF37475EFE4C09C075A968AF".to_string()).is_some() {
+            panic!("Could make id from string");
+        }
+    }
+}

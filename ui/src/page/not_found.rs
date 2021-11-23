@@ -9,22 +9,20 @@ use crate::view::cell::{Cell, Row};
 
 pub fn view<Msg: 'static>() -> Vec<Row<Msg>> {
     vec![
-        Row::from_cells(
+        center(Cell::from_str(
             vec![Style::JustifyCenter],
-            vec![Cell::from_str(
-                vec![Style::JustifyCenter],
-                "Sorry, this page does not seem to exist.",
-            )],
-        ),
-        Row::from_cells(
-            vec![Style::JustifyCenter],
-            vec![Button::primary("go to title screen")
+            "sorry, this page does not seem to exist.",
+        )),
+        center(
+            Button::primary("go to title screen")
                 .route(Route::Title)
-                .cell()],
+                .cell(),
         ),
     ]
 }
 
-pub fn parent_styles() -> Vec<Style> {
-    vec![Style::JustifyCenter, Style::G3]
+fn center<Msg: 'static>(cells: Cell<Msg>) -> Row<Msg> {
+    Row::from_cells(vec![Style::JustifyCenter], vec![cells])
 }
+
+pub const PARENT_STYLES: [Style; 2] = [Style::JustifyCenter, Style::G3];

@@ -53,6 +53,10 @@ impl<Msg: 'static> Row<Msg> {
         Row(Cell::group_in_tag_name(styles, cells, ROW_TAG_NAME))
     }
 
+    pub fn from_str(s: &str) -> Row<Msg> {
+        Row::from_cells(vec![], vec![Cell::from_str(vec![], s)])
+    }
+
     pub fn map_msg<OtherMsg: 'static>(
         self,
         f: impl FnOnce(Msg) -> OtherMsg + 'static + Clone,
@@ -83,6 +87,17 @@ impl<Msg: 'static> Cell<Msg> {
                 }
 
                 Node::Element(element)
+            }
+        }
+    }
+
+    pub fn with_tag_name(mut self, tag_name: &'static str) -> Cell<Msg> {
+        match self {
+            Cell::None => Cell::None,
+            Cell::Model(mut model) => {
+                model.tag_name = tag_name;
+
+                Cell::Model(model)
             }
         }
     }

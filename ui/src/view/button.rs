@@ -47,8 +47,8 @@ impl Variant {
 
     fn to_styles(&self) -> Vec<Style> {
         match self {
-            Variant::Simple => vec![Style::Inset],
-            Variant::Primary => vec![],
+            Variant::Simple => vec![Style::Pointer, Style::Outset],
+            Variant::Primary => vec![Style::Pointer],
         }
     }
 }

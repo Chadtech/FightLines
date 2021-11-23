@@ -13,8 +13,6 @@ pub enum Route {
 // Helpers //
 ///////////////////////////////////////////////////////////////
 
-const LANDING: Route = Route::Button;
-
 const BUTTON_PATH: &str = "button";
 
 ///////////////////////////////////////////////////////////////
@@ -23,6 +21,8 @@ const BUTTON_PATH: &str = "button";
 
 pub const ROOT: &str = "component-library";
 
+pub const LANDING: Route = Route::Button;
+
 impl ToString for Route {
     fn to_string(&self) -> String {
         self.to_pieces().join("/")
@@ -30,7 +30,7 @@ impl ToString for Route {
 }
 
 impl Route {
-    fn to_pieces(self) -> Vec<String> {
+    pub fn to_pieces(self) -> Vec<String> {
         match self {
             Route::Button => vec![BUTTON_PATH.to_string()],
         }

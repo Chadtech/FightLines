@@ -1924,6 +1924,7 @@ name = "shared"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "hex",
  "rand 0.8.4",
  "rand_pcg 0.3.1",
  "serde",
