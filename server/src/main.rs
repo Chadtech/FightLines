@@ -41,10 +41,13 @@ async fn main() -> Result<(), String> {
             .app_data(web_model.clone())
             .route("/package.js", web::get().to(js_asset_route))
             .route("/package_bg.wasm", web::get().to(wasm_asset_route))
-            .service(web::scope(endpoint::ROOT).route(
-                endpoint::CREATE_LOBBY,
-                web::post().to(route::create_lobby::handle),
-            ))
+            .service(
+                web::scope(endpoint::ROOT).service(
+                    web::scope(endpoint::LOBBY)
+                        .route("/create", web::post().to(route::create_lobby::handle))
+                        .route("/get/{id}", web::get().to(route::get_lobby::handle)),
+                ),
+            )
             .default_service(web::get().to(frontend))
     })
     .bind("127.0.0.1:8080")

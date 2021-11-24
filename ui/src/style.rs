@@ -5,6 +5,7 @@ use seed::prelude::{El, Node};
 use std::borrow::Cow;
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub enum Style {
     Batch(Vec<Style>),
     FlexCol,

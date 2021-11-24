@@ -24,6 +24,10 @@ impl Lobbies {
         }
     }
 
+    pub fn get_lobby(&self, id: Id) -> Option<Lobby> {
+        self.lobbies.get(&id).map(|lobby| lobby.clone())
+    }
+
     pub fn insert_lobby(&mut self, id: Id, lobby: Lobby) {
         self.lobbies.insert(id, lobby);
     }

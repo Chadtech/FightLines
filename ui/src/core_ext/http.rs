@@ -4,36 +4,27 @@ pub fn fetch_error_to_string(error: FetchError) -> String {
     match error {
         FetchError::SerdeError(error) => error.to_string(),
         FetchError::DomException(_error) => "Dom Exception".to_string(),
-        FetchError::PromiseError(error) => match error.as_string() {
-            Some(str) => {
-                let mut buf = String::new();
+        FetchError::PromiseError(error) => {
+            let mut buf = String::new();
 
-                buf.push_str("Promise Error : ");
-                buf.push_str(str.as_str());
-                buf
-            }
-            None => "Unknown Promise Error".to_string(),
-        },
-        FetchError::NetworkError(error) => match error.as_string() {
-            Some(str) => {
-                let mut buf = String::new();
+            buf.push_str("Promise Error : ");
+            buf.push_str(format!("{:?}", error).as_str());
+            buf
+        }
+        FetchError::NetworkError(error) => {
+            let mut buf = String::new();
 
-                buf.push_str("Network Error : ");
-                buf.push_str(str.as_str());
-                buf
-            }
-            None => "Unknown Network Error".to_string(),
-        },
-        FetchError::RequestError(error) => match error.as_string() {
-            Some(str) => {
-                let mut buf = String::new();
+            buf.push_str("Network Error : ");
+            buf.push_str(format!("{:?}", error).as_str());
+            buf
+        }
+        FetchError::RequestError(error) => {
+            let mut buf = String::new();
 
-                buf.push_str("Request Error : ");
-                buf.push_str(str.as_str());
-                buf
-            }
-            None => "Unknown Request Error".to_string(),
-        },
+            buf.push_str("Request Error : ");
+            buf.push_str(format!("{:?}", error).as_str());
+            buf
+        }
         FetchError::StatusError(status) => {
             let mut buf = String::new();
 

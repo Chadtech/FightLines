@@ -1,4 +1,5 @@
 pub mod component_library;
+pub mod error;
 pub mod loading;
 pub mod lobby;
 pub mod not_found;
@@ -13,6 +14,7 @@ pub enum Page {
     ComponentLibrary(component_library::Model),
     Lobby(lobby::Model),
     Loading,
+    Error(error::Model),
     NotFound,
     Blank,
 }

@@ -7,7 +7,7 @@ use crate::view::cell::{Cell, Row};
 // View
 ///////////////////////////////////////////////////////////////
 
-pub fn view<Msg: 'static>() -> Vec<Row<Msg>> {
+pub fn view<Msg: 'static + Clone>() -> Vec<Row<Msg>> {
     vec![
         center(Cell::from_str(
             vec![Style::JustifyCenter],

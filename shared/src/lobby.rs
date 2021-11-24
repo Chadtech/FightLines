@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 pub struct Lobby {
     host: Player,
     guests: Vec<Player>,
+    game_started: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -20,6 +21,7 @@ impl Lobby {
         Lobby {
             host,
             guests: Vec::new(),
+            game_started: false,
         }
     }
 }

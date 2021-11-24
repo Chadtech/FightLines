@@ -8,12 +8,13 @@ mod route;
 mod style;
 mod view;
 
-use crate::page::{component_library, loading, lobby, not_found};
+use crate::page::{component_library, error, loading, lobby, not_found, title};
 use crate::view::cell::{Cell, Row};
-use page::title;
 use page::Page;
 use route::Route;
 use seed::{prelude::*, *};
+use shared::api::endpoint::Endpoint;
+use shared::api::get_lobby;
 use style::Style;
 
 ///////////////////////////////////////////////////////////////
@@ -30,7 +31,10 @@ enum Msg {
     // Pages
     Title(title::Msg),
     Lobby(lobby::Msg),
+    Error(error::Msg),
 
+    // Page Loads
+    LoadedLobby(Result<lobby::Flags, String>),
     //
     UrlChanged(subs::UrlChanged),
 }
@@ -71,9 +75,32 @@ fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders
         Route::ComponentLibrary(sub_route) => {
             Page::ComponentLibrary(component_library::init(sub_route))
         }
-        Route::Lobby(_) => {
-            // TODO fetch lobby
-            orders;
+        Route::Lobby(lobby_id) => {
+            orders.skip().perform_cmd({
+                async {
+                    let result = match api::get(Endpoint::GetLobby(lobby_id).to_url()).await {
+                        Ok(res_bytes) => match get_lobby::Response::from_bytes(res_bytes) {
+                            Ok(res) => Ok(lobby::Flags {
+                                lobby_id: res.get_lobby_id(),
+                                lobby: res.get_lobby(),
+                            }),
+                            Err(err) => Err(err.to_string()),
+                        },
+                        Err(error) => {
+                            // log!(error);
+
+                            // let error_str = format!("{}", error.into());
+
+                            let fetch_error = core_ext::http::fetch_error_to_string(error);
+                            Err(fetch_error)
+                        }
+                    };
+
+                    log!(result);
+
+                    Msg::LoadedLobby(result)
+                }
+            });
 
             Page::Loading
         }
@@ -111,6 +138,22 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                 );
             }
         }
+        Msg::LoadedLobby(result) => match result {
+            Ok(flags) => {
+                let sub_model = lobby::init(flags);
+
+                model.page = Page::Lobby(sub_model);
+            }
+            Err(error) => {
+                let flags =
+                    error::Flags::from_title("could not load lobby".to_string()).with_msg(error);
+
+                model.page = Page::Error(error::init(flags));
+            }
+        },
+        Msg::Error(sub_msg) => {
+            error::update(sub_msg, &mut orders.proxy(Msg::Error));
+        }
     }
 }
 
@@ -133,6 +176,10 @@ fn view(model: &Model) -> Node<Msg> {
         Page::NotFound => not_found::view(),
         Page::Blank => vec![],
         Page::Loading => loading::view(),
+        Page::Error(sub_model) => error::view(sub_model)
+            .into_iter()
+            .map(|row| row.map_msg(Msg::Error))
+            .collect(),
     };
 
     let mut page_styles: Vec<Style> = Vec::new();
@@ -144,6 +191,7 @@ fn view(model: &Model) -> Node<Msg> {
         Page::ComponentLibrary(_) => {}
         Page::Blank => {}
         Page::Loading => page_styles.append(&mut loading::PARENT_STYLES.to_vec()),
+        Page::Error(_) => page_styles.append(&mut error::PARENT_STYLES.to_vec()),
     }
 
     page_styles.append(&mut vec![Style::Grow]);

@@ -1,8 +1,8 @@
 use seed::prelude::{fetch, Method, Request};
 
-async fn send_request(url: String, bytes: Vec<u8>) -> fetch::Result<Vec<u8>> {
+async fn send_request(method: Method, url: String, bytes: Vec<u8>) -> fetch::Result<Vec<u8>> {
     Request::new(url.as_str())
-        .method(Method::Post)
+        .method(method)
         .text(hex::encode(bytes))
         .fetch()
         .await?
@@ -12,5 +12,15 @@ async fn send_request(url: String, bytes: Vec<u8>) -> fetch::Result<Vec<u8>> {
 }
 
 pub async fn post(url: String, bytes: Vec<u8>) -> fetch::Result<Vec<u8>> {
-    send_request(url, bytes).await
+    send_request(Method::Post, url, bytes).await
+}
+
+pub async fn get(url: String) -> fetch::Result<Vec<u8>> {
+    Request::new(url.as_str())
+        .method(Method::Get)
+        .fetch()
+        .await?
+        .check_status()?
+        .bytes()
+        .await
 }

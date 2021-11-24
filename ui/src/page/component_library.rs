@@ -60,7 +60,7 @@ pub fn view<Msg: 'static + Clone>(model: &Model) -> Vec<Row<Msg>> {
     )]
 }
 
-fn nav_bar<Msg: 'static>(model: &Model) -> Vec<Row<Msg>> {
+fn nav_bar<Msg: 'static + Clone>(model: &Model) -> Vec<Row<Msg>> {
     let mut ret_rows = Vec::new();
 
     let header_row = Row::from_cells(vec![], vec![Cell::from_str(vec![], "Component Library")]);

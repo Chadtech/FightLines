@@ -3,8 +3,8 @@ use crate::style::Style;
 use crate::view::button::Button;
 use crate::view::card::Card;
 use crate::view::cell::{Cell, Row};
+use crate::view::error_card::ErrorCard;
 use crate::view::loading_spinner::LoadingSpinner;
-use crate::view::textarea::Textarea;
 use crate::{api, core_ext, global};
 use seed::prelude::Orders;
 use shared::api::create_lobby;
@@ -58,19 +58,19 @@ pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut 
         Msg::ClickedStartGame => {
             model.status = Status::WaitingForNewGame;
 
-            let url = Endpoint::CreateLobby.to_url();
-
-            let lobby_request = create_lobby::Request::init(global.viewer_id());
-            match lobby_request.to_bytes() {
+            match create_lobby::Request::init(global.viewer_id()).to_bytes() {
                 Ok(request_bytes) => {
                     orders.skip().perform_cmd({
                         async {
-                            let result = match api::post(url, request_bytes).await {
+                            let result = match api::post(
+                                Endpoint::CreateLobby.to_url(),
+                                request_bytes,
+                            )
+                            .await
+                            {
                                 Ok(response_bytes) => {
-                                    match create_lobby::Response::from_bytes(response_bytes) {
-                                        Ok(response) => Ok(response),
-                                        Err(error) => Err(error.to_string()),
-                                    }
+                                    create_lobby::Response::from_bytes(response_bytes)
+                                        .map_err(|err| err.to_string())
                                 }
                                 Err(error) => {
                                     let fetch_error = core_ext::http::fetch_error_to_string(error);
@@ -157,26 +157,12 @@ fn new_game_error_view(error: &NewGameError) -> Vec<Row<Msg>> {
         NewGameError::RemoteError(s) => s.as_str(),
     };
 
-    let card = Card::cell_from_rows(
-        vec![Style::G4],
-        vec![
-            Row::from_str(title),
-            Row::from_cells(
-                vec![],
-                vec![Textarea::simple(msg.to_string()).cell(vec![
-                    Style::Grow,
-                    Style::H8,
-                    Style::W9,
-                ])],
-            ),
-            Row::from_cells(
-                vec![Style::JustifyEnd],
-                vec![Button::primary("go back to title page")
-                    .on_click(|_| Msg::ClickedGoBackToTitle)
-                    .cell()],
-            ),
-        ],
-    );
+    let card = ErrorCard::from_title(title)
+        .with_msg(msg)
+        .with_buttons(vec![
+            Button::primary("go back to title page").on_click(|_| Msg::ClickedGoBackToTitle)
+        ])
+        .cell();
 
     vec![center(vec![card])]
 }

@@ -2,22 +2,34 @@
 // Types //
 ////////////////////////////////////////////////////////////////////////////////
 
+use crate::id::Id;
+
 pub enum Endpoint {
     CreateLobby,
+    GetLobby(Id),
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Api //
 ////////////////////////////////////////////////////////////////////////////////
 
-pub const CREATE_LOBBY: &'static str = "/lobby/create";
+pub const LOBBY: &'static str = "/lobby";
+
+// pub const CREATE_LOBBY: &'static str = "/lobby/create";
+//
+// pub const GET_LOBBY: &'static str = "/lobby/get";
 
 pub const ROOT: &'static str = "/api";
 
 impl Endpoint {
-    fn to_pieces<'a>(self) -> &'a [&'a str] {
+    fn to_pieces<'a>(self) -> Vec<String> {
         match self {
-            Endpoint::CreateLobby => &["lobby", "create"],
+            Endpoint::CreateLobby => vec!["lobby".to_string(), "create".to_string()],
+            Endpoint::GetLobby(id) => vec![
+                "lobby".to_string(),
+                "get".to_string(),
+                id.clone().to_string(),
+            ],
         }
     }
 
