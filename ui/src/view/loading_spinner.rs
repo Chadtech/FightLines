@@ -1,8 +1,5 @@
 use crate::style::Style;
 use crate::view::cell::{Cell, Row};
-use seed::dom_entity_names::Tag;
-use seed::prelude::{El, Node};
-use std::borrow::Cow;
 
 pub struct LoadingSpinner;
 

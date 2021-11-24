@@ -1,18 +1,6 @@
-use crate::route::Route;
-use crate::style::Style;
-use crate::view::button::Button;
-use crate::view::card;
-use crate::view::card::Card;
-use crate::view::cell::{Cell, Row};
-use crate::view::loading_spinner::LoadingSpinner;
-use crate::view::textarea::Textarea;
-use crate::{core_ext, global};
-use seed::log;
-use seed::prelude::{fetch, Method, Orders, Request};
-use shared::api::create_lobby;
-use shared::api::create_lobby::Response;
-use shared::api::endpoint::Endpoint;
-use shared::id::Id;
+use crate::global;
+use crate::view::cell::Row;
+use seed::prelude::Orders;
 
 ///////////////////////////////////////////////////////////////
 // Types
@@ -37,7 +25,12 @@ pub fn init() -> Model {
 // Update
 ///////////////////////////////////////////////////////////////
 
-pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
+pub fn update(
+    _global: &global::Model,
+    msg: Msg,
+    _model: &mut Model,
+    _orders: &mut impl Orders<Msg>,
+) {
     match msg {
         Msg::Msg => {}
     }
@@ -47,6 +40,6 @@ pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut 
 // View
 ///////////////////////////////////////////////////////////////
 
-pub fn view(model: &Model) -> Vec<Row<Msg>> {
+pub fn view(_model: &Model) -> Vec<Row<Msg>> {
     vec![]
 }

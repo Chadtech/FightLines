@@ -1,5 +1,6 @@
 #![allow(clippy::wildcard_imports)]
 
+mod api;
 mod core_ext;
 mod global;
 mod page;
@@ -70,7 +71,12 @@ fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders
         Route::ComponentLibrary(sub_route) => {
             Page::ComponentLibrary(component_library::init(sub_route))
         }
-        Route::Lobby(_) => Page::Loading,
+        Route::Lobby(_) => {
+            // TODO fetch lobby
+            orders;
+
+            Page::Loading
+        }
     };
 
     model.page = new_page;

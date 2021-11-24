@@ -7,15 +7,14 @@ use actix_cors::Cors;
 use actix_web::{web, App, HttpResponse, HttpServer};
 use notify::{raw_watcher, RecursiveMode, Watcher};
 
-use crate::model::Model;
 use shared::api::endpoint;
+
+use crate::model::Model;
 
 mod dev;
 mod flags;
 mod lobbies;
-mod lobby;
 mod model;
-mod player;
 mod route;
 mod setting;
 

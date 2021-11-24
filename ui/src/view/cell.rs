@@ -91,7 +91,7 @@ impl<Msg: 'static> Cell<Msg> {
         }
     }
 
-    pub fn with_tag_name(mut self, tag_name: &'static str) -> Cell<Msg> {
+    pub fn with_tag_name(self, tag_name: &'static str) -> Cell<Msg> {
         match self {
             Cell::None => Cell::None,
             Cell::Model(mut model) => {

@@ -1,16 +1,13 @@
 use crate::route::Route;
 use crate::style::Style;
 use crate::view::button::Button;
-use crate::view::card;
 use crate::view::card::Card;
 use crate::view::cell::{Cell, Row};
 use crate::view::loading_spinner::LoadingSpinner;
 use crate::view::textarea::Textarea;
-use crate::{core_ext, global};
-use seed::log;
-use seed::prelude::{fetch, Method, Orders, Request};
+use crate::{api, core_ext, global};
+use seed::prelude::Orders;
 use shared::api::create_lobby;
-use shared::api::create_lobby::Response;
 use shared::api::endpoint::Endpoint;
 use shared::id::Id;
 
@@ -68,7 +65,7 @@ pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut 
                 Ok(request_bytes) => {
                     orders.skip().perform_cmd({
                         async {
-                            let result = match send_request(url, request_bytes).await {
+                            let result = match api::post(url, request_bytes).await {
                                 Ok(response_bytes) => {
                                     match create_lobby::Response::from_bytes(response_bytes) {
                                         Ok(response) => Ok(response),
@@ -93,7 +90,11 @@ pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut 
         }
         Msg::LoadedLobby(result) => match result {
             Ok(response) => {
-                orders.request_url(Route::Lobby(response.get_lobby_id()).to_url());
+                let lobby_id = response.get_lobby_id();
+
+                model.status = Status::NewGameCreated(lobby_id.clone());
+
+                orders.request_url(Route::Lobby(lobby_id).to_url());
             }
             Err(err) => {
                 model.status = Status::CouldNotMakeNewGame(NewGameError::RemoteError(err));
@@ -108,17 +109,6 @@ pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut 
             }
         }
     }
-}
-
-async fn send_request(url: String, bytes: Vec<u8>) -> fetch::Result<Vec<u8>> {
-    Request::new(url.as_str())
-        .method(Method::Post)
-        .text(hex::encode(bytes))
-        .fetch()
-        .await?
-        .check_status()?
-        .bytes()
-        .await
 }
 
 ///////////////////////////////////////////////////////////////
@@ -147,7 +137,7 @@ fn new_game_view() -> Vec<Row<Msg>> {
             Row::from_cells(
                 vec![Style::JustifyEnd],
                 vec![Button::primary("go back to title page")
-                    .on_click(|_| Msg::ClickedGoBackToTitle)
+                    .on_click(|_| Msg::ClickedGoToNewGame)
                     .cell()],
             ),
         ],

@@ -1,9 +1,9 @@
 use actix_web::{web, HttpResponse};
 
-use crate::lobby::Lobby;
 use crate::model::Model;
-use crate::player::Player;
 use shared::api::create_lobby::{Request, Response};
+use shared::lobby::Lobby;
+use shared::player::Player;
 
 pub async fn handle(body: String, data: web::Data<Model>) -> HttpResponse {
     match hex::decode(body) {

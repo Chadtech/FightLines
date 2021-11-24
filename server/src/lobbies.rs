@@ -1,5 +1,5 @@
-use crate::lobby::Lobby;
 use shared::id::Id;
+use shared::lobby::Lobby;
 use shared::rng::{RandGen, RandSeed};
 use std::collections::HashMap;
 
