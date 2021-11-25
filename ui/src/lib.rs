@@ -14,7 +14,7 @@ use page::Page;
 use route::Route;
 use seed::{prelude::*, *};
 use shared::api::endpoint::Endpoint;
-use shared::api::get_lobby;
+use shared::api::lobby::get as get_lobby;
 use style::Style;
 
 ///////////////////////////////////////////////////////////////

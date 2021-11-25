@@ -7,8 +7,8 @@ use crate::view::error_card::ErrorCard;
 use crate::view::loading_spinner::LoadingSpinner;
 use crate::{api, core_ext, global};
 use seed::prelude::Orders;
-use shared::api::create_lobby;
 use shared::api::endpoint::Endpoint;
+use shared::api::lobby::create;
 use shared::id::Id;
 
 ///////////////////////////////////////////////////////////////
@@ -34,7 +34,7 @@ enum NewGameError {
 #[derive(Clone, Debug)]
 pub enum Msg {
     ClickedStartGame,
-    LoadedLobby(Result<create_lobby::Response, String>),
+    LoadedLobby(Result<create::Response, String>),
     ClickedGoBackToTitle,
     ClickedGoToNewGame,
 }
@@ -58,7 +58,7 @@ pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut 
         Msg::ClickedStartGame => {
             model.status = Status::WaitingForNewGame;
 
-            match create_lobby::Request::init(global.viewer_id()).to_bytes() {
+            match create::Request::init(global.viewer_id()).to_bytes() {
                 Ok(request_bytes) => {
                     orders.skip().perform_cmd({
                         async {
@@ -68,10 +68,8 @@ pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut 
                             )
                             .await
                             {
-                                Ok(response_bytes) => {
-                                    create_lobby::Response::from_bytes(response_bytes)
-                                        .map_err(|err| err.to_string())
-                                }
+                                Ok(response_bytes) => create::Response::from_bytes(response_bytes)
+                                    .map_err(|err| err.to_string()),
                                 Err(error) => {
                                     let fetch_error = core_ext::http::fetch_error_to_string(error);
                                     Err(fetch_error)

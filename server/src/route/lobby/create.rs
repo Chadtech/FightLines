@@ -1,7 +1,7 @@
 use actix_web::{web, HttpResponse};
 
 use crate::model::Model;
-use shared::api::create_lobby::{Request, Response};
+use shared::api::lobby::create::{Request, Response};
 use shared::lobby::Lobby;
 use shared::player::Player;
 

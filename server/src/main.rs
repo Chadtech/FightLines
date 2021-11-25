@@ -7,6 +7,7 @@ use actix_cors::Cors;
 use actix_web::{web, App, HttpResponse, HttpServer};
 use notify::{raw_watcher, RecursiveMode, Watcher};
 
+use route::lobby;
 use shared::api::endpoint;
 
 use crate::model::Model;
@@ -44,8 +45,9 @@ async fn main() -> Result<(), String> {
             .service(
                 web::scope(endpoint::ROOT).service(
                     web::scope(endpoint::LOBBY)
-                        .route("/create", web::post().to(route::create_lobby::handle))
-                        .route("/get/{id}", web::get().to(route::get_lobby::handle)),
+                        .route("/create", web::post().to(lobby::create::handle))
+                        .route("/get/{id}", web::get().to(lobby::get::handle))
+                        .route("/join", web::post().to(lobby::join::handle)),
                 ),
             )
             .default_service(web::get().to(frontend))

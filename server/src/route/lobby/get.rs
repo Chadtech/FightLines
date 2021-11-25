@@ -1,7 +1,7 @@
 use actix_web::{web, HttpResponse};
 
 use crate::model::Model;
-use shared::api::get_lobby::Response;
+use shared::api::lobby::get::Response;
 use shared::id::Id;
 
 pub async fn handle(data: web::Data<Model>, url_id: web::Path<(String,)>) -> HttpResponse {
