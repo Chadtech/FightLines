@@ -111,6 +111,9 @@ impl SampleUniform for RandSeed {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl RandSeed {
+    pub fn test() -> RandSeed {
+        RandSeed::from_bytes([0; N])
+    }
     pub fn from_bytes(bytes: [u8; N]) -> RandSeed {
         RandSeed { bytes }
     }
@@ -134,6 +137,9 @@ impl RandSeed {
 }
 
 impl RandGen {
+    pub fn test() -> RandGen {
+        RandGen::from_seed(RandSeed::test())
+    }
     pub fn from_seed(seed: RandSeed) -> RandGen {
         RandGen { seed }
     }
@@ -195,7 +201,7 @@ mod test_rng {
     fn more_than_255_seeds() {
         let seeds_count = 1024;
         let mut seeds: Vec<RandSeed> = Vec::with_capacity(seeds_count);
-        seeds.push(RandSeed::from_bytes([0; N]));
+        seeds.push(RandSeed::test());
 
         let mut index = 0;
 

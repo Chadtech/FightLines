@@ -7,6 +7,7 @@ use crate::id::Id;
 pub enum Endpoint {
     CreateLobby,
     GetLobby(Id),
+    JoinLobby(Id),
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -28,6 +29,11 @@ impl Endpoint {
             Endpoint::GetLobby(id) => vec![
                 "lobby".to_string(),
                 "get".to_string(),
+                id.clone().to_string(),
+            ],
+            Endpoint::JoinLobby(id) => vec![
+                "lobby".to_string(),
+                "join".to_string(),
                 id.clone().to_string(),
             ],
         }

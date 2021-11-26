@@ -23,7 +23,7 @@ enum Status {
     Ready,
     WaitingForNewGame,
     CouldNotMakeNewGame(NewGameError),
-    NewGameCreated(Id),
+    NewGameCreated { lobby_id: Id },
 }
 
 enum NewGameError {
@@ -43,9 +43,18 @@ pub enum Msg {
 // Init
 ///////////////////////////////////////////////////////////////
 
-pub fn init() -> Model {
-    Model {
-        status: Status::Ready,
+impl Model {
+    pub fn init() -> Model {
+        Model {
+            status: Status::Ready,
+        }
+    }
+
+    pub fn just_created_lobby(&self) -> Option<&Id> {
+        match &self.status {
+            Status::NewGameCreated { lobby_id } => Some(lobby_id),
+            _ => None,
+        }
     }
 }
 
@@ -90,7 +99,9 @@ pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut 
             Ok(response) => {
                 let lobby_id = response.get_lobby_id();
 
-                model.status = Status::NewGameCreated(lobby_id.clone());
+                model.status = Status::NewGameCreated {
+                    lobby_id: lobby_id.clone(),
+                };
 
                 orders.request_url(Route::Lobby(lobby_id).to_url());
             }
@@ -102,8 +113,8 @@ pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut 
             orders.request_url(Route::Title.to_url());
         }
         Msg::ClickedGoToNewGame => {
-            if let Status::NewGameCreated(game_id) = &mut model.status {
-                orders.request_url(Route::Lobby(game_id.clone()).to_url());
+            if let Status::NewGameCreated { lobby_id } = &mut model.status {
+                orders.request_url(Route::Lobby(lobby_id.clone()).to_url());
             }
         }
     }
@@ -118,7 +129,7 @@ pub fn view(model: &Model) -> Vec<Row<Msg>> {
         Status::Ready => ready_view(),
         Status::WaitingForNewGame => waiting_for_new_game_view(),
         Status::CouldNotMakeNewGame(error) => new_game_error_view(error),
-        Status::NewGameCreated(_) => new_game_view(),
+        Status::NewGameCreated { lobby_id: _ } => new_game_view(),
     }
 }
 

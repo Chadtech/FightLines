@@ -3,6 +3,7 @@
 mod api;
 mod core_ext;
 mod global;
+mod name;
 mod page;
 mod route;
 mod style;
@@ -15,6 +16,8 @@ use route::Route;
 use seed::{prelude::*, *};
 use shared::api::endpoint::Endpoint;
 use shared::api::lobby::get as get_lobby;
+use shared::api::lobby::join as join_lobby;
+
 use style::Style;
 
 ///////////////////////////////////////////////////////////////
@@ -71,36 +74,76 @@ fn handle_url_change(url: Url, model: &mut Model, orders: &mut impl Orders<Msg>)
 
 fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders<Msg>) {
     let new_page = match route {
-        Route::Title => Page::Title(title::init()),
+        Route::Title => Page::Title(title::Model::init()),
         Route::ComponentLibrary(sub_route) => {
             Page::ComponentLibrary(component_library::init(sub_route))
         }
         Route::Lobby(lobby_id) => {
-            orders.skip().perform_cmd({
-                async {
-                    let result = match api::get(Endpoint::GetLobby(lobby_id).to_url()).await {
-                        Ok(res_bytes) => match get_lobby::Response::from_bytes(res_bytes) {
-                            Ok(res) => Ok(lobby::Flags {
-                                lobby_id: res.get_lobby_id(),
-                                lobby: res.get_lobby(),
-                            }),
-                            Err(err) => Err(err.to_string()),
-                        },
-                        Err(error) => {
-                            // log!(error);
+            match &model.page {
+                Page::Title(sub_model) => {
+                    if sub_model.just_created_lobby() == Some(&lobby_id.clone()) {
+                        orders.skip().perform_cmd({
+                            async {
+                                let result =
+                                    match api::get(Endpoint::GetLobby(lobby_id).to_url()).await {
+                                        Ok(res_bytes) => {
+                                            match get_lobby::Response::from_bytes(res_bytes) {
+                                                Ok(res) => Ok(lobby::Flags {
+                                                    lobby_id: res.get_lobby_id(),
+                                                    lobby: res.get_lobby(),
+                                                }),
+                                                Err(err) => Err(err.to_string()),
+                                            }
+                                        }
+                                        Err(error) => {
+                                            let fetch_error =
+                                                core_ext::http::fetch_error_to_string(error);
+                                            Err(fetch_error)
+                                        }
+                                    };
 
-                            // let error_str = format!("{}", error.into());
-
-                            let fetch_error = core_ext::http::fetch_error_to_string(error);
-                            Err(fetch_error)
-                        }
+                                Msg::LoadedLobby(result)
+                            }
+                        });
+                    }
+                }
+                _ => {
+                    let req: join_lobby::Request = join_lobby::Request {
+                        guest_id: model.global.viewer_id(),
+                        lobby_id: lobby_id.clone(),
                     };
 
-                    log!(result);
+                    let url = Endpoint::JoinLobby(lobby_id.clone()).to_url();
 
-                    Msg::LoadedLobby(result)
+                    match req.to_bytes() {
+                        Ok(bytes) => {
+                            orders.skip().perform_cmd({
+                                async {
+                                    let result = match api::post(url, bytes).await {
+                                        Ok(res_bytes) => {
+                                            match get_lobby::Response::from_bytes(res_bytes) {
+                                                Ok(res) => Ok(lobby::Flags {
+                                                    lobby_id: res.get_lobby_id(),
+                                                    lobby: res.get_lobby(),
+                                                }),
+                                                Err(err) => Err(err.to_string()),
+                                            }
+                                        }
+                                        Err(error) => {
+                                            let fetch_error =
+                                                core_ext::http::fetch_error_to_string(error);
+                                            Err(fetch_error)
+                                        }
+                                    };
+
+                                    Msg::LoadedLobby(result)
+                                }
+                            });
+                        }
+                        Err(_) => {}
+                    }
                 }
-            });
+            }
 
             Page::Loading
         }

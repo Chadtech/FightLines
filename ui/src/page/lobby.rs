@@ -1,5 +1,5 @@
 use crate::global;
-use crate::view::cell::Row;
+use crate::view::cell::{Cell, Row};
 use seed::log;
 use seed::prelude::Orders;
 use shared::id::Id;
@@ -9,7 +9,9 @@ use shared::lobby::Lobby;
 // Types //
 ///////////////////////////////////////////////////////////////
 
-pub struct Model;
+pub struct Model {
+    lobby_id: Id,
+}
 
 #[derive(Clone, Debug)]
 pub enum Msg {
@@ -27,8 +29,9 @@ pub struct Flags {
 ///////////////////////////////////////////////////////////////
 
 pub fn init(flags: Flags) -> Model {
-    log!(flags);
-    Model
+    Model {
+        lobby_id: flags.lobby_id,
+    }
 }
 
 ///////////////////////////////////////////////////////////////
@@ -50,6 +53,7 @@ pub fn update(
 // View //
 ///////////////////////////////////////////////////////////////
 
-pub fn view(_model: &Model) -> Vec<Row<Msg>> {
-    vec![]
+pub fn view(model: &Model) -> Vec<Row<Msg>> {
+    log!("A");
+    vec![Row::from_str(model.lobby_id.to_string().as_str())]
 }

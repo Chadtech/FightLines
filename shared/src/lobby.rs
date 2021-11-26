@@ -1,6 +1,5 @@
 use crate::id::Id;
 use crate::player::Player;
-use actix_web::HttpResponse;
 use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -28,14 +27,6 @@ const MAX_PLAYERS: usize = 4;
 // Api //
 ////////////////////////////////////////////////////////////////////////////////
 
-impl Into<HttpResponse> for AddError {
-    fn into(self) -> HttpResponse {
-        match self {
-            AddError::LobbyIsFull => HttpResponse::Conflict().body("Lobby is full"),
-        }
-    }
-}
-
 impl Lobby {
     pub fn init(host: Player) -> Lobby {
         Lobby {
@@ -44,6 +35,7 @@ impl Lobby {
             game_started: false,
         }
     }
+
     pub fn players(mut self) -> Vec<Player> {
         let mut players = Vec::new();
 
@@ -53,6 +45,7 @@ impl Lobby {
 
         players
     }
+
     pub fn add_guest(&mut self, guest: Player) -> Result<&mut Lobby, AddError> {
         let players = self.clone().players();
 
