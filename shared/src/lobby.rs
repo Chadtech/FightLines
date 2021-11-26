@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct Lobby {
-    host: Player,
-    guests: Vec<Player>,
+    pub host: Player,
+    pub guests: Vec<Player>,
     game_started: bool,
 }
 
@@ -21,11 +21,13 @@ pub enum AddError {
 // Helpers //
 ////////////////////////////////////////////////////////////////////////////////
 
-const MAX_PLAYERS: usize = 4;
+const MAX_PLAYERS: usize = MAX_GUESTS + 1;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Api //
 ////////////////////////////////////////////////////////////////////////////////
+
+pub const MAX_GUESTS: usize = 3;
 
 impl Lobby {
     pub fn init(host: Player) -> Lobby {

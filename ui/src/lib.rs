@@ -1,24 +1,26 @@
 #![allow(clippy::wildcard_imports)]
 
+use seed::{prelude::*, *};
+
+use page::Page;
+use route::Route;
+use shared::api::endpoint::Endpoint;
+use shared::api::lobby::get as get_lobby;
+use shared::api::lobby::join as join_lobby;
+use shared::id::Id;
+use shared::lobby::Lobby;
+use style::Style;
+
+use crate::page::{component_library, error, loading, lobby, not_found, title};
+use crate::view::cell::{Cell, Row};
+
 mod api;
 mod core_ext;
 mod global;
-mod name;
 mod page;
 mod route;
 mod style;
 mod view;
-
-use crate::page::{component_library, error, loading, lobby, not_found, title};
-use crate::view::cell::{Cell, Row};
-use page::Page;
-use route::Route;
-use seed::{prelude::*, *};
-use shared::api::endpoint::Endpoint;
-use shared::api::lobby::get as get_lobby;
-use shared::api::lobby::join as join_lobby;
-
-use style::Style;
 
 ///////////////////////////////////////////////////////////////
 // Types //
@@ -79,73 +81,76 @@ fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders
             Page::ComponentLibrary(component_library::init(sub_route))
         }
         Route::Lobby(lobby_id) => {
-            match &model.page {
-                Page::Title(sub_model) => {
-                    if sub_model.just_created_lobby() == Some(&lobby_id.clone()) {
+            let mut already_loaded_lobby: Option<Lobby> = None;
+
+            let mut join_lobby = || {
+                let req: join_lobby::Request = join_lobby::Request {
+                    guest_id: model.global.viewer_id(),
+                    guest_name: model.global.viewer_name.clone(),
+                    lobby_id: lobby_id.clone(),
+                };
+
+                let url = Endpoint::JoinLobby(lobby_id.clone()).to_url();
+
+                match req.to_bytes() {
+                    Ok(bytes) => {
                         orders.skip().perform_cmd({
                             async {
-                                let result =
-                                    match api::get(Endpoint::GetLobby(lobby_id).to_url()).await {
-                                        Ok(res_bytes) => {
-                                            match get_lobby::Response::from_bytes(res_bytes) {
-                                                Ok(res) => Ok(lobby::Flags {
-                                                    lobby_id: res.get_lobby_id(),
-                                                    lobby: res.get_lobby(),
-                                                }),
-                                                Err(err) => Err(err.to_string()),
-                                            }
+                                let result = match api::post(url, bytes).await {
+                                    Ok(res_bytes) => {
+                                        match get_lobby::Response::from_bytes(res_bytes) {
+                                            Ok(res) => Ok(lobby::Flags {
+                                                lobby_id: res.get_lobby_id(),
+                                                lobby: res.get_lobby(),
+                                            }),
+                                            Err(err) => Err(err.to_string()),
                                         }
-                                        Err(error) => {
-                                            let fetch_error =
-                                                core_ext::http::fetch_error_to_string(error);
-                                            Err(fetch_error)
-                                        }
-                                    };
+                                    }
+                                    Err(error) => {
+                                        let fetch_error =
+                                            core_ext::http::fetch_error_to_string(error);
+                                        Err(fetch_error)
+                                    }
+                                };
 
                                 Msg::LoadedLobby(result)
                             }
                         });
                     }
+
+                    Err(_) => {}
                 }
+            };
+
+            match &model.page {
+                Page::Title(sub_model) => match sub_model.just_created_lobby() {
+                    Some((existing_lobby_id, lobby)) => {
+                        if existing_lobby_id != &lobby_id {
+                            join_lobby()
+                        } else {
+                            already_loaded_lobby = Some(lobby.clone());
+                        }
+                    }
+                    None => {
+                        join_lobby();
+                    }
+                },
                 _ => {
-                    let req: join_lobby::Request = join_lobby::Request {
-                        guest_id: model.global.viewer_id(),
-                        lobby_id: lobby_id.clone(),
+                    join_lobby();
+                }
+            };
+
+            match already_loaded_lobby {
+                Some(lobby) => {
+                    let flags = lobby::Flags {
+                        lobby_id: lobby_id,
+                        lobby,
                     };
 
-                    let url = Endpoint::JoinLobby(lobby_id.clone()).to_url();
-
-                    match req.to_bytes() {
-                        Ok(bytes) => {
-                            orders.skip().perform_cmd({
-                                async {
-                                    let result = match api::post(url, bytes).await {
-                                        Ok(res_bytes) => {
-                                            match get_lobby::Response::from_bytes(res_bytes) {
-                                                Ok(res) => Ok(lobby::Flags {
-                                                    lobby_id: res.get_lobby_id(),
-                                                    lobby: res.get_lobby(),
-                                                }),
-                                                Err(err) => Err(err.to_string()),
-                                            }
-                                        }
-                                        Err(error) => {
-                                            let fetch_error =
-                                                core_ext::http::fetch_error_to_string(error);
-                                            Err(fetch_error)
-                                        }
-                                    };
-
-                                    Msg::LoadedLobby(result)
-                                }
-                            });
-                        }
-                        Err(_) => {}
-                    }
+                    Page::Lobby(lobby::Model::init(flags))
                 }
+                None => Page::Loading,
             }
-
-            Page::Loading
         }
     };
 
@@ -173,7 +178,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
         }
         Msg::Lobby(sub_msg) => {
             if let Page::Lobby(sub_model) = &mut model.page {
-                page::lobby::update(
+                lobby::update(
                     &model.global,
                     sub_msg,
                     sub_model,
@@ -183,7 +188,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
         }
         Msg::LoadedLobby(result) => match result {
             Ok(flags) => {
-                let sub_model = lobby::init(flags);
+                let sub_model = lobby::Model::init(flags);
 
                 model.page = Page::Lobby(sub_model);
             }
@@ -212,7 +217,7 @@ fn view(model: &Model) -> Node<Msg> {
             .collect(),
 
         Page::ComponentLibrary(sub_model) => component_library::view(sub_model),
-        Page::Lobby(sub_model) => lobby::view(sub_model)
+        Page::Lobby(sub_model) => lobby::view(&model.global, sub_model)
             .into_iter()
             .map(|row| row.map_msg(Msg::Lobby))
             .collect(),
@@ -227,16 +232,17 @@ fn view(model: &Model) -> Node<Msg> {
 
     let mut page_styles: Vec<Style> = Vec::new();
 
-    match &model.page {
-        Page::Title(_) => page_styles.append(&mut title::PARENT_STYLES.to_vec()),
-        Page::NotFound => page_styles.append(&mut not_found::PARENT_STYLES.to_vec()),
-        Page::Lobby(_) => {}
-        Page::ComponentLibrary(_) => {}
-        Page::Blank => {}
-        Page::Loading => page_styles.append(&mut loading::PARENT_STYLES.to_vec()),
-        Page::Error(_) => page_styles.append(&mut error::PARENT_STYLES.to_vec()),
-    }
+    let mut from_page = match &model.page {
+        Page::Title(_) => title::PARENT_STYLES.to_vec(),
+        Page::NotFound => not_found::PARENT_STYLES.to_vec(),
+        Page::Lobby(_) => lobby::PARENT_STYLES.to_vec(),
+        Page::ComponentLibrary(_) => vec![],
+        Page::Blank => vec![],
+        Page::Loading => loading::PARENT_STYLES.to_vec(),
+        Page::Error(_) => error::PARENT_STYLES.to_vec(),
+    };
 
+    page_styles.append(&mut from_page);
     page_styles.append(&mut vec![Style::Grow]);
 
     div![

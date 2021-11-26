@@ -1,5 +1,6 @@
 use crate::id::Id;
 use crate::lobby::Lobby;
+use crate::name::Name;
 use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////
@@ -9,6 +10,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
 pub struct Request {
     pub guest_id: Id,
+    pub guest_name: Name,
     pub lobby_id: Id,
 }
 

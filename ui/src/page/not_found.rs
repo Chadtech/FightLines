@@ -21,8 +21,8 @@ pub fn view<Msg: 'static + Clone>() -> Vec<Row<Msg>> {
     ]
 }
 
-fn center<Msg: 'static>(cells: Cell<Msg>) -> Row<Msg> {
-    Row::from_cells(vec![Style::JustifyCenter], vec![cells])
+fn center<Msg: 'static>(cell: Cell<Msg>) -> Row<Msg> {
+    Row::from_cells(vec![Style::JustifyCenter], vec![cell])
 }
 
 pub const PARENT_STYLES: [Style; 2] = [Style::JustifyCenter, Style::G3];

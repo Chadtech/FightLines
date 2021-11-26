@@ -3,6 +3,7 @@ use actix_web::{web, HttpResponse};
 use crate::model::Model;
 use shared::api::lobby::create::{Request, Response};
 use shared::lobby::Lobby;
+use shared::name::Name;
 use shared::player::Player;
 
 pub async fn handle(body: String, data: web::Data<Model>) -> HttpResponse {
@@ -16,14 +17,14 @@ pub async fn handle(body: String, data: web::Data<Model>) -> HttpResponse {
 }
 
 async fn from_req(request: Request, data: web::Data<Model>) -> HttpResponse {
-    let host = Player::new(request.host_id());
+    let host = Player::new(request.host_id(), Name::from_str("host"));
     let new_lobby = Lobby::init(host);
 
     let mut lobbies = data.lobbies.lock().unwrap();
 
-    let lobby_id = lobbies.new_lobby(new_lobby);
+    let lobby_id = lobbies.new_lobby(new_lobby.clone());
 
-    match Response::init(lobby_id).to_bytes() {
+    match Response::init(lobby_id, new_lobby).to_bytes() {
         Ok(response_bytes) => HttpResponse::Ok()
             .header("Content-Type", "application/octet-stream")
             .body(response_bytes),

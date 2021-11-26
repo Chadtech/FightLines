@@ -2,7 +2,7 @@ use actix_web::{web, HttpResponse};
 
 use crate::model::Model;
 use shared::api::lobby::join::{Request, Response};
-use shared::lobby::{AddError, Lobby};
+use shared::lobby::AddError;
 use shared::player::Player;
 
 pub async fn handle(body: String, data: web::Data<Model>) -> HttpResponse {
@@ -16,7 +16,7 @@ pub async fn handle(body: String, data: web::Data<Model>) -> HttpResponse {
 }
 
 async fn from_req(req: Request, data: web::Data<Model>) -> HttpResponse {
-    let guest = Player::new(req.guest_id);
+    let guest = Player::new(req.guest_id, req.guest_name);
 
     let mut lobbies = data.lobbies.lock().unwrap();
 

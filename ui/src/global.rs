@@ -1,9 +1,7 @@
-use crate::name::Name;
-use rand::distributions::uniform::UniformInt;
 use rand::Rng;
 use seed::browser::web_storage::{LocalStorage, WebStorage, WebStorageError};
-use seed::log;
 use shared::id::Id;
+use shared::name::Name;
 use shared::rng::{RandGen, RandSeed};
 
 ///////////////////////////////////////////////////////////////
@@ -12,7 +10,7 @@ use shared::rng::{RandGen, RandSeed};
 
 pub struct Model {
     viewer_id: Id,
-    viewer_name: Name,
+    pub viewer_name: Name,
     random_seed: RandSeed,
 }
 

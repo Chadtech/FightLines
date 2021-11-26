@@ -1,12 +1,11 @@
-use rand::distributions::uniform::{SampleBorrow, SampleUniform, UniformInt, UniformSampler};
-use rand::distributions::{Distribution, Standard};
-use rand::Rng;
-use shared::rng::RandGen;
+use crate::rng::RandGen;
+use serde::{Deserialize, Serialize};
 
 ///////////////////////////////////////////////////////////////
 // Types //
 ///////////////////////////////////////////////////////////////
 
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct Name(String);
 
 ///////////////////////////////////////////////////////////////
@@ -24,6 +23,10 @@ impl Name {
 
     pub fn from_string(s: String) -> Name {
         Name(s)
+    }
+
+    pub fn from_str(s: &str) -> Name {
+        Name(s.to_string())
     }
 
     pub fn to_string(&self) -> String {

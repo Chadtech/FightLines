@@ -1,4 +1,5 @@
 use crate::id::Id;
+use crate::lobby::Lobby;
 use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////
@@ -32,16 +33,13 @@ impl Request {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Response {
-    lobby_id: Id,
+    pub lobby_id: Id,
+    pub lobby: Lobby,
 }
 
 impl Response {
-    pub fn init(lobby_id: Id) -> Response {
-        Response { lobby_id }
-    }
-
-    pub fn get_lobby_id(&self) -> Id {
-        self.lobby_id.clone()
+    pub fn init(lobby_id: Id, lobby: Lobby) -> Response {
+        Response { lobby_id, lobby }
     }
 
     pub fn to_bytes(&self) -> bincode::Result<Vec<u8>> {
@@ -57,12 +55,19 @@ impl Response {
 mod test_create_lobby {
     use crate::api::lobby::create::Response;
     use crate::id::Id;
+    use crate::lobby::Lobby;
+    use crate::player::Player;
 
     #[test]
     fn response_encodes_and_decodes() {
-        let id = Id::from_int_test_only(0);
+        let lobby_id = Id::from_int_test_only(0);
 
-        let response = Response::init(id);
+        let response = Response::init(
+            lobby_id,
+            Lobby {
+                host: Player::new(Id::from_int_test_only(1), guests: Vec::new()),
+            },
+        );
 
         let bytes = response.to_bytes().unwrap();
 

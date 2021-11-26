@@ -41,6 +41,7 @@ body {
     --s-7: 128px;
     --s-8: 256px;
     --s-9: 512px;
+    --s-a: 1024px;
 
     background-color: var(--bg-1);
 
@@ -172,6 +173,10 @@ a.button {
 
 .w-9 {
     width: var(--s-9);
+}
+
+.w-a {
+    width: var(--s-a);
 }
 
 .w-full {
