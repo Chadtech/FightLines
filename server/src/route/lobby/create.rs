@@ -17,7 +17,7 @@ pub async fn handle(body: String, data: web::Data<Model>) -> HttpResponse {
 }
 
 async fn from_req(request: Request, data: web::Data<Model>) -> HttpResponse {
-    let host = Player::new(request.host_id(), Name::from_str("host"));
+    let host = Player::new(request.host_id(), request.host_name);
     let new_lobby = Lobby::init(host);
 
     let mut lobbies = data.lobbies.lock().unwrap();

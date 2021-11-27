@@ -187,12 +187,12 @@ a.button {
     background-color: var(--content-0);
 }
 
-.bg-content-4 {
-    background-color: var(--content-4);
-}
-
 .bg-content-1 {
     background-color: var(--content-1);
+}
+
+.bg-content-4 {
+    background-color: var(--content-4);
 }
 
 .bg-background-0 {

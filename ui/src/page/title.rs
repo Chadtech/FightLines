@@ -68,7 +68,7 @@ pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut 
         Msg::ClickedStartGame => {
             model.status = Status::WaitingForNewGame;
 
-            match create::Request::init(global.viewer_id()).to_bytes() {
+            match create::Request::init(global.viewer_id(), global.viewer_name.clone()).to_bytes() {
                 Ok(request_bytes) => {
                     orders.skip().perform_cmd({
                         async {

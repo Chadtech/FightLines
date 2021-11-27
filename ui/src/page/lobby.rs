@@ -86,7 +86,9 @@ pub fn view(global: &global::Model, model: &Model) -> Vec<Row<Msg>> {
 }
 
 fn empty_slot() -> Cell<Msg> {
-    Card::cell_from_rows(vec![CARD_WIDTH], vec![])
+    Card::init()
+        .disable(true)
+        .cell(vec![Style::BgContent0, CARD_WIDTH], vec![])
 }
 
 pub fn guest_card(guest: Player) -> Cell<Msg> {
@@ -99,7 +101,7 @@ pub fn host_card(global: &global::Model, viewer_is_host: bool, model: &Model) ->
     let name_row = if viewer_is_host {
         Row::from_cells(vec![], vec![])
     } else {
-        Row::from_str(global.viewer_name.to_string().as_str())
+        Row::from_str(model.lobby.host.name.to_string().as_str())
     };
 
     player_card(vec![name_row])

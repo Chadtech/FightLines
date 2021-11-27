@@ -52,6 +52,7 @@ mod test_lobbies {
     use crate::lobbies::Lobbies;
     use shared::id::Id;
     use shared::lobby::Lobby;
+    use shared::name::Name;
     use shared::player::Player;
     use shared::rng::{RandGen, RandSeed};
 
@@ -61,11 +62,11 @@ mod test_lobbies {
 
         let mut lobbies = Lobbies::init(RandSeed::next(&mut rng));
 
-        let host = Player::new(Id::new(&mut rng));
+        let host = Player::new(Id::new(&mut rng), Name::from_str("host"));
 
         let lobby_id = lobbies.new_lobby(Lobby::init(host.clone()));
 
-        let guest = Player::new(Id::new(&mut rng));
+        let guest = Player::new(Id::new(&mut rng), Name::from_str("guest"));
 
         let lobby = lobbies
             .get_lobby(lobby_id.clone())

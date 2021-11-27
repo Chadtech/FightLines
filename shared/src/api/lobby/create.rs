@@ -1,5 +1,6 @@
 use crate::id::Id;
 use crate::lobby::Lobby;
+use crate::name::Name;
 use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////
@@ -9,11 +10,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
 pub struct Request {
     host_id: Id,
+    pub host_name: Name,
 }
 
 impl Request {
-    pub fn init(host_id: Id) -> Request {
-        Request { host_id }
+    pub fn init(host_id: Id, host_name: Name) -> Request {
+        Request { host_id, host_name }
     }
 
     pub fn host_id(&self) -> Id {
@@ -56,6 +58,7 @@ mod test_create_lobby {
     use crate::api::lobby::create::Response;
     use crate::id::Id;
     use crate::lobby::Lobby;
+    use crate::name::Name;
     use crate::player::Player;
 
     #[test]
@@ -64,9 +67,10 @@ mod test_create_lobby {
 
         let response = Response::init(
             lobby_id,
-            Lobby {
-                host: Player::new(Id::from_int_test_only(1), guests: Vec::new()),
-            },
+            Lobby::init(Player::new(
+                Id::from_int_test_only(1),
+                Name::from_str("host"),
+            )),
         );
 
         let bytes = response.to_bytes().unwrap();
