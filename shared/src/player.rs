@@ -1,4 +1,3 @@
-use crate::id::Id;
 use crate::name::Name;
 use serde::{Deserialize, Serialize};
 
@@ -8,7 +7,6 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct Player {
-    pub id: Id,
     pub name: Name,
 }
 
@@ -17,7 +15,7 @@ pub struct Player {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl Player {
-    pub fn new(id: Id, name: Name) -> Player {
-        Player { id, name }
+    pub fn new(name: Name) -> Player {
+        Player { name }
     }
 }

@@ -2,7 +2,7 @@ use crate::global;
 use crate::style::Style;
 use crate::view::card::Card;
 use crate::view::cell::{Cell, Row};
-use seed::log;
+use crate::view::loading_spinner::LoadingSpinner;
 use seed::prelude::Orders;
 use shared::id::Id;
 use shared::lobby::{Lobby, MAX_GUESTS};
@@ -40,7 +40,7 @@ impl Model {
         }
     }
     pub fn viewer_is_host(&self, global: &global::Model) -> bool {
-        self.lobby.host.id == global.viewer_id()
+        self.lobby.host_id == global.viewer_id()
     }
 }
 
@@ -68,11 +68,11 @@ pub fn view(global: &global::Model, model: &Model) -> Vec<Row<Msg>> {
 
     let viewer_is_host = model.viewer_is_host(global);
 
-    rows.push(center(host_card(global, viewer_is_host, model)));
+    rows.push(center(host_card(viewer_is_host, model)));
 
     let guests = &model.lobby.guests;
 
-    for guest in guests {
+    for (_, guest) in guests.into_iter() {
         let guest_row = center(guest_card(guest.clone()));
 
         rows.push(guest_row)
@@ -86,9 +86,12 @@ pub fn view(global: &global::Model, model: &Model) -> Vec<Row<Msg>> {
 }
 
 fn empty_slot() -> Cell<Msg> {
-    Card::init()
-        .disable(true)
-        .cell(vec![Style::BgContent0, CARD_WIDTH], vec![])
+    let cells = vec![Cell::from_str(vec![], "empty slot"), LoadingSpinner::cell()];
+
+    Card::init().disable(true).cell(
+        vec![Style::BgContent0, CARD_WIDTH],
+        vec![Row::from_cells(vec![], cells)],
+    )
 }
 
 pub fn guest_card(guest: Player) -> Cell<Msg> {
@@ -97,7 +100,7 @@ pub fn guest_card(guest: Player) -> Cell<Msg> {
     player_card(vec![name_row])
 }
 
-pub fn host_card(global: &global::Model, viewer_is_host: bool, model: &Model) -> Cell<Msg> {
+pub fn host_card(viewer_is_host: bool, model: &Model) -> Cell<Msg> {
     let name_row = if viewer_is_host {
         Row::from_cells(vec![], vec![])
     } else {

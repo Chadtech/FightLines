@@ -3,7 +3,6 @@ use actix_web::{web, HttpResponse};
 use crate::model::Model;
 use shared::api::lobby::create::{Request, Response};
 use shared::lobby::Lobby;
-use shared::name::Name;
 use shared::player::Player;
 
 pub async fn handle(body: String, data: web::Data<Model>) -> HttpResponse {
@@ -17,8 +16,8 @@ pub async fn handle(body: String, data: web::Data<Model>) -> HttpResponse {
 }
 
 async fn from_req(request: Request, data: web::Data<Model>) -> HttpResponse {
-    let host = Player::new(request.host_id(), request.host_name);
-    let new_lobby = Lobby::init(host);
+    let host = Player::new(request.host_name.clone());
+    let new_lobby = Lobby::init(request.host_id(), host);
 
     let mut lobbies = data.lobbies.lock().unwrap();
 

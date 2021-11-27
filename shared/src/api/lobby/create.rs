@@ -67,10 +67,10 @@ mod test_create_lobby {
 
         let response = Response::init(
             lobby_id,
-            Lobby::init(Player::new(
+            Lobby::init(
                 Id::from_int_test_only(1),
-                Name::from_str("host"),
-            )),
+                Player::new(Name::from_str("host")),
+            ),
         );
 
         let bytes = response.to_bytes().unwrap();

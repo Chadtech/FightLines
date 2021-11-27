@@ -16,14 +16,14 @@ pub async fn handle(body: String, data: web::Data<Model>) -> HttpResponse {
 }
 
 async fn from_req(req: Request, data: web::Data<Model>) -> HttpResponse {
-    let guest = Player::new(req.guest_id, req.guest_name);
+    let guest = Player::new(req.guest_name);
 
     let mut lobbies = data.lobbies.lock().unwrap();
 
     match &mut lobbies.get_lobby(req.lobby_id.clone()) {
         None => HttpResponse::NotFound().body("Lobby not found"),
         Some(lobby) => {
-            let lobby_result = lobby.add_guest(guest);
+            let lobby_result = lobby.add_guest(req.guest_id, guest);
 
             match lobby_result.map(|l| l.clone()) {
                 Ok(lobby) => {

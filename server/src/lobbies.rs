@@ -62,23 +62,36 @@ mod test_lobbies {
 
         let mut lobbies = Lobbies::init(RandSeed::next(&mut rng));
 
-        let host = Player::new(Id::new(&mut rng), Name::from_str("host"));
+        let host = Player::new(Name::from_str("host"));
+        let host_id = Id::new(&mut rng);
 
-        let lobby_id = lobbies.new_lobby(Lobby::init(host.clone()));
+        let lobby_id = lobbies.new_lobby(Lobby::init(host_id.clone(), host.clone()));
 
-        let guest = Player::new(Id::new(&mut rng), Name::from_str("guest"));
+        let guest = Player::new(Name::from_str("guest"));
+        let guest_id = Id::new(&mut rng);
 
         let lobby = lobbies
             .get_lobby(lobby_id.clone())
             .unwrap()
-            .add_guest(guest.clone())
+            .add_guest(guest_id.clone(), guest.clone())
             .unwrap_or_else(|_| panic!("Lobby does not exist"))
             .clone();
 
         lobbies.upsert(lobby_id.clone(), lobby);
 
-        let players = lobbies.get_lobby(lobby_id).unwrap().players();
+        let mut players: Vec<(Id, Player)> = lobbies
+            .get_lobby(lobby_id)
+            .unwrap()
+            .players()
+            .into_iter()
+            .collect();
 
-        assert_eq!(players, vec![host, guest])
+        players.sort_by_key(|(_, p)| p.name.clone());
+
+        let mut expectation = vec![(guest_id, guest), (host_id, host)];
+
+        expectation.sort_by_key(|(_, p)| p.name.clone());
+
+        assert_eq!(players, expectation)
     }
 }

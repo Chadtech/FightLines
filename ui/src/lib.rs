@@ -7,7 +7,6 @@ use route::Route;
 use shared::api::endpoint::Endpoint;
 use shared::api::lobby::get as get_lobby;
 use shared::api::lobby::join as join_lobby;
-use shared::id::Id;
 use shared::lobby::Lobby;
 use style::Style;
 

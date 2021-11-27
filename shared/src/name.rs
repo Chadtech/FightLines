@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 // Types //
 ///////////////////////////////////////////////////////////////
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
 pub struct Name(String);
 
 ///////////////////////////////////////////////////////////////

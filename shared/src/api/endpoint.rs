@@ -16,14 +16,10 @@ pub enum Endpoint {
 
 pub const LOBBY: &'static str = "/lobby";
 
-// pub const CREATE_LOBBY: &'static str = "/lobby/create";
-//
-// pub const GET_LOBBY: &'static str = "/lobby/get";
-
 pub const ROOT: &'static str = "/api";
 
 impl Endpoint {
-    fn to_pieces<'a>(self) -> Vec<String> {
+    fn to_pieces(self) -> Vec<String> {
         match self {
             Endpoint::CreateLobby => vec!["lobby".to_string(), "create".to_string()],
             Endpoint::GetLobby(id) => vec![
