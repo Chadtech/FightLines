@@ -135,6 +135,14 @@ a.button {
     border-right: var(--s-1) solid var(--content-2);
 }
 
+.border-content-1 {
+    border: var(--s-1) solid var(--content-1);
+}
+
+.border-content-2 {
+    border: var(--s-1) solid var(--content-2);
+}
+
 .p-2 {
     padding: var(--s-2);
 }

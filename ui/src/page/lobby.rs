@@ -1,5 +1,6 @@
 use crate::global;
 use crate::style::Style;
+use crate::view::button::Button;
 use crate::view::card::Card;
 use crate::view::cell::{Cell, Row};
 use crate::view::loading_spinner::LoadingSpinner;
@@ -19,7 +20,8 @@ pub struct Model {
 
 #[derive(Clone, Debug)]
 pub enum Msg {
-    Msg,
+    ClickedAddSlot,
+    ClickedCloseSlot,
 }
 
 #[derive(Clone, Debug)]
@@ -55,7 +57,13 @@ pub fn update(
     _orders: &mut impl Orders<Msg>,
 ) {
     match msg {
-        Msg::Msg => {}
+        Msg::ClickedAddSlot => {
+            // TODO
+        }
+        Msg::ClickedCloseSlot => {
+
+            // TODO
+        }
     }
 }
 
@@ -68,9 +76,13 @@ pub fn view(global: &global::Model, model: &Model) -> Vec<Row<Msg>> {
 
     let viewer_is_host = model.viewer_is_host(global);
 
-    rows.push(center(host_card(viewer_is_host, model)));
+    let lobby = &model.lobby;
 
-    let guests = &model.lobby.guests;
+    let guests = &lobby.guests;
+
+    rows.push(center(header(viewer_is_host, lobby.clone())));
+
+    rows.push(center(host_card(viewer_is_host, model)));
 
     for (_, guest) in guests.into_iter() {
         let guest_row = center(guest_card(guest.clone()));
@@ -78,19 +90,51 @@ pub fn view(global: &global::Model, model: &Model) -> Vec<Row<Msg>> {
         rows.push(guest_row)
     }
 
-    for _ in 0..(MAX_GUESTS - guests.len()) {
-        rows.push(center(empty_slot()))
+    let max_num_guests = lobby.num_players_limit - 1;
+
+    for _ in 0..(max_num_guests - lobby.num_guests()) {
+        rows.push(center(open_slot(viewer_is_host)))
+    }
+
+    if lobby.num_guests() < max_num_guests && viewer_is_host {
+        rows.push(center(add_slot_row()))
     }
 
     rows
 }
 
-fn empty_slot() -> Cell<Msg> {
-    let cells = vec![Cell::from_str(vec![], "empty slot"), LoadingSpinner::cell()];
+fn header(viewer_is_host: bool, lobby: Lobby) -> Cell<Msg> {
+    let mut msg = String::new();
+    msg.push_str("Lobby for \"");
+    msg.push_str(lobby.name.as_str());
+    msg.push('"');
 
-    Card::init().disable(true).cell(
-        vec![Style::BgContent0, CARD_WIDTH],
-        vec![Row::from_cells(vec![], cells)],
+    Cell::from_str(vec![CARD_WIDTH], msg.as_str())
+}
+
+fn add_slot_row() -> Cell<Msg> {
+    Cell::group(
+        vec![CARD_WIDTH],
+        vec![Button::simple("add slot")
+            .on_click(|_| Msg::ClickedAddSlot)
+            .cell()],
+    )
+}
+
+fn open_slot(viewer_is_host: bool) -> Cell<Msg> {
+    let cells = vec![
+        Cell::from_str(
+            vec![Style::FlexCol, Style::Grow, Style::JustifyCenter],
+            "open slot",
+        ),
+        Button::simple("close")
+            .on_click(|_| Msg::ClickedCloseSlot)
+            .cell(),
+    ];
+
+    Cell::group(
+        vec![Style::BorderContent2, Style::FlexRow, Style::P4, CARD_WIDTH],
+        cells,
     )
 }
 

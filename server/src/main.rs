@@ -56,7 +56,8 @@ async fn main() -> Result<(), String> {
                     web::scope(endpoint::LOBBY)
                         .route("/create", web::post().to(lobby::create::handle))
                         .route("/get/{id}", web::get().to(lobby::get::handle))
-                        .route("/join/{id}", web::post().to(lobby::join::handle)),
+                        .route("/join/{id}", web::post().to(lobby::join::handle))
+                        .route("/update", web::post().to(lobby::update::handle)),
                 ),
             )
             .default_service(web::get().to(frontend))
