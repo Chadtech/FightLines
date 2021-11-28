@@ -1,6 +1,5 @@
 use crate::id::Id;
 use crate::lobby::{Lobby, Update};
-use crate::name::Name;
 use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////

@@ -18,6 +18,7 @@ use shared::api::endpoint;
 use crate::model::Model;
 use actix::StreamHandler;
 use actix_web::rt::time::Instant;
+use shared::api::endpoint::Endpoint;
 use std::time::Duration;
 
 mod dev;
@@ -52,13 +53,23 @@ async fn main() -> Result<(), String> {
             .route("/package_bg.wasm", web::get().to(wasm_asset_route))
             .route("/ws/", web::get().to(handle_websocket))
             .service(
-                web::scope(endpoint::ROOT).service(
-                    web::scope(endpoint::LOBBY)
-                        .route("/create", web::post().to(lobby::create::handle))
-                        .route("/get/{id}", web::get().to(lobby::get::handle))
-                        .route("/join/{id}", web::post().to(lobby::join::handle))
-                        .route("/update", web::post().to(lobby::update::handle)),
-                ),
+                web::scope(endpoint::ROOT)
+                    .route(
+                        Endpoint::CreateLobby.to_string().as_str(),
+                        web::post().to(lobby::create::handle),
+                    )
+                    .route(
+                        Endpoint::template_get_lobby().to_string().as_str(),
+                        web::get().to(lobby::get::handle),
+                    )
+                    .route(
+                        Endpoint::template_join_lobby().to_string().as_str(),
+                        web::post().to(lobby::join::handle),
+                    )
+                    .route(
+                        Endpoint::update_lobby().to_string().as_str(),
+                        web::post().to(lobby::update::handle),
+                    ),
             )
             .default_service(web::get().to(frontend))
     })

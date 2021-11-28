@@ -6,6 +6,7 @@ use crate::view::cell::{Cell, Row};
 use crate::view::error_card::ErrorCard;
 use crate::view::loading_spinner::LoadingSpinner;
 use crate::{api, core_ext, global};
+use seed::log;
 use seed::prelude::Orders;
 use shared::api::endpoint::Endpoint;
 use shared::api::lobby::create;
@@ -64,6 +65,7 @@ impl Model {
 ///////////////////////////////////////////////////////////////
 
 pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
+    log!(msg);
     match msg {
         Msg::ClickedStartGame => {
             model.status = Status::WaitingForNewGame;

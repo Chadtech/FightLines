@@ -1,12 +1,15 @@
-use crate::global;
 use crate::style::Style;
 use crate::view::button::Button;
 use crate::view::card::Card;
 use crate::view::cell::{Cell, Row};
-use crate::view::loading_spinner::LoadingSpinner;
+use crate::{api, core_ext, global};
+use seed::log;
 use seed::prelude::Orders;
+use shared::api::endpoint::Endpoint;
+use shared::api::lobby::update as lobby_update;
 use shared::id::Id;
-use shared::lobby::{Lobby, MAX_GUESTS};
+use shared::lobby;
+use shared::lobby::Lobby;
 use shared::player::Player;
 
 ///////////////////////////////////////////////////////////////
@@ -22,6 +25,7 @@ pub struct Model {
 pub enum Msg {
     ClickedAddSlot,
     ClickedCloseSlot,
+    UpdatedLobby(Result<lobby_update::Response, String>),
 }
 
 #[derive(Clone, Debug)]
@@ -50,21 +54,55 @@ impl Model {
 // Update //
 ///////////////////////////////////////////////////////////////
 
-pub fn update(
-    _global: &global::Model,
-    msg: Msg,
-    _model: &mut Model,
-    _orders: &mut impl Orders<Msg>,
-) {
+pub fn update(_global: &global::Model, msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
+    log!(msg);
     match msg {
         Msg::ClickedAddSlot => {
-            // TODO
+            send_updates(model.lobby_id.clone(), vec![lobby::Update::AddSlot], orders);
         }
         Msg::ClickedCloseSlot => {
-
-            // TODO
+            send_updates(
+                model.lobby_id.clone(),
+                vec![lobby::Update::CloseSlot],
+                orders,
+            );
         }
+        Msg::UpdatedLobby(result) => match result {
+            Ok(res) => {
+                model.lobby = res.get_lobby();
+            }
+            Err(_) => {}
+        },
     }
+}
+
+fn send_updates(lobby_id: Id, upts: Vec<lobby::Update>, orders: &mut impl Orders<Msg>) {
+    let req = lobby_update::Request {
+        lobby_id: lobby_id.clone(),
+        updates: upts,
+    };
+
+    match req.to_bytes() {
+        Ok(request_bytes) => {
+            orders.skip().perform_cmd({
+                async {
+                    let result = match api::post(Endpoint::update_lobby().to_url(), request_bytes)
+                        .await
+                    {
+                        Ok(response_bytes) => lobby_update::Response::from_bytes(response_bytes)
+                            .map_err(|err| err.to_string()),
+                        Err(error) => {
+                            let fetch_error = core_ext::http::fetch_error_to_string(error);
+                            Err(fetch_error)
+                        }
+                    };
+
+                    Msg::UpdatedLobby(result)
+                }
+            });
+        }
+        Err(_) => {}
+    };
 }
 
 ///////////////////////////////////////////////////////////////

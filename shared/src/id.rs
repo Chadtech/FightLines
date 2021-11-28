@@ -69,18 +69,6 @@ impl Id {
         Id { bytes: [0; N] }
     }
 
-    pub fn to_display_string(&self) -> String {
-        let mut buf = String::new();
-
-        for byte in self.bytes {
-            let hex: String = format!("{:02X}", byte);
-
-            buf.push_str(hex.as_str());
-        }
-
-        buf
-    }
-
     pub fn from_int_test_only(n: u8) -> Id {
         Id {
             bytes: [n, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -90,7 +78,15 @@ impl Id {
 
 impl fmt::Display for Id {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.to_display_string())
+        let mut buf = String::new();
+
+        for byte in self.bytes {
+            let hex: String = format!("{:02X}", byte);
+
+            buf.push_str(hex.as_str());
+        }
+
+        write!(f, "{}", buf)
     }
 }
 
@@ -156,10 +152,18 @@ mod test_id {
 
     #[test]
     fn can_make_id_from_string() {
-        let maybe_id = Id::from_string("6D5B5DBFF37475EFE4C09C075A968A54".to_string());
+        let id_string = "6D5B5DBFF37475EFE4C09C075A968A54".to_string();
+        let maybe_id = Id::from_string(id_string.clone());
 
-        if maybe_id.is_none() {
-            panic!("Could not make id from string");
+        if maybe_id.is_none() {}
+
+        match maybe_id {
+            None => {
+                panic!("Could not make id from string");
+            }
+            Some(id) => {
+                assert_eq!(id.to_string(), id_string);
+            }
         }
     }
 

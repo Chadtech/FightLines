@@ -89,7 +89,7 @@ fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders
                     lobby_id: lobby_id.clone(),
                 };
 
-                let url = Endpoint::JoinLobby(lobby_id.clone()).to_url();
+                let url = Endpoint::join_lobby(lobby_id.clone()).to_url();
 
                 match req.to_bytes() {
                     Ok(bytes) => {

@@ -2,8 +2,7 @@ use actix_web::{web, HttpResponse};
 
 use crate::model::Model;
 use shared::api::lobby::update::{Request, Response};
-use shared::lobby::{AddError, UpdateError};
-use shared::player::Player;
+use shared::lobby::UpdateError;
 
 pub async fn handle(body: String, data: web::Data<Model>) -> HttpResponse {
     match hex::decode(body) {
