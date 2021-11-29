@@ -55,17 +55,18 @@ impl Model {
 ///////////////////////////////////////////////////////////////
 
 pub fn update(_global: &global::Model, msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
-    log!(msg);
     match msg {
         Msg::ClickedAddSlot => {
             send_updates(model.lobby_id.clone(), vec![lobby::Update::AddSlot], orders);
         }
         Msg::ClickedCloseSlot => {
-            send_updates(
-                model.lobby_id.clone(),
-                vec![lobby::Update::CloseSlot],
-                orders,
-            );
+            if !model.lobby.at_player_count_minimum() {
+                send_updates(
+                    model.lobby_id.clone(),
+                    vec![lobby::Update::CloseSlot],
+                    orders,
+                );
+            }
         }
         Msg::UpdatedLobby(result) => match result {
             Ok(res) => {
@@ -128,13 +129,16 @@ pub fn view(global: &global::Model, model: &Model) -> Vec<Row<Msg>> {
         rows.push(guest_row)
     }
 
-    let max_num_guests = lobby.num_players_limit - 1;
+    let num_guests_limit = lobby.num_guests_limit();
 
-    for _ in 0..(max_num_guests - lobby.num_guests()) {
-        rows.push(center(open_slot(viewer_is_host)))
+    for _ in 0..(num_guests_limit - lobby.num_guests()) {
+        rows.push(center(open_slot(
+            viewer_is_host,
+            lobby.at_player_count_minimum(),
+        )))
     }
 
-    if lobby.num_guests() < max_num_guests && viewer_is_host {
+    if lobby.num_guests() < num_guests_limit && viewer_is_host {
         rows.push(center(add_slot_row()))
     }
 
@@ -159,15 +163,27 @@ fn add_slot_row() -> Cell<Msg> {
     )
 }
 
-fn open_slot(viewer_is_host: bool) -> Cell<Msg> {
+fn open_slot(viewer_is_host: bool, at_player_count_minimum: bool) -> Cell<Msg> {
+    let button_cell = if viewer_is_host {
+        let label = "close";
+
+        let button_base = if at_player_count_minimum {
+            Button::disabled(label)
+        } else {
+            Button::simple(label)
+        };
+
+        button_base.on_click(|_| Msg::ClickedCloseSlot).cell()
+    } else {
+        Cell::none()
+    };
+
     let cells = vec![
         Cell::from_str(
             vec![Style::FlexCol, Style::Grow, Style::JustifyCenter],
             "open slot",
         ),
-        Button::simple("close")
-            .on_click(|_| Msg::ClickedCloseSlot)
-            .cell(),
+        button_cell,
     ];
 
     Cell::group(

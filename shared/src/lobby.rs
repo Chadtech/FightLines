@@ -63,12 +63,19 @@ impl Lobby {
         }
     }
 
+    pub fn num_guests_limit(&self) -> u8 {
+        self.num_players_limit - 1
+    }
     pub fn num_guests(&self) -> u8 {
         self.guests.len() as u8
     }
 
     pub fn num_players(&self) -> u8 {
         self.num_guests() + 1
+    }
+
+    pub fn at_player_count_minimum(&self) -> bool {
+        self.num_players_limit == MIN_PLAYERS
     }
 
     pub fn players(self) -> HashMap<Id, Player> {

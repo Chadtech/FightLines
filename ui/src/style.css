@@ -84,6 +84,10 @@ a.button {
     background-color: var(--content-1);
 }
 
+.button.button-disabled {
+    background-color: var(--content-0);
+}
+
 .button.button-primary {
     color: var(--important-4);
     background-color: var(--important-1);

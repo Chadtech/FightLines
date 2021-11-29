@@ -25,6 +25,7 @@ pub struct Button<Msg: 'static> {
 enum Variant {
     Simple,
     Primary,
+    Disabled,
 }
 
 enum Click<Msg> {
@@ -42,6 +43,7 @@ impl Variant {
         match self {
             Variant::Simple => "button-simple",
             Variant::Primary => "button-primary",
+            Variant::Disabled => "button-disabled",
         }
     }
 
@@ -49,6 +51,7 @@ impl Variant {
         match self {
             Variant::Simple => vec![Style::Pointer, Style::Outset],
             Variant::Primary => vec![Style::Pointer],
+            Variant::Disabled => vec![Style::BgContent0, Style::Outset],
         }
     }
 }
@@ -76,6 +79,16 @@ impl<Msg: 'static> Button<Msg> {
     }
     pub fn simple(label: &str) -> Button<Msg> {
         Button::from_variant(label, Variant::Simple)
+    }
+    pub fn disabled(label: &str) -> Button<Msg> {
+        Button::from_variant(label, Variant::Disabled)
+    }
+    pub fn disable(&mut self, d: &bool) -> &mut Button<Msg> {
+        if *d {
+            self.variant = Variant::Disabled
+        }
+
+        self
     }
     pub fn active(mut self, active: bool) -> Button<Msg> {
         self.active = active;
