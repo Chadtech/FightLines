@@ -57,6 +57,13 @@ body {
     border-left: var(--s-1) solid var(--content-2);
 }
 
+.inset-important {
+    border-right: var(--s-1) solid var(--important-0);
+    border-bottom: var(--s-1) solid var(--important-0);
+    border-top: var(--s-1) solid var(--important-2);
+    border-left: var(--s-1) solid var(--important-2);
+}
+
 .inset {
     border-right: var(--s-1) solid var(--content-2);
     border-bottom: var(--s-1) solid var(--content-2);
@@ -64,15 +71,35 @@ body {
     border-left: var(--s-1) solid var(--content-0);
 }
 
+.inset-important {
+    border-right: var(--s-1) solid var(--important-2);
+    border-bottom: var(--s-1) solid var(--important-2);
+    border-top: var(--s-1) solid var(--important-0);
+    border-left: var(--s-1) solid var(--important-0);
+}
+
 .page-container {
     height: 100%;
     display: flex;
+}
+
+.text-field {
+    background-color: var(--bg-0);
+
+    border-right: var(--s-1) solid var(--content-2);
+    border-bottom: var(--s-1) solid var(--content-2);
+    border-top: var(--s-1) solid var(--content-0);
+    border-left: var(--s-1) solid var(--content-0);
+    padding: var(--s-3);
+
+    outline: none;
 }
 
 .button {
     padding: var(--s-3);
 
     outline: none;
+
 }
 
 a.button {
@@ -82,6 +109,10 @@ a.button {
 
 .button.button-simple {
     background-color: var(--content-1);
+}
+
+.button.button-simple:hover {
+    color: var(--content-5);
 }
 
 .button.button-disabled {
@@ -96,6 +127,24 @@ a.button {
     border-bottom: var(--s-1) solid var(--important-0);
     border-top: var(--s-1) solid var(--important-2);
     border-left: var(--s-1) solid var(--important-2);
+}
+
+.button.button-primary:hover {
+    color: var(--important-5);
+}
+
+.button.button-destructive {
+    color: var(--important-4);
+    background-color: var(--important-1);
+
+    border-right: var(--s-1) solid var(--important-0);
+    border-bottom: var(--s-1) solid var(--important-0);
+    border-top: var(--s-1) solid var(--important-2);
+    border-left: var(--s-1) solid var(--important-2);
+}
+
+.button.button-destructive:hover {
+    color: var(--important-5);
 }
 
 .button.button-simple:active, .button.button-simple.active {
@@ -205,6 +254,11 @@ a.button {
 
 .bg-content-4 {
     background-color: var(--content-4);
+}
+
+
+.bg-important-1 {
+    background-color: var(--important-1);
 }
 
 .bg-background-0 {

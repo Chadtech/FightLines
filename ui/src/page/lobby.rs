@@ -2,15 +2,17 @@ use crate::style::Style;
 use crate::view::button::Button;
 use crate::view::card::Card;
 use crate::view::cell::{Cell, Row};
+use crate::view::text_field::TextField;
 use crate::{api, core_ext, global};
-use seed::log;
-use seed::prelude::Orders;
+use seed::prelude::{Orders, WebSocket, WebSocketMessage};
+use seed::{log, spawn_local};
 use shared::api::endpoint::Endpoint;
 use shared::api::lobby::update as lobby_update;
 use shared::id::Id;
 use shared::lobby;
-use shared::lobby::Lobby;
+use shared::lobby::{Lobby, MAX_GUESTS};
 use shared::player::Player;
+use std::rc::Rc;
 
 ///////////////////////////////////////////////////////////////
 // Types //
@@ -19,6 +21,13 @@ use shared::player::Player;
 pub struct Model {
     lobby_id: Id,
     lobby: Lobby,
+    name_field: String,
+    host_model: Option<HostModel>,
+    web_socket: WebSocket,
+}
+
+struct HostModel {
+    game_name_field: String,
 }
 
 #[derive(Clone, Debug)]
@@ -26,6 +35,17 @@ pub enum Msg {
     ClickedAddSlot,
     ClickedCloseSlot,
     UpdatedLobby(Result<lobby_update::Response, String>),
+    UpdatedNameField(String),
+    UpdatedGameNameField(String),
+    ClickedSaveGameName,
+    ClickedSavePlayerName,
+    ClickedKickGuest(Id),
+    ClickedStart,
+
+    // WebSocket
+    OpenedWebSocket,
+    ClosedWebSocket,
+    WebSocketErrored,
 }
 
 #[derive(Clone, Debug)]
@@ -35,18 +55,74 @@ pub struct Flags {
 }
 
 ///////////////////////////////////////////////////////////////
+// Helpers //
+///////////////////////////////////////////////////////////////
+
+impl HostModel {
+    pub fn init(global: &global::Model, lobby: Lobby) -> Option<HostModel> {
+        if global.viewer_id() == lobby.host_id {
+            let host_model = HostModel {
+                game_name_field: lobby.name,
+            };
+
+            Some(host_model)
+        } else {
+            None
+        }
+    }
+}
+
+fn create_websocket(orders: &impl Orders<Msg>) -> WebSocket {
+    let msg_sender = orders.msg_sender();
+
+    WebSocket::builder(Endpoint::LobbyWebsocket.to_string(), orders)
+        .on_open(|| Msg::OpenedWebSocket)
+        .on_message(move |msg| decode_message(msg, msg_sender))
+        .on_close(Msg::ClosedWebSocket)
+        .on_error(|| Msg::WebSocketErrored)
+        .build_and_open()
+        .unwrap()
+}
+
+fn decode_message(message: WebSocketMessage, msg_sender: Rc<dyn Fn(Option<Msg>)>) {
+    if message.contains_text() {
+        let msg = message
+            .json::<shared::ServerMessage>()
+            .expect("Failed to decode WebSocket text message");
+
+        msg_sender(Some(Msg::TextMessageReceived(msg)));
+    } else {
+        spawn_local(async move {
+            let bytes = message
+                .bytes()
+                .await
+                .expect("WebsocketError on binary data");
+
+            log!("Bytes!");
+            log!(bytes);
+            // let msg: shared::ServerMessage = rmp_serde::from_slice(&bytes).unwrap();
+            // msg_sender(Some(Msg::BinaryMessageReceived(msg)));
+        });
+    }
+}
+
+///////////////////////////////////////////////////////////////
 // Api //
 ///////////////////////////////////////////////////////////////
 
 impl Model {
-    pub fn init(flags: Flags) -> Model {
+    pub fn init(global: &global::Model, flags: Flags, orders: &mut impl Orders<Msg>) -> Model {
+        let name_field = global.viewer_name.to_string();
         Model {
             lobby_id: flags.lobby_id,
-            lobby: flags.lobby,
+            lobby: flags.lobby.clone(),
+            name_field,
+            host_model: HostModel::init(global, flags.lobby),
+            web_socket: create_websocket(orders),
         }
     }
-    pub fn viewer_is_host(&self, global: &global::Model) -> bool {
-        self.lobby.host_id == global.viewer_id()
+    pub fn viewer_is_host(&self) -> bool {
+        self.host_model.is_some()
     }
 }
 
@@ -74,6 +150,30 @@ pub fn update(_global: &global::Model, msg: Msg, model: &mut Model, orders: &mut
             }
             Err(_) => {}
         },
+        Msg::UpdatedNameField(field) => {
+            model.name_field = field;
+        }
+        Msg::UpdatedGameNameField(field) => {
+            if let Some(host_model) = &mut model.host_model {
+                host_model.game_name_field = field;
+            }
+        }
+        Msg::ClickedSaveGameName => {
+            if let Some(host_model) = &mut model.host_model {
+                // TODO
+            }
+        }
+        Msg::ClickedSavePlayerName => {
+            // TODO
+        }
+        Msg::ClickedKickGuest(guest_id) => {
+            // TODO
+        }
+        Msg::ClickedStart => {
+            if let Some(host_model) = &model.host_model {
+                // TODO
+            }
+        }
     }
 }
 
@@ -102,7 +202,9 @@ fn send_updates(lobby_id: Id, upts: Vec<lobby::Update>, orders: &mut impl Orders
                 }
             });
         }
-        Err(_) => {}
+        Err(_) => {
+            // TODO
+        }
     };
 }
 
@@ -113,18 +215,24 @@ fn send_updates(lobby_id: Id, upts: Vec<lobby::Update>, orders: &mut impl Orders
 pub fn view(global: &global::Model, model: &Model) -> Vec<Row<Msg>> {
     let mut rows = Vec::new();
 
-    let viewer_is_host = model.viewer_is_host(global);
+    let viewer_is_host = model.viewer_is_host();
 
     let lobby = &model.lobby;
 
     let guests = &lobby.guests;
 
-    rows.push(center(header(viewer_is_host, lobby.clone())));
+    rows.push(center(header(model.host_model.as_ref(), lobby.clone())));
 
     rows.push(center(host_card(viewer_is_host, model)));
 
-    for (_, guest) in guests.into_iter() {
-        let guest_row = center(guest_card(guest.clone()));
+    for (guest_id, guest) in guests.into_iter() {
+        let guest_row = center(guest_card(
+            global.viewer_id(),
+            guest_id.clone(),
+            guest.clone(),
+            &model.name_field,
+            viewer_is_host,
+        ));
 
         rows.push(guest_row)
     }
@@ -138,20 +246,43 @@ pub fn view(global: &global::Model, model: &Model) -> Vec<Row<Msg>> {
         )))
     }
 
-    if lobby.num_guests() < num_guests_limit && viewer_is_host {
+    if num_guests_limit < MAX_GUESTS && viewer_is_host {
         rows.push(center(add_slot_row()))
     }
 
     rows
 }
 
-fn header(viewer_is_host: bool, lobby: Lobby) -> Cell<Msg> {
-    let mut msg = String::new();
-    msg.push_str("Lobby for \"");
-    msg.push_str(lobby.name.as_str());
-    msg.push('"');
+fn header(maybe_host_model: Option<&HostModel>, lobby: Lobby) -> Cell<Msg> {
+    match maybe_host_model {
+        Some(host_model) => Cell::group(
+            vec![CARD_WIDTH, Style::G4, Style::FlexRow],
+            vec![
+                Cell::from_str(vec![Style::FlexCol, Style::JustifyCenter], "game name"),
+                TextField::simple(host_model.game_name_field.as_str(), |field| {
+                    Msg::UpdatedGameNameField(field)
+                })
+                .cell(),
+                Button::simple("save")
+                    .on_click(|_| Msg::ClickedSaveGameName)
+                    .cell(),
+                Cell::group(
+                    vec![Style::Grow, Style::FlexRow, Style::JustifyEnd],
+                    vec![Button::primary("start")
+                        .on_click(|_| Msg::ClickedStart)
+                        .cell()],
+                ),
+            ],
+        ),
+        None => {
+            let mut msg = String::new();
+            msg.push_str("Lobby for \"");
+            msg.push_str(lobby.name.as_str());
+            msg.push('"');
 
-    Cell::from_str(vec![CARD_WIDTH], msg.as_str())
+            Cell::from_str(vec![CARD_WIDTH], msg.as_str())
+        }
+    }
 }
 
 fn add_slot_row() -> Cell<Msg> {
@@ -192,24 +323,67 @@ fn open_slot(viewer_is_host: bool, at_player_count_minimum: bool) -> Cell<Msg> {
     )
 }
 
-pub fn guest_card(guest: Player) -> Cell<Msg> {
-    let name_row = Row::from_str(guest.name.to_string().as_str());
+pub fn guest_card(
+    viewer_id: Id,
+    guest_id: Id,
+    guest: Player,
+    viewer_name_field: &String,
+    viewer_is_host: bool,
+) -> Cell<Msg> {
+    let guest_is_viewer = viewer_id == guest_id;
 
-    player_card(vec![name_row])
+    let name_row = if guest_is_viewer {
+        name_field(viewer_name_field)
+    } else {
+        let remove_player_button = if viewer_is_host {
+            Button::destructive("kick")
+                .on_click(|_| Msg::ClickedKickGuest(guest_id))
+                .cell()
+        } else {
+            Cell::none()
+        };
+
+        Row::from_cells(
+            vec![Style::G4],
+            vec![
+                Cell::from_str(
+                    vec![Style::FlexCol, Style::JustifyCenter, Style::Grow],
+                    guest.name.to_string().as_str(),
+                ),
+                remove_player_button,
+            ],
+        )
+    };
+
+    player_card(guest_is_viewer, vec![name_row])
 }
 
 pub fn host_card(viewer_is_host: bool, model: &Model) -> Cell<Msg> {
     let name_row = if viewer_is_host {
-        Row::from_cells(vec![], vec![])
+        name_field(&model.name_field)
     } else {
         Row::from_str(model.lobby.host.name.to_string().as_str())
     };
 
-    player_card(vec![name_row])
+    player_card(viewer_is_host, vec![name_row])
 }
 
-pub fn player_card<Msg: 'static>(rows: Vec<Row<Msg>>) -> Cell<Msg> {
-    Card::cell_from_rows(vec![CARD_WIDTH], rows)
+fn name_field(field: &String) -> Row<Msg> {
+    Row::from_cells(
+        vec![Style::G4],
+        vec![
+            TextField::simple(field.as_str(), |event| Msg::UpdatedNameField(event)).cell(),
+            Button::simple("save")
+                .on_click(|_| Msg::ClickedSavePlayerName)
+                .cell(),
+        ],
+    )
+}
+
+fn player_card<Msg: 'static>(player_is_viewer: bool, rows: Vec<Row<Msg>>) -> Cell<Msg> {
+    let mut styles = vec![CARD_WIDTH];
+
+    Card::init().primary(player_is_viewer).cell(styles, rows)
 }
 
 fn center<Msg: 'static>(cell: Cell<Msg>) -> Row<Msg> {

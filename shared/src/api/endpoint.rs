@@ -10,6 +10,7 @@ pub enum Endpoint {
     GetLobby(Param<Id>),
     JoinLobby(Param<Id>),
     UpdateLobby,
+    LobbyWebsocket,
 }
 
 #[derive(Clone)]
@@ -71,6 +72,7 @@ impl Endpoint {
                 vec!["lobby".to_string(), "join".to_string(), param.to_string()]
             }
             Endpoint::UpdateLobby => vec!["lobby".to_string(), "update".to_string()],
+            Endpoint::LobbyWebsocket => vec!["lobby".to_string(), "ws".to_string()],
         }
     }
 

@@ -26,6 +26,7 @@ enum Variant {
     Simple,
     Primary,
     Disabled,
+    Destructive,
 }
 
 enum Click<Msg> {
@@ -44,6 +45,7 @@ impl Variant {
             Variant::Simple => "button-simple",
             Variant::Primary => "button-primary",
             Variant::Disabled => "button-disabled",
+            Variant::Destructive => "button-destructive",
         }
     }
 
@@ -52,6 +54,8 @@ impl Variant {
             Variant::Simple => vec![Style::Pointer, Style::Outset],
             Variant::Primary => vec![Style::Pointer],
             Variant::Disabled => vec![Style::BgContent0, Style::Outset],
+
+            Variant::Destructive => vec![Style::Pointer],
         }
     }
 }
@@ -82,6 +86,9 @@ impl<Msg: 'static> Button<Msg> {
     }
     pub fn disabled(label: &str) -> Button<Msg> {
         Button::from_variant(label, Variant::Disabled)
+    }
+    pub fn destructive(label: &str) -> Button<Msg> {
+        Button::from_variant(label, Variant::Destructive)
     }
     pub fn disable(&mut self, d: &bool) -> &mut Button<Msg> {
         if *d {

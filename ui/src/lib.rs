@@ -146,7 +146,7 @@ fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders
                         lobby,
                     };
 
-                    Page::Lobby(lobby::Model::init(flags))
+                    Page::Lobby(lobby::Model::init(&model.global, flags))
                 }
                 None => Page::Loading,
             }
@@ -187,7 +187,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
         }
         Msg::LoadedLobby(result) => match result {
             Ok(flags) => {
-                let sub_model = lobby::Model::init(flags);
+                let sub_model = lobby::Model::init(&model.global, flags);
 
                 model.page = Page::Lobby(sub_model);
             }

@@ -32,9 +32,12 @@ pub enum Style {
     BgContent1,
     BgContent4,
     Outset,
+    OutsetImportant,
     Inset,
+    InsetImportant,
     BgBackground0,
     BgBackground1,
+    BgImportant1,
     H4,
     H5,
     H8,
@@ -82,7 +85,9 @@ impl Style {
             Style::BgContent1 => vec!["bg-content-1"],
             Style::BgContent4 => vec!["bg-content-4"],
             Style::Outset => vec!["outset"],
+            Style::OutsetImportant => vec!["outset-important"],
             Style::Inset => vec!["inset"],
+            Style::InsetImportant => vec!["inset-important"],
             Style::BgBackground0 => vec!["bg-background-0"],
             Style::BgBackground1 => vec!["bg-background-1"],
             Style::H4 => vec!["h-4"],
@@ -94,6 +99,7 @@ impl Style {
             Style::OverflowHidden => vec!["overflow-hidden"],
             Style::OutlineNone => vec!["outline-none"],
             Style::Pointer => vec!["pointer"],
+            Style::BgImportant1 => vec!["bg-important-1"],
         }
     }
 }
