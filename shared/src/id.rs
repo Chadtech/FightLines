@@ -4,7 +4,6 @@ use rand::distributions::{Distribution, Standard};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use std::marker::PhantomData;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Types //

@@ -4,6 +4,7 @@ use crate::view::card::Card;
 use crate::view::cell::{Cell, Row};
 use crate::view::text_field::TextField;
 use crate::{api, core_ext, global};
+use seed::browser::web_socket::CloseEvent;
 use seed::prelude::{Orders, WebSocket, WebSocketMessage};
 use seed::{log, spawn_local};
 use shared::api::endpoint::Endpoint;
@@ -44,7 +45,7 @@ pub enum Msg {
 
     // WebSocket
     OpenedWebSocket,
-    ClosedWebSocket,
+    ClosedWebSocket(CloseEvent),
     WebSocketErrored,
 }
 
@@ -75,7 +76,10 @@ impl HostModel {
 fn create_websocket(orders: &impl Orders<Msg>) -> WebSocket {
     let msg_sender = orders.msg_sender();
 
-    WebSocket::builder(Endpoint::LobbyWebsocket.to_string(), orders)
+    let mut url = "ws://localhost:8080".to_string();
+    url.push_str(Endpoint::LobbyWebsocket.to_url().as_str());
+
+    WebSocket::builder(url, orders)
         .on_open(|| Msg::OpenedWebSocket)
         .on_message(move |msg| decode_message(msg, msg_sender))
         .on_close(Msg::ClosedWebSocket)
@@ -85,25 +89,17 @@ fn create_websocket(orders: &impl Orders<Msg>) -> WebSocket {
 }
 
 fn decode_message(message: WebSocketMessage, msg_sender: Rc<dyn Fn(Option<Msg>)>) {
-    if message.contains_text() {
-        let msg = message
-            .json::<shared::ServerMessage>()
-            .expect("Failed to decode WebSocket text message");
+    spawn_local(async move {
+        let bytes = message
+            .bytes()
+            .await
+            .expect("WebsocketError on binary data");
 
-        msg_sender(Some(Msg::TextMessageReceived(msg)));
-    } else {
-        spawn_local(async move {
-            let bytes = message
-                .bytes()
-                .await
-                .expect("WebsocketError on binary data");
-
-            log!("Bytes!");
-            log!(bytes);
-            // let msg: shared::ServerMessage = rmp_serde::from_slice(&bytes).unwrap();
-            // msg_sender(Some(Msg::BinaryMessageReceived(msg)));
-        });
-    }
+        log!("Bytes!");
+        log!(bytes);
+        // let msg: shared::ServerMessage = rmp_serde::from_slice(&bytes).unwrap();
+        // msg_sender(Some(Msg::BinaryMessageReceived(msg)));
+    });
 }
 
 ///////////////////////////////////////////////////////////////
@@ -173,6 +169,20 @@ pub fn update(_global: &global::Model, msg: Msg, model: &mut Model, orders: &mut
             if let Some(host_model) = &model.host_model {
                 // TODO
             }
+        }
+        Msg::OpenedWebSocket => {
+            log!("WebSocket connection is open now");
+        }
+        Msg::ClosedWebSocket(close_event) => {
+            log!("==================");
+            log!("WebSocket connection was closed:");
+            log!("Clean:", close_event.was_clean());
+            log!("Code:", close_event.code());
+            log!("Reason:", close_event.reason());
+            log!("==================");
+        }
+        Msg::WebSocketErrored => {
+            log!("WebSocket failed");
         }
     }
 }
@@ -381,7 +391,7 @@ fn name_field(field: &String) -> Row<Msg> {
 }
 
 fn player_card<Msg: 'static>(player_is_viewer: bool, rows: Vec<Row<Msg>>) -> Cell<Msg> {
-    let mut styles = vec![CARD_WIDTH];
+    let styles = vec![CARD_WIDTH];
 
     Card::init().primary(player_is_viewer).cell(styles, rows)
 }

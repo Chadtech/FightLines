@@ -3,10 +3,7 @@ use std::process::Command;
 use std::sync::mpsc::channel;
 use std::thread;
 
-use actix::prelude::*;
-
 use actix;
-use actix::Actor;
 use actix_cors::Cors;
 use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer};
 use actix_web_actors::ws;
@@ -16,10 +13,7 @@ use route::lobby;
 use shared::api::endpoint;
 
 use crate::model::Model;
-use actix::StreamHandler;
-use actix_web::rt::time::Instant;
 use shared::api::endpoint::Endpoint;
-use std::time::Duration;
 
 mod dev;
 mod flags;
