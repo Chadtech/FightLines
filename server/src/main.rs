@@ -3,7 +3,6 @@ use std::process::Command;
 use std::sync::mpsc::channel;
 use std::thread;
 
-use actix;
 use actix_cors::Cors;
 use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer};
 use actix_web_actors::ws;
@@ -62,10 +61,6 @@ async fn main() -> Result<(), String> {
                     .route(
                         Endpoint::update_lobby().to_string().as_str(),
                         web::post().to(lobby::update::handle),
-                    )
-                    .route(
-                        Endpoint::LobbyWebsocket.to_string().as_str(),
-                        web::get().to(handle_lobby_websocket),
                     ),
             )
             .default_service(web::get().to(frontend))
@@ -75,16 +70,6 @@ async fn main() -> Result<(), String> {
     .run()
     .await
     .map_err(|err| err.to_string())
-}
-
-async fn handle_lobby_websocket(
-    r: HttpRequest,
-    stream: web::Payload,
-) -> Result<HttpResponse, actix_web::Error> {
-    println!("{:?}", r);
-    let res = ws::start(lobby::websocket::WebSocket::init(), &r, stream);
-    println!("{:?}", res);
-    res
 }
 
 async fn wasm_asset_route(model: web::Data<Model>) -> HttpResponse {

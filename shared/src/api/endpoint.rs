@@ -14,7 +14,6 @@ pub enum Endpoint {
 }
 
 #[derive(Clone)]
-
 pub enum Param<P>
 where
     P: ToString + Clone,
@@ -82,6 +81,10 @@ impl Endpoint {
 
     pub fn join_lobby(lobby_id: Id) -> Endpoint {
         Endpoint::JoinLobby(Param::Value(lobby_id))
+    }
+
+    pub fn make_get_lobby(id: Id) -> Endpoint {
+        Endpoint::GetLobby(Param::Value(id))
     }
 
     pub fn template_get_lobby() -> Endpoint {

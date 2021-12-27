@@ -4,16 +4,15 @@ use crate::view::card::Card;
 use crate::view::cell::{Cell, Row};
 use crate::view::text_field::TextField;
 use crate::{api, core_ext, global};
-use seed::browser::web_socket::CloseEvent;
-use seed::prelude::{Orders, WebSocket, WebSocketMessage};
-use seed::{log, spawn_local};
+use seed::browser::web_socket::WebSocketError;
+use seed::prelude::{cmds, CmdHandle, Orders};
 use shared::api::endpoint::Endpoint;
+use shared::api::lobby::get as lobby_get;
 use shared::api::lobby::update as lobby_update;
 use shared::id::Id;
 use shared::lobby;
 use shared::lobby::{Lobby, MAX_GUESTS};
 use shared::player::Player;
-use std::rc::Rc;
 
 ///////////////////////////////////////////////////////////////
 // Types //
@@ -24,7 +23,7 @@ pub struct Model {
     lobby: Lobby,
     name_field: String,
     host_model: Option<HostModel>,
-    web_socket: WebSocket,
+    handle_timeout: CmdHandle,
 }
 
 struct HostModel {
@@ -43,10 +42,9 @@ pub enum Msg {
     ClickedKickGuest(Id),
     ClickedStart,
 
-    // WebSocket
-    OpenedWebSocket,
-    ClosedWebSocket(CloseEvent),
-    WebSocketErrored,
+    //
+    PollTimeoutExpired,
+    GotLobbyResponse(Result<lobby_get::Response, String>),
 }
 
 #[derive(Clone, Debug)]
@@ -73,35 +71,6 @@ impl HostModel {
     }
 }
 
-fn create_websocket(orders: &impl Orders<Msg>) -> WebSocket {
-    let msg_sender = orders.msg_sender();
-
-    let mut url = "ws://localhost:8080".to_string();
-    url.push_str(Endpoint::LobbyWebsocket.to_url().as_str());
-
-    WebSocket::builder(url, orders)
-        .on_open(|| Msg::OpenedWebSocket)
-        .on_message(move |msg| decode_message(msg, msg_sender))
-        .on_close(Msg::ClosedWebSocket)
-        .on_error(|| Msg::WebSocketErrored)
-        .build_and_open()
-        .unwrap()
-}
-
-fn decode_message(message: WebSocketMessage, msg_sender: Rc<dyn Fn(Option<Msg>)>) {
-    spawn_local(async move {
-        let bytes = message
-            .bytes()
-            .await
-            .expect("WebsocketError on binary data");
-
-        log!("Bytes!");
-        log!(bytes);
-        // let msg: shared::ServerMessage = rmp_serde::from_slice(&bytes).unwrap();
-        // msg_sender(Some(Msg::BinaryMessageReceived(msg)));
-    });
-}
-
 ///////////////////////////////////////////////////////////////
 // Api //
 ///////////////////////////////////////////////////////////////
@@ -109,12 +78,13 @@ fn decode_message(message: WebSocketMessage, msg_sender: Rc<dyn Fn(Option<Msg>)>
 impl Model {
     pub fn init(global: &global::Model, flags: Flags, orders: &mut impl Orders<Msg>) -> Model {
         let name_field = global.viewer_name.to_string();
+
         Model {
             lobby_id: flags.lobby_id,
             lobby: flags.lobby.clone(),
             name_field,
             host_model: HostModel::init(global, flags.lobby),
-            web_socket: create_websocket(orders),
+            handle_timeout: wait_to_poll_lobby(orders),
         }
     }
     pub fn viewer_is_host(&self) -> bool {
@@ -122,11 +92,15 @@ impl Model {
     }
 }
 
+fn wait_to_poll_lobby(orders: &mut impl Orders<Msg>) -> CmdHandle {
+    orders.perform_cmd_with_handle(cmds::timeout(2048, || Msg::PollTimeoutExpired))
+}
+
 ///////////////////////////////////////////////////////////////
 // Update //
 ///////////////////////////////////////////////////////////////
 
-pub fn update(_global: &global::Model, msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
+pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
     match msg {
         Msg::ClickedAddSlot => {
             send_updates(model.lobby_id.clone(), vec![lobby::Update::AddSlot], orders);
@@ -140,12 +114,16 @@ pub fn update(_global: &global::Model, msg: Msg, model: &mut Model, orders: &mut
                 );
             }
         }
-        Msg::UpdatedLobby(result) => match result {
-            Ok(res) => {
-                model.lobby = res.get_lobby();
+        Msg::UpdatedLobby(result) => {
+            match result {
+                Ok(res) => {
+                    model.lobby = res.get_lobby();
+                }
+                Err(_) => {
+                    // TODO
+                }
             }
-            Err(_) => {}
-        },
+        }
         Msg::UpdatedNameField(field) => {
             model.name_field = field;
         }
@@ -156,7 +134,17 @@ pub fn update(_global: &global::Model, msg: Msg, model: &mut Model, orders: &mut
         }
         Msg::ClickedSaveGameName => {
             if let Some(host_model) = &mut model.host_model {
-                // TODO
+                if host_model.game_name_field.is_empty() {
+                    // TODO
+                } else {
+                    send_updates(
+                        model.lobby_id.clone(),
+                        vec![lobby::Update::ChangeName(
+                            host_model.game_name_field.clone(),
+                        )],
+                        orders,
+                    )
+                }
             }
         }
         Msg::ClickedSavePlayerName => {
@@ -170,20 +158,33 @@ pub fn update(_global: &global::Model, msg: Msg, model: &mut Model, orders: &mut
                 // TODO
             }
         }
-        Msg::OpenedWebSocket => {
-            log!("WebSocket connection is open now");
+        Msg::PollTimeoutExpired => {
+            model.handle_timeout = wait_to_poll_lobby(orders);
+
+            let lobby_id = model.lobby_id.clone();
+
+            orders.skip().perform_cmd({
+                async {
+                    let result = match api::get(Endpoint::make_get_lobby(lobby_id).to_url()).await {
+                        Ok(response_bytes) => lobby_get::Response::from_bytes(response_bytes)
+                            .map_err(|err| err.to_string()),
+                        Err(error) => Err(core_ext::http::fetch_error_to_string(error)),
+                    };
+
+                    Msg::GotLobbyResponse(result)
+                }
+            });
         }
-        Msg::ClosedWebSocket(close_event) => {
-            log!("==================");
-            log!("WebSocket connection was closed:");
-            log!("Clean:", close_event.was_clean());
-            log!("Code:", close_event.code());
-            log!("Reason:", close_event.reason());
-            log!("==================");
-        }
-        Msg::WebSocketErrored => {
-            log!("WebSocket failed");
-        }
+        Msg::GotLobbyResponse(result) => match result {
+            Ok(res) => {
+                let lobby = res.get_lobby();
+
+                model.lobby = lobby;
+            }
+            Err(error) => {
+                // TODO
+            }
+        },
     }
 }
 
@@ -217,6 +218,14 @@ fn send_updates(lobby_id: Id, upts: Vec<lobby::Update>, orders: &mut impl Orders
         }
     };
 }
+
+enum LobbyUpdateError {
+    ResponseError(String),
+    FailedToMakeWebsocket(String),
+    WebsocketError(WebSocketError),
+}
+
+fn handle_lobby_update(lobby_res: Result<lobby_update::Response, String>, model: &mut Model) {}
 
 ///////////////////////////////////////////////////////////////
 // View //

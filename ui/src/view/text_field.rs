@@ -40,6 +40,7 @@ impl<Msg: 'static> TextField<Msg> {
         element.add_class("text-field");
 
         element.add_attr(Cow::Borrowed("value"), self.value);
+        element.add_attr(Cow::Borrowed("spellcheck"), "false");
 
         match self.placeholder {
             None => {}

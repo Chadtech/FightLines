@@ -1,5 +1,5 @@
 use crate::id::Id;
-use crate::lobby::UpdateError::{AtMaximumSlots, NoOpenSlotToClose};
+use crate::lobby::UpdateError::{AtMaximumSlots, NameCannotBeEmpty, NoOpenSlotToClose};
 use crate::player::Player;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -26,6 +26,7 @@ pub enum AddError {
 pub enum Update {
     AddSlot,
     CloseSlot,
+    ChangeName(String),
 }
 
 #[derive(Clone)]
@@ -33,6 +34,7 @@ pub enum Update {
 pub enum UpdateError {
     AtMaximumSlots,
     NoOpenSlotToClose,
+    NameCannotBeEmpty,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -140,6 +142,14 @@ impl Lobby {
                     Ok(self)
                 } else {
                     Err(NoOpenSlotToClose)
+                }
+            }
+            Update::ChangeName(new_name) => {
+                if new_name.is_empty() {
+                    Err(NameCannotBeEmpty)
+                } else {
+                    self.name = new_name;
+                    Ok(self)
                 }
             }
         }
