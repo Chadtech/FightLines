@@ -12,6 +12,7 @@ use style::Style;
 
 use crate::page::{component_library, error, loading, lobby, not_found, title};
 use crate::view::cell::{Cell, Row};
+use crate::view::toast::Toast;
 
 mod api;
 mod core_ext;
@@ -41,6 +42,7 @@ enum Msg {
     LoadedLobby(Result<lobby::Flags, String>),
     //
     UrlChanged(subs::UrlChanged),
+    Global(global::Msg),
 }
 
 ///////////////////////////////////////////////////////////////
@@ -54,7 +56,7 @@ fn init(url: Url, orders: &mut impl Orders<Msg>) -> Model {
 
     Model {
         page: Page::Blank,
-        global: global::Model::init(),
+        global: global::Model::init(&mut orders.proxy(Msg::Global)),
     }
 }
 
@@ -206,6 +208,9 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
         Msg::Error(sub_msg) => {
             error::update(sub_msg, &mut orders.proxy(Msg::Error));
         }
+        Msg::Global(sub_msg) => {
+            global::update(sub_msg, &mut model.global, &mut orders.proxy(Msg::Global));
+        }
     }
 }
 
@@ -252,7 +257,8 @@ fn view(model: &Model) -> Node<Msg> {
     div![
         C!["page-container"],
         style::global_html(),
-        Cell::from_rows(page_styles, body).html()
+        Cell::from_rows(page_styles, body).html(),
+        Toast::many_to_html(model.global.first_toast_hidden(), &model.global.toasts())
     ]
 }
 

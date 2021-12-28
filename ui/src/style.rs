@@ -47,6 +47,10 @@ pub enum Style {
     OverflowHidden,
     OutlineNone,
     Pointer,
+    Hide,
+    Implode,
+    Implded,
+    ImplodeReady,
 }
 
 impl Style {
@@ -100,6 +104,10 @@ impl Style {
             Style::OutlineNone => vec!["outline-none"],
             Style::Pointer => vec!["pointer"],
             Style::BgImportant1 => vec!["bg-important-1"],
+            Style::Hide => vec!["hide"],
+            Style::Implode => vec!["implode"],
+            Style::Implded => vec!["imploded"],
+            Style::ImplodeReady => vec!["implode-ready"],
         }
     }
 }

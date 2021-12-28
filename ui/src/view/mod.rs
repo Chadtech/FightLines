@@ -6,3 +6,4 @@ pub mod loading_spinner;
 pub mod text;
 pub mod text_field;
 pub mod textarea;
+pub mod toast;
