@@ -29,6 +29,12 @@ body {
     --important-1: #302507;
     --important-0: #161303;
 
+    --problem-5: #F21D23;
+
+
+    --problem-2: #651A20;
+    --problem-1: #320d10;
+
     --s-neg-7: -128px;
 
     --s-0: 0px;
@@ -196,6 +202,14 @@ a.button {
     border: var(--s-1) solid var(--content-2);
 }
 
+.m-2 {
+    margin: var(--s-2);
+}
+
+.mt-4 {
+    margin-top: var(--s-4);
+}
+
 .p-2 {
     padding: var(--s-2);
 }
@@ -218,6 +232,11 @@ a.button {
 
 .text-important-4 {
     color: var(--important-4);
+}
+
+
+.text-content-1 {
+    color: var(--content-1);
 }
 
 .text-content-5 {
@@ -269,6 +288,10 @@ a.button {
     background-color: var(--bg-1);
 }
 
+.bg-problem-1 {
+    background-color: var(--problem-1);
+}
+
 .relative {
     position: relative;
 }
@@ -298,20 +321,7 @@ spinner {
 
 .implode {
     transition: transform 128ms ease-in-out;
-}
-
-.imploded {
     transform: scale(0);
-}
-
-.implode-ready {
-    transform: scale(1);
-}
-
-@keyframes implode {
-    from {
-        transform: scale(1);
-    }
 }
 
 .h-4 {

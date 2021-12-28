@@ -184,7 +184,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
         Msg::Lobby(sub_msg) => {
             if let Page::Lobby(sub_model) = &mut model.page {
                 lobby::update(
-                    &model.global,
+                    &mut model.global,
                     sub_msg,
                     sub_model,
                     &mut orders.proxy(Msg::Lobby),

@@ -17,12 +17,14 @@ pub struct Model {
     random_seed: RandSeed,
     toasts: Vec<Toast>,
     first_toast_hidden: bool,
-    handle_toast_timeout: Option<CmdHandle>,
+    handle_hide_toast_timeout: Option<CmdHandle>,
+    handle_remove_toast_timeout: Option<CmdHandle>,
 }
 
 #[derive(Clone)]
 pub enum Msg {
-    ToastTimeoutExpired,
+    HideToastTimeoutExpired,
+    RemoveToastTimeoutExpired,
 }
 
 ///////////////////////////////////////////////////////////////
@@ -30,7 +32,11 @@ pub enum Msg {
 ///////////////////////////////////////////////////////////////
 
 fn wait_to_progress_toasts(orders: &mut impl Orders<Msg>) -> CmdHandle {
-    orders.perform_cmd_with_handle(cmds::timeout(8192, || Msg::ToastTimeoutExpired))
+    orders.perform_cmd_with_handle(cmds::timeout(8192, || Msg::HideToastTimeoutExpired))
+}
+
+fn wait_to_remove_toast(orders: &mut impl Orders<Msg>) -> CmdHandle {
+    orders.perform_cmd_with_handle(cmds::timeout(128, || Msg::RemoveToastTimeoutExpired))
 }
 
 ///////////////////////////////////////////////////////////////
@@ -59,13 +65,16 @@ impl Model {
 
         let mut toasts = Vec::new();
 
-        toasts.push(Toast::from_str(
-            "TEST toast that has a decently long message",
-        ));
+        let t = || Toast::init("test!", "TEST toast that has a decently long message");
 
-        toasts.push(Toast::from_str(
-            "TEST toast that has a decently long message",
-        ));
+        toasts.push(t());
+
+        let tt = t()
+            .error()
+            .with_more_info("Dang this is some real info")
+            .clone();
+
+        toasts.push(tt);
 
         Model {
             viewer_id,
@@ -73,7 +82,8 @@ impl Model {
             random_seed,
             toasts,
             first_toast_hidden: false,
-            handle_toast_timeout: Some(wait_to_progress_toasts(orders)),
+            handle_hide_toast_timeout: Some(wait_to_progress_toasts(orders)),
+            handle_remove_toast_timeout: None,
         }
     }
 
@@ -81,9 +91,8 @@ impl Model {
         self.viewer_id.clone()
     }
 
-    pub fn toast_from_text(&mut self, text: &str) -> &mut Model {
-        self.toasts.push(Toast::from_str(text));
-        self
+    pub fn toast(&mut self, toast: Toast) {
+        self.toasts.push(toast);
     }
 
     pub fn toasts(&self) -> &Vec<Toast> {
@@ -118,22 +127,28 @@ fn get_viewer_id(rand_gen: &mut RandGen) -> Id {
 
 pub fn update(msg: Msg, global: &mut Model, orders: &mut impl Orders<Msg>) {
     match msg {
-        Msg::ToastTimeoutExpired => match global.toasts.split_first() {
+        Msg::HideToastTimeoutExpired => match global.toasts.split_first() {
             None => {
-                log!("???? Somhoew");
                 global.first_toast_hidden = false;
-                global.handle_toast_timeout = None;
+                global.handle_hide_toast_timeout = None;
+                global.handle_remove_toast_timeout = None;
             }
             Some((_, rest)) => {
-                log!("Timeout expired!");
-                if global.first_toast_hidden {
-                    global.toasts = rest.to_vec();
-                } else {
-                    global.first_toast_hidden = true;
-                }
+                global.first_toast_hidden = true;
 
-                global.handle_toast_timeout = Some(wait_to_progress_toasts(orders));
+                global.handle_hide_toast_timeout = Some(wait_to_progress_toasts(orders));
+                global.handle_remove_toast_timeout = Some(wait_to_remove_toast(orders));
             }
         },
+        Msg::RemoveToastTimeoutExpired => {
+            global.first_toast_hidden = false;
+
+            match global.toasts.split_first() {
+                None => {}
+                Some((_, rest)) => {
+                    global.toasts = rest.to_vec();
+                }
+            }
+        }
     }
 }

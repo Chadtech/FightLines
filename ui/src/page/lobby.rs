@@ -3,6 +3,7 @@ use crate::view::button::Button;
 use crate::view::card::Card;
 use crate::view::cell::{Cell, Row};
 use crate::view::text_field::TextField;
+use crate::view::toast::Toast;
 use crate::{api, core_ext, global};
 use seed::browser::web_socket::WebSocketError;
 use seed::prelude::{cmds, CmdHandle, Orders};
@@ -100,7 +101,12 @@ fn wait_to_poll_lobby(orders: &mut impl Orders<Msg>) -> CmdHandle {
 // Update //
 ///////////////////////////////////////////////////////////////
 
-pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
+pub fn update(
+    global: &mut global::Model,
+    msg: Msg,
+    model: &mut Model,
+    orders: &mut impl Orders<Msg>,
+) {
     match msg {
         Msg::ClickedAddSlot => {
             send_updates(model.lobby_id.clone(), vec![lobby::Update::AddSlot], orders);
@@ -114,16 +120,12 @@ pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut 
                 );
             }
         }
-        Msg::UpdatedLobby(result) => {
-            match result {
-                Ok(res) => {
-                    model.lobby = res.get_lobby();
-                }
-                Err(_) => {
-                    // TODO
-                }
+        Msg::UpdatedLobby(result) => match result {
+            Ok(res) => {
+                model.lobby = res.get_lobby();
             }
-        }
+            Err(_) => global.toast(Toast::init("Error", "Could not load lobby").error()),
+        },
         Msg::UpdatedNameField(field) => {
             model.name_field = field;
         }

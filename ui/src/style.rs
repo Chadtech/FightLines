@@ -21,7 +21,10 @@ pub enum Style {
     P4,
     G3,
     G4,
+    M2,
+    MT4,
     TextImportant4,
+    TextContent1,
     TextContent5,
     W7,
     W8,
@@ -32,12 +35,12 @@ pub enum Style {
     BgContent1,
     BgContent4,
     Outset,
-    OutsetImportant,
     Inset,
     InsetImportant,
     BgBackground0,
     BgBackground1,
     BgImportant1,
+    BgProblem1,
     H4,
     H5,
     H8,
@@ -49,8 +52,6 @@ pub enum Style {
     Pointer,
     Hide,
     Implode,
-    Implded,
-    ImplodeReady,
 }
 
 impl Style {
@@ -73,12 +74,15 @@ impl Style {
             Style::P4 => vec!["p-4"],
             Style::G3 => vec!["g-3"],
             Style::G4 => vec!["g-4"],
+            Style::M2 => vec!["m-2"],
+            Style::MT4 => vec!["mt-4"],
             Style::Batch(styles) => styles
                 .into_iter()
                 .map(|style| style.css_classes())
                 .collect::<Vec<Vec<&'static str>>>()
                 .concat(),
             Style::TextImportant4 => vec!["text-important-4"],
+            Style::TextContent1 => vec!["text-content-1"],
             Style::TextContent5 => vec!["text-content-5"],
             Style::W7 => vec!["w-7"],
             Style::W8 => vec!["w-8"],
@@ -89,11 +93,11 @@ impl Style {
             Style::BgContent1 => vec!["bg-content-1"],
             Style::BgContent4 => vec!["bg-content-4"],
             Style::Outset => vec!["outset"],
-            Style::OutsetImportant => vec!["outset-important"],
             Style::Inset => vec!["inset"],
             Style::InsetImportant => vec!["inset-important"],
             Style::BgBackground0 => vec!["bg-background-0"],
             Style::BgBackground1 => vec!["bg-background-1"],
+            Style::BgProblem1 => vec!["bg-problem-1"],
             Style::H4 => vec!["h-4"],
             Style::H5 => vec!["h-5"],
             Style::H8 => vec!["h-8"],
@@ -106,8 +110,6 @@ impl Style {
             Style::BgImportant1 => vec!["bg-important-1"],
             Style::Hide => vec!["hide"],
             Style::Implode => vec!["implode"],
-            Style::Implded => vec!["imploded"],
-            Style::ImplodeReady => vec!["implode-ready"],
         }
     }
 }
