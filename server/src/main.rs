@@ -15,6 +15,7 @@ use shared::api::endpoint::Endpoint;
 
 mod dev;
 mod flags;
+mod games;
 mod lobbies;
 mod model;
 mod route;
@@ -60,6 +61,10 @@ async fn main() -> Result<(), String> {
                     .route(
                         Endpoint::update_lobby().to_string().as_str(),
                         web::post().to(lobby::update::handle),
+                    )
+                    .route(
+                        Endpoint::StartGame.to_string().as_str(),
+                        web::post().to(lobby::start::handle),
                     ),
             )
             .default_service(web::get().to(frontend))

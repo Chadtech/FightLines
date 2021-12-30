@@ -1,4 +1,5 @@
 use seed::prelude::{fetch, Method, Request};
+use shared::api::endpoint::Endpoint;
 
 async fn send_request(method: Method, url: String, bytes: Vec<u8>) -> fetch::Result<Vec<u8>> {
     Request::new(url.as_str())
@@ -11,12 +12,12 @@ async fn send_request(method: Method, url: String, bytes: Vec<u8>) -> fetch::Res
         .await
 }
 
-pub async fn post(url: String, bytes: Vec<u8>) -> fetch::Result<Vec<u8>> {
-    send_request(Method::Post, url, bytes).await
+pub async fn post(endpoint: Endpoint, bytes: Vec<u8>) -> fetch::Result<Vec<u8>> {
+    send_request(Method::Post, endpoint.to_string(), bytes).await
 }
 
-pub async fn get(url: String) -> fetch::Result<Vec<u8>> {
-    Request::new(url.as_str())
+pub async fn get(endpoint: Endpoint) -> fetch::Result<Vec<u8>> {
+    Request::new(endpoint.to_string().as_str())
         .method(Method::Get)
         .fetch()
         .await?

@@ -94,7 +94,7 @@ fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders
                     lobby_id: lobby_id.clone(),
                 };
 
-                let url = Endpoint::join_lobby(lobby_id.clone()).to_url();
+                let url = Endpoint::join_lobby(lobby_id.clone());
 
                 match req.to_bytes() {
                     Ok(bytes) => {
@@ -167,6 +167,9 @@ fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders
             }
         }
         Route::Kicked => Page::Kicked,
+        Route::Game(_) => {
+            panic!("TODO, navigate to game page")
+        }
     };
 
     model.page = new_page;

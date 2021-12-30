@@ -13,6 +13,7 @@ pub enum Route {
     ComponentLibrary(component_library::Route),
     Lobby(Id),
     Kicked,
+    Game(Id),
 }
 
 ////////////////////////////////////////////////////////////////
@@ -22,6 +23,8 @@ pub enum Route {
 const LOBBY: &'static str = "lobby";
 
 const KICKED: &'static str = "kicked";
+
+const GAME: &'static str = "game";
 
 ////////////////////////////////////////////////////////////////
 // API //
@@ -58,6 +61,9 @@ impl Route {
             Route::Kicked => {
                 vec![KICKED.to_string()]
             }
+            Route::Game(id) => {
+                vec![GAME.to_string(), id.to_string()]
+            }
         }
     }
     pub fn from_url(url: Url) -> Option<Route> {
@@ -71,6 +77,13 @@ impl Route {
                         .next()
                         .and_then(|id| Id::from_string(id.clone()))
                         .map(Route::Lobby);
+                }
+
+                if first == GAME {
+                    return path
+                        .next()
+                        .and_then(|id| Id::from_string(id.clone()))
+                        .map(Route::Game);
                 }
 
                 if first == component_library::ROOT {

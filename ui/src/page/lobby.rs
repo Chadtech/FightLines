@@ -9,7 +9,9 @@ use crate::{api, core_ext, global};
 use seed::prelude::{cmds, CmdHandle, Orders};
 use shared::api::endpoint::Endpoint;
 use shared::api::lobby::get as lobby_get;
+use shared::api::lobby::start as lobby_start;
 use shared::api::lobby::update as lobby_update;
+use shared::game::Game;
 use shared::id::Id;
 use shared::lobby;
 use shared::lobby::{Lobby, MAX_GUESTS};
@@ -47,6 +49,7 @@ pub enum Msg {
     //
     PollTimeoutExpired,
     GotLobbyResponse(Result<lobby_get::Response, String>),
+    StartedGame(Result<lobby_start::Response, String>),
 }
 
 #[derive(Clone, Debug)]
@@ -198,8 +201,30 @@ pub fn update(
             }
         }
         Msg::ClickedStart => {
-            if let Some(host_model) = &model.host_model {
-                // TODO
+            if Game::from_lobby(model.lobby.clone()).is_ok() && model.host_model.is_some() {
+                let req = lobby_start::Request {
+                    player_id: global.viewer_id(),
+                    lobby_id: model.lobby_id.clone(),
+                };
+
+                match req.to_bytes() {
+                    Ok(bytes) => {
+                        orders.skip().perform_cmd({
+                            async {
+                                let result = match api::post(Endpoint::StartGame, bytes).await {
+                                    Ok(response_bytes) => {
+                                        lobby_start::Response::from_bytes(response_bytes)
+                                            .map_err(|err| err.to_string())
+                                    }
+                                    Err(error) => Err(core_ext::http::fetch_error_to_string(error)),
+                                };
+
+                                Msg::StartedGame(result)
+                            }
+                        });
+                    }
+                    Err(_) => {}
+                }
             }
         }
         Msg::PollTimeoutExpired => {
@@ -209,7 +234,7 @@ pub fn update(
 
             orders.skip().perform_cmd({
                 async {
-                    let result = match api::get(Endpoint::make_get_lobby(lobby_id).to_url()).await {
+                    let result = match api::get(Endpoint::make_get_lobby(lobby_id)).await {
                         Ok(response_bytes) => lobby_get::Response::from_bytes(response_bytes)
                             .map_err(|err| err.to_string()),
                         Err(error) => Err(core_ext::http::fetch_error_to_string(error)),
@@ -230,6 +255,10 @@ pub fn update(
                     .error()
                     .with_more_info(error.as_str()),
             ),
+        },
+        Msg::StartedGame(result) => match result {
+            Ok(_) => {}
+            Err(_) => {}
         },
     }
 }
@@ -258,9 +287,7 @@ fn send_updates(lobby_id: Id, upts: Vec<lobby::Update>, orders: &mut impl Orders
         Ok(request_bytes) => {
             orders.skip().perform_cmd({
                 async {
-                    let result = match api::post(Endpoint::update_lobby().to_url(), request_bytes)
-                        .await
-                    {
+                    let result = match api::post(Endpoint::update_lobby(), request_bytes).await {
                         Ok(response_bytes) => lobby_update::Response::from_bytes(response_bytes)
                             .map_err(|err| err.to_string()),
                         Err(error) => {

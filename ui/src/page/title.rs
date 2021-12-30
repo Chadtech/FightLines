@@ -74,11 +74,7 @@ pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut 
                 Ok(request_bytes) => {
                     orders.skip().perform_cmd({
                         async {
-                            let result = match api::post(
-                                Endpoint::CreateLobby.to_url(),
-                                request_bytes,
-                            )
-                            .await
+                            let result = match api::post(Endpoint::CreateLobby, request_bytes).await
                             {
                                 Ok(response_bytes) => create::Response::from_bytes(response_bytes)
                                     .map_err(|err| err.to_string()),

@@ -1,4 +1,5 @@
 use crate::flags::Flags;
+use crate::games::Games;
 use crate::lobbies::Lobbies;
 use crate::setting::Setting;
 use shared::rng::{RandGen, RandSeed};
@@ -15,6 +16,7 @@ pub struct Model {
     pub port_number: u64,
     pub setting: Setting,
     pub lobbies: Mutex<Lobbies>,
+    pub games: Mutex<Games>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -39,6 +41,7 @@ impl Model {
         let mut rand_gen: RandGen = RandGen::from_seed(random_seed);
 
         let lobbies_seed: RandSeed = RandSeed::next(&mut rand_gen);
+        let games_seed: RandSeed = RandSeed::next(&mut rand_gen);
 
         Ok(Model {
             ip_address: flags.ip_address,
@@ -46,6 +49,7 @@ impl Model {
             port_number: flags.port_number,
             setting,
             lobbies: Mutex::new(Lobbies::init(lobbies_seed)),
+            games: Mutex::new(Games::init(games_seed)),
         })
     }
 }

@@ -1,4 +1,5 @@
 pub mod api;
+pub mod game;
 pub mod id;
 pub mod lobby;
 pub mod name;

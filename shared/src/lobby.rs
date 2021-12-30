@@ -131,6 +131,10 @@ impl Lobby {
         }
     }
 
+    pub fn started(&mut self) {
+        self.game_started = true;
+    }
+
     pub fn update(&mut self, upt: Update) -> Result<&mut Lobby, UpdateError> {
         match upt {
             Update::AddSlot => {
