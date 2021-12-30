@@ -1,8 +1,8 @@
 use crate::id::Id;
-use crate::lobby::UpdateError::{AtMaximumSlots, NameCannotBeEmpty, NoOpenSlotToClose};
+use crate::name::Name;
 use crate::player::Player;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Types //
@@ -15,6 +15,7 @@ pub struct Lobby {
     pub guests: HashMap<Id, Player>,
     pub num_players_limit: u8,
     pub name: String,
+    pub kicked_guests: HashSet<Id>,
     game_started: bool,
 }
 
@@ -27,6 +28,8 @@ pub enum Update {
     AddSlot,
     CloseSlot,
     ChangeName(String),
+    ChangePlayerName { player_id: Id, new_name: Name },
+    KickGuest { guest_id: Id },
 }
 
 #[derive(Clone)]
@@ -34,7 +37,8 @@ pub enum Update {
 pub enum UpdateError {
     AtMaximumSlots,
     NoOpenSlotToClose,
-    NameCannotBeEmpty,
+    GameNameCannotBeEmpty,
+    CannotFindPlayer,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -62,6 +66,7 @@ impl Lobby {
             game_started: false,
             name: "new game".to_string(),
             num_players_limit: 2,
+            kicked_guests: HashSet::new(),
         }
     }
 
@@ -133,7 +138,7 @@ impl Lobby {
                     self.num_players_limit += 1;
                     Ok(self)
                 } else {
-                    Err(AtMaximumSlots)
+                    Err(UpdateError::AtMaximumSlots)
                 }
             }
             Update::CloseSlot => {
@@ -141,16 +146,40 @@ impl Lobby {
                     self.num_players_limit -= 1;
                     Ok(self)
                 } else {
-                    Err(NoOpenSlotToClose)
+                    Err(UpdateError::NoOpenSlotToClose)
                 }
             }
             Update::ChangeName(new_name) => {
                 if new_name.is_empty() {
-                    Err(NameCannotBeEmpty)
+                    Err(UpdateError::GameNameCannotBeEmpty)
                 } else {
                     self.name = new_name;
                     Ok(self)
                 }
+            }
+            Update::ChangePlayerName {
+                player_id,
+                new_name,
+            } => {
+                if self.host_id == player_id {
+                    self.host.name = new_name;
+                    Ok(self)
+                } else {
+                    match self.guests.get_mut(&player_id) {
+                        None => Err(UpdateError::CannotFindPlayer),
+                        Some(guest) => {
+                            guest.name = new_name;
+
+                            Ok(self)
+                        }
+                    }
+                }
+            }
+            Update::KickGuest { guest_id } => {
+                self.guests.remove(&guest_id);
+                self.kicked_guests.insert(guest_id);
+
+                Ok(self)
             }
         }
     }

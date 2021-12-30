@@ -3,6 +3,7 @@ use crate::view::cell::{Cell, Row};
 
 pub struct Card {
     variant: Variant,
+    body_styles: Vec<Style>,
     header: Option<Header>,
 }
 
@@ -35,6 +36,7 @@ impl Card {
     pub fn init() -> Card {
         Card {
             variant: Variant::Normal,
+            body_styles: Vec::new(),
             header: None,
         }
     }
@@ -44,15 +46,15 @@ impl Card {
         self
     }
 
-    pub fn problem(mut self, p: bool) -> Card {
+    pub fn problem(self, p: bool) -> Card {
         self.with_variant(Variant::Problem, p)
     }
 
-    pub fn disable(mut self, d: bool) -> Card {
+    pub fn disable(self, d: bool) -> Card {
         self.with_variant(Variant::Disabled, d)
     }
 
-    pub fn primary(mut self, p: bool) -> Card {
+    pub fn primary(self, p: bool) -> Card {
         self.with_variant(Variant::Primary, p)
     }
 
@@ -60,6 +62,12 @@ impl Card {
         if cond {
             self.variant = variant;
         }
+
+        self
+    }
+
+    pub fn with_body_styles(mut self, styles: Vec<Style>) -> Card {
+        self.body_styles = styles;
 
         self
     }
@@ -80,12 +88,12 @@ impl Card {
             styles,
             vec![
                 self.header.map(|h| h.to_cell()).unwrap_or_else(Cell::none),
-                Cell::from_rows(vec![Style::P4], rows),
+                Cell::from_rows(vec![Style::P4, Style::Batch(self.body_styles)], rows),
             ],
         )
     }
     pub fn cell_from_rows<Msg: 'static>(styles: Vec<Style>, rows: Vec<Row<Msg>>) -> Cell<Msg> {
-        Card::init().cell(styles, rows)
+        Card::init().with_body_styles(styles).cell(vec![], rows)
     }
 }
 

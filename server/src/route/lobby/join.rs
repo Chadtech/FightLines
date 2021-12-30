@@ -29,17 +29,21 @@ async fn from_req(req: Request, data: web::Data<Model>) -> HttpResponse {
                 Ok(lobby) => {
                     lobbies.upsert(req.lobby_id.clone(), lobby.clone());
 
-                    match Response::init(req.lobby_id, lobby).to_bytes() {
-                        Ok(response_bytes) => HttpResponse::Ok()
-                            .header("Content-Type", "application/octet-stream")
-                            .body(response_bytes),
-                        Err(error) => HttpResponse::InternalServerError().body(error.to_string()),
-                    }
+                    response_to_http(Response::init(req.lobby_id, lobby))
                 }
                 Err(err) => match err {
                     AddError::LobbyIsFull => HttpResponse::Conflict().body("Lobby is full"),
                 },
             }
         }
+    }
+}
+
+fn response_to_http(res: Response) -> HttpResponse {
+    match res.to_bytes() {
+        Ok(response_bytes) => HttpResponse::Ok()
+            .header("Content-Type", "application/octet-stream")
+            .body(response_bytes),
+        Err(error) => HttpResponse::InternalServerError().body(error.to_string()),
     }
 }

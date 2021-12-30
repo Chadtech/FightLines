@@ -46,7 +46,7 @@ impl<'a, Msg: 'static> ErrorCard<'a, Msg> {
             Row::none()
         } else {
             Row::from_cells(
-                vec![Style::JustifyEnd],
+                vec![],
                 self.buttons
                     .into_iter()
                     .map(|button| button.cell())

@@ -12,6 +12,7 @@ pub enum Route {
     Title,
     ComponentLibrary(component_library::Route),
     Lobby(Id),
+    Kicked,
 }
 
 ////////////////////////////////////////////////////////////////
@@ -20,8 +21,10 @@ pub enum Route {
 
 const LOBBY: &'static str = "lobby";
 
+const KICKED: &'static str = "kicked";
+
 ////////////////////////////////////////////////////////////////
-// Api //
+// API //
 ////////////////////////////////////////////////////////////////
 
 impl ToString for Route {
@@ -52,6 +55,9 @@ impl Route {
             Route::Lobby(id) => {
                 vec![LOBBY.to_string(), id.to_string()]
             }
+            Route::Kicked => {
+                vec![KICKED.to_string()]
+            }
         }
     }
     pub fn from_url(url: Url) -> Option<Route> {
@@ -70,6 +76,10 @@ impl Route {
                 if first == component_library::ROOT {
                     let sub_route = component_library::Route::from_pieces(path)?;
                     return Some(Route::ComponentLibrary(sub_route));
+                }
+
+                if first == KICKED {
+                    return Some(Route::Kicked);
                 }
 
                 None

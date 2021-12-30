@@ -1,3 +1,4 @@
+use crate::route::Route;
 use crate::style::Style;
 use crate::view::button::Button;
 use crate::view::card::Card;
@@ -5,7 +6,6 @@ use crate::view::cell::{Cell, Row};
 use crate::view::text_field::TextField;
 use crate::view::toast::Toast;
 use crate::{api, core_ext, global};
-use seed::browser::web_socket::WebSocketError;
 use seed::prelude::{cmds, CmdHandle, Orders};
 use shared::api::endpoint::Endpoint;
 use shared::api::lobby::get as lobby_get;
@@ -13,6 +13,7 @@ use shared::api::lobby::update as lobby_update;
 use shared::id::Id;
 use shared::lobby;
 use shared::lobby::{Lobby, MAX_GUESTS};
+use shared::name::Name;
 use shared::player::Player;
 
 ///////////////////////////////////////////////////////////////
@@ -76,16 +77,33 @@ impl HostModel {
 // Api //
 ///////////////////////////////////////////////////////////////
 
-impl Model {
-    pub fn init(global: &global::Model, flags: Flags, orders: &mut impl Orders<Msg>) -> Model {
-        let name_field = global.viewer_name.to_string();
+pub enum InitError {
+    PlayerIsKicked,
+}
 
-        Model {
-            lobby_id: flags.lobby_id,
-            lobby: flags.lobby.clone(),
-            name_field,
-            host_model: HostModel::init(global, flags.lobby),
-            handle_timeout: wait_to_poll_lobby(orders),
+impl Model {
+    pub fn init(
+        global: &global::Model,
+        flags: Flags,
+        orders: &mut impl Orders<Msg>,
+    ) -> Result<Model, InitError> {
+        let lobby = flags.lobby.clone();
+
+        if lobby.kicked_guests.contains(&global.viewer_id()) {
+            orders.request_url(Route::Kicked.to_url());
+            Err(InitError::PlayerIsKicked)
+        } else {
+            let name_field = global.viewer_name.to_string();
+
+            let model = Model {
+                lobby_id: flags.lobby_id,
+                lobby,
+                name_field,
+                host_model: HostModel::init(global, flags.lobby),
+                handle_timeout: wait_to_poll_lobby(orders),
+            };
+
+            Ok(model)
         }
     }
     pub fn viewer_is_host(&self) -> bool {
@@ -122,9 +140,15 @@ pub fn update(
         }
         Msg::UpdatedLobby(result) => match result {
             Ok(res) => {
-                model.lobby = res.get_lobby();
+                let lobby = res.get_lobby();
+
+                handle_updated_lobby(&global, model, lobby, orders);
             }
-            Err(_) => global.toast(Toast::init("Error", "Could not load lobby").error()),
+            Err(error) => global.toast(
+                Toast::init("error", "could not load lobby")
+                    .error()
+                    .with_more_info(error.as_str()),
+            ),
         },
         Msg::UpdatedNameField(field) => {
             model.name_field = field;
@@ -137,7 +161,7 @@ pub fn update(
         Msg::ClickedSaveGameName => {
             if let Some(host_model) = &mut model.host_model {
                 if host_model.game_name_field.is_empty() {
-                    // TODO
+                    global.toast(Toast::validation_error("game name cannot be blank"))
                 } else {
                     send_updates(
                         model.lobby_id.clone(),
@@ -149,11 +173,29 @@ pub fn update(
                 }
             }
         }
-        Msg::ClickedSavePlayerName => {
-            // TODO
-        }
+        Msg::ClickedSavePlayerName => match Name::from_string(model.name_field.clone()) {
+            None => global.toast(Toast::validation_error("player name cannot be blank")),
+            Some(name) => {
+                global.set_viewer_name(name.clone());
+
+                send_updates(
+                    model.lobby_id.clone(),
+                    vec![lobby::Update::ChangePlayerName {
+                        player_id: global.viewer_id(),
+                        new_name: name,
+                    }],
+                    orders,
+                );
+            }
+        },
         Msg::ClickedKickGuest(guest_id) => {
-            // TODO
+            if model.host_model.is_some() {
+                send_updates(
+                    model.lobby_id.clone(),
+                    vec![lobby::Update::KickGuest { guest_id }],
+                    orders,
+                )
+            }
         }
         Msg::ClickedStart => {
             if let Some(host_model) = &model.host_model {
@@ -181,12 +223,28 @@ pub fn update(
             Ok(res) => {
                 let lobby = res.get_lobby();
 
-                model.lobby = lobby;
+                handle_updated_lobby(&global, model, lobby, orders);
             }
-            Err(error) => {
-                // TODO
-            }
+            Err(error) => global.toast(
+                Toast::init("error", "could not load lobby")
+                    .error()
+                    .with_more_info(error.as_str()),
+            ),
         },
+    }
+}
+
+fn handle_updated_lobby(
+    global: &global::Model,
+    model: &mut Model,
+    lobby: Lobby,
+    orders: &mut impl Orders<Msg>,
+) {
+    // Redirect out of here, if the viewer is kicked
+    if lobby.kicked_guests.contains(&global.viewer_id()) {
+        orders.request_url(Route::Kicked.to_url());
+    } else {
+        model.lobby = lobby;
     }
 }
 
@@ -220,14 +278,6 @@ fn send_updates(lobby_id: Id, upts: Vec<lobby::Update>, orders: &mut impl Orders
         }
     };
 }
-
-enum LobbyUpdateError {
-    ResponseError(String),
-    FailedToMakeWebsocket(String),
-    WebsocketError(WebSocketError),
-}
-
-fn handle_lobby_update(lobby_res: Result<lobby_update::Response, String>, model: &mut Model) {}
 
 ///////////////////////////////////////////////////////////////
 // View //

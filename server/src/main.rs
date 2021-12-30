@@ -4,8 +4,7 @@ use std::sync::mpsc::channel;
 use std::thread;
 
 use actix_cors::Cors;
-use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer};
-use actix_web_actors::ws;
+use actix_web::{web, App, HttpResponse, HttpServer};
 use notify::{raw_watcher, RecursiveMode, Watcher};
 
 use route::lobby;

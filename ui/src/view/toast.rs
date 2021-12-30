@@ -18,6 +18,17 @@ pub struct Toast {
     variant: Variant,
 }
 
+pub struct OpenToast {
+    pub text: String,
+    pub title: String,
+    pub info: String,
+}
+
+#[derive(Clone)]
+pub enum Msg {
+    ClickedOpenToast(usize),
+}
+
 #[derive(Clone, PartialEq)]
 enum Variant {
     Normal,
@@ -38,6 +49,14 @@ impl Toast {
         }
     }
 
+    pub fn to_open_toast(&self) -> Option<OpenToast> {
+        self.more_info.clone().map(|more_info| OpenToast {
+            text: self.text.clone(),
+            title: self.title.clone(),
+            info: more_info,
+        })
+    }
+
     fn with_variant(mut self, variant: Variant) -> Toast {
         self.variant = variant;
         self
@@ -48,17 +67,26 @@ impl Toast {
         self
     }
 
-    pub fn error(mut self) -> Toast {
+    pub fn error(self) -> Toast {
         self.with_variant(Variant::Error)
     }
 
-    fn to_cell<Msg: 'static>(&self, hide: bool) -> Cell<Msg> {
+    pub fn validation_error(text: &str) -> Toast {
+        Toast::init("validation error", text).error()
+    }
+
+    fn to_cell(&self, hide: bool, index: usize) -> Cell<Msg> {
         let implode_style = if hide { Style::Implode } else { Style::none() };
 
         let text_cell = Cell::from_str(vec![], self.text.as_str());
 
         let more_info_row = if self.more_info.is_some() {
-            Row::from_cells(vec![Style::MT4], vec![Button::simple("open").cell()])
+            Row::from_cells(
+                vec![Style::MT4],
+                vec![Button::simple("open")
+                    .on_click(move |_| Msg::ClickedOpenToast(index))
+                    .cell()],
+            )
         } else {
             Row::none()
         };
@@ -72,14 +100,16 @@ impl Toast {
             )
     }
 
-    pub fn many_to_html<Msg: 'static>(hide_first: bool, toasts: &Vec<Toast>) -> Node<Msg> {
+    pub fn many_to_html(hide_first: bool, toasts: &Vec<Toast>) -> Node<Msg> {
         let mut element: El<Msg> = El::empty(Tag::Custom(Cow::Borrowed("toasts")));
 
         if let Some((first, rest)) = toasts.split_first() {
-            element.children.push(first.to_cell(hide_first).html());
+            element.children.push(first.to_cell(hide_first, 0).html());
 
-            for toast in rest {
-                element.children.push(toast.to_cell(false).html());
+            for (index, toast) in rest.iter().enumerate() {
+                element
+                    .children
+                    .push(toast.to_cell(false, index + 1).html());
             }
         }
 

@@ -52,6 +52,8 @@ pub enum Style {
     Pointer,
     Hide,
     Implode,
+    Screen,
+    AbsoluteCenter,
 }
 
 impl Style {
@@ -110,6 +112,8 @@ impl Style {
             Style::BgImportant1 => vec!["bg-important-1"],
             Style::Hide => vec!["hide"],
             Style::Implode => vec!["implode"],
+            Style::Screen => vec!["screen"],
+            Style::AbsoluteCenter => vec!["absolute-center"],
         }
     }
 }

@@ -1,5 +1,6 @@
 pub mod component_library;
 pub mod error;
+pub mod kicked;
 pub mod loading;
 pub mod lobby;
 pub mod not_found;
@@ -13,6 +14,7 @@ pub enum Page {
     Title(title::Model),
     ComponentLibrary(component_library::Model),
     Lobby(lobby::Model),
+    Kicked,
     Loading,
     Error(error::Model),
     NotFound,

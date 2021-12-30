@@ -5,13 +5,14 @@ use seed::{prelude::*, *};
 use page::Page;
 use route::Route;
 use shared::api::endpoint::Endpoint;
-use shared::api::lobby::get as get_lobby;
 use shared::api::lobby::join as join_lobby;
 use shared::lobby::Lobby;
 use style::Style;
 
-use crate::page::{component_library, error, loading, lobby, not_found, title};
+use crate::page::lobby::InitError;
+use crate::page::{component_library, error, kicked, loading, lobby, not_found, title};
 use crate::view::cell::{Cell, Row};
+use crate::view::toast;
 use crate::view::toast::Toast;
 
 mod api;
@@ -37,12 +38,14 @@ enum Msg {
     Title(title::Msg),
     Lobby(lobby::Msg),
     Error(error::Msg),
+    Kicked(kicked::Msg),
 
     // Page Loads
     LoadedLobby(Result<lobby::Flags, String>),
     //
     UrlChanged(subs::UrlChanged),
     Global(global::Msg),
+    Toast(toast::Msg),
 }
 
 ///////////////////////////////////////////////////////////////
@@ -76,7 +79,7 @@ fn handle_url_change(url: Url, model: &mut Model, orders: &mut impl Orders<Msg>)
 }
 
 fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders<Msg>) {
-    let new_page = match route {
+    let new_page: Page = match route {
         Route::Title => Page::Title(title::Model::init()),
         Route::ComponentLibrary(sub_route) => {
             Page::ComponentLibrary(component_library::init(sub_route))
@@ -99,11 +102,15 @@ fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders
                             async {
                                 let result = match api::post(url, bytes).await {
                                     Ok(res_bytes) => {
-                                        match get_lobby::Response::from_bytes(res_bytes) {
-                                            Ok(res) => Ok(lobby::Flags {
-                                                lobby_id: res.get_lobby_id(),
-                                                lobby: res.get_lobby(),
-                                            }),
+                                        match join_lobby::Response::from_bytes(res_bytes) {
+                                            Ok(res) => {
+                                                let flags = lobby::Flags {
+                                                    lobby_id: res.lobby_id,
+                                                    lobby: res.lobby,
+                                                };
+
+                                                Ok(flags)
+                                            }
                                             Err(err) => Err(err.to_string()),
                                         }
                                     }
@@ -148,15 +155,18 @@ fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders
                         lobby,
                     };
 
-                    Page::Lobby(lobby::Model::init(
-                        &model.global,
-                        flags,
-                        &mut orders.proxy(Msg::Lobby),
-                    ))
+                    match lobby::Model::init(&model.global, flags, &mut orders.proxy(Msg::Lobby)) {
+                        Err(error) => match error {
+                            InitError::PlayerIsKicked => Page::Kicked,
+                        },
+
+                        Ok(sub_model) => Page::Lobby(sub_model),
+                    }
                 }
                 None => Page::Loading,
             }
         }
+        Route::Kicked => Page::Kicked,
     };
 
     model.page = new_page;
@@ -193,10 +203,16 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
         }
         Msg::LoadedLobby(result) => match result {
             Ok(flags) => {
-                let sub_model =
-                    lobby::Model::init(&model.global, flags, &mut orders.proxy(Msg::Lobby));
-
-                model.page = Page::Lobby(sub_model);
+                match lobby::Model::init(&model.global, flags, &mut orders.proxy(Msg::Lobby)) {
+                    Ok(sub_model) => {
+                        model.page = Page::Lobby(sub_model);
+                    }
+                    Err(error) => match error {
+                        InitError::PlayerIsKicked => {
+                            model.page = Page::Kicked;
+                        }
+                    },
+                }
             }
             Err(error) => {
                 let flags =
@@ -211,6 +227,10 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
         Msg::Global(sub_msg) => {
             global::update(sub_msg, &mut model.global, &mut orders.proxy(Msg::Global));
         }
+        Msg::Toast(sub_msg) => {
+            global::update_from_toast_msg(sub_msg, &mut model.global);
+        }
+        Msg::Kicked(sub_msg) => kicked::update(sub_msg, &mut orders.proxy(Msg::Kicked)),
     }
 }
 
@@ -219,46 +239,58 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
 ///////////////////////////////////////////////////////////////
 
 fn view(model: &Model) -> Node<Msg> {
-    let body: Vec<Row<Msg>> = match &model.page {
-        Page::Title(sub_model) => title::view(sub_model)
-            .into_iter()
-            .map(|row| row.map_msg(Msg::Title))
-            .collect(),
+    let page_body = global::open_toast_view(&model.global)
+        .map(|cell| cell.map_msg(Msg::Global))
+        .unwrap_or_else(|| {
+            let body: Vec<Row<Msg>> = match &model.page {
+                Page::Title(sub_model) => title::view(sub_model)
+                    .into_iter()
+                    .map(|row| row.map_msg(Msg::Title))
+                    .collect(),
 
-        Page::ComponentLibrary(sub_model) => component_library::view(sub_model),
-        Page::Lobby(sub_model) => lobby::view(&model.global, sub_model)
-            .into_iter()
-            .map(|row| row.map_msg(Msg::Lobby))
-            .collect(),
-        Page::NotFound => not_found::view(),
-        Page::Blank => vec![],
-        Page::Loading => loading::view(),
-        Page::Error(sub_model) => error::view(sub_model)
-            .into_iter()
-            .map(|row| row.map_msg(Msg::Error))
-            .collect(),
-    };
+                Page::ComponentLibrary(sub_model) => component_library::view(sub_model),
+                Page::Lobby(sub_model) => lobby::view(&model.global, sub_model)
+                    .into_iter()
+                    .map(|row| row.map_msg(Msg::Lobby))
+                    .collect(),
+                Page::NotFound => not_found::view(),
+                Page::Blank => vec![],
+                Page::Loading => loading::view(),
+                Page::Error(sub_model) => error::view(sub_model)
+                    .into_iter()
+                    .map(|row| row.map_msg(Msg::Error))
+                    .collect(),
+                Page::Kicked => kicked::view()
+                    .into_iter()
+                    .map(|row| row.map_msg(Msg::Kicked))
+                    .collect(),
+            };
 
-    let mut page_styles: Vec<Style> = Vec::new();
+            let mut page_styles: Vec<Style> = Vec::new();
 
-    let mut from_page = match &model.page {
-        Page::Title(_) => title::PARENT_STYLES.to_vec(),
-        Page::NotFound => not_found::PARENT_STYLES.to_vec(),
-        Page::Lobby(_) => lobby::PARENT_STYLES.to_vec(),
-        Page::ComponentLibrary(_) => vec![],
-        Page::Blank => vec![],
-        Page::Loading => loading::PARENT_STYLES.to_vec(),
-        Page::Error(_) => error::PARENT_STYLES.to_vec(),
-    };
+            let mut from_page = match &model.page {
+                Page::Title(_) => title::PARENT_STYLES.to_vec(),
+                Page::NotFound => not_found::PARENT_STYLES.to_vec(),
+                Page::Lobby(_) => lobby::PARENT_STYLES.to_vec(),
+                Page::ComponentLibrary(_) => vec![],
+                Page::Blank => vec![],
+                Page::Loading => loading::PARENT_STYLES.to_vec(),
+                Page::Error(_) => error::PARENT_STYLES.to_vec(),
+                Page::Kicked => kicked::PARENT_STYLES.to_vec(),
+            };
 
-    page_styles.append(&mut from_page);
-    page_styles.append(&mut vec![Style::Grow]);
+            page_styles.append(&mut from_page);
+            page_styles.append(&mut vec![Style::Grow]);
+
+            Cell::from_rows(page_styles, body)
+        });
 
     div![
         C!["page-container"],
         style::global_html(),
-        Cell::from_rows(page_styles, body).html(),
+        page_body.html(),
         Toast::many_to_html(model.global.first_toast_hidden(), &model.global.toasts())
+            .map_msg(Msg::Toast),
     ]
 }
 

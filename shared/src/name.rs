@@ -21,8 +21,12 @@ impl Name {
         Name(name.to_string())
     }
 
-    pub fn from_string(s: String) -> Name {
-        Name(s)
+    pub fn from_string(s: String) -> Option<Name> {
+        if s.is_empty() {
+            None
+        } else {
+            Some(Name(s))
+        }
     }
 
     pub fn from_str(s: &str) -> Name {
