@@ -10,7 +10,7 @@ use shared::lobby::Lobby;
 use style::Style;
 
 use crate::page::lobby::InitError;
-use crate::page::{component_library, error, kicked, loading, lobby, not_found, title};
+use crate::page::{component_library, error, game, kicked, loading, lobby, not_found, title};
 use crate::view::cell::{Cell, Row};
 use crate::view::toast;
 use crate::view::toast::Toast;
@@ -39,6 +39,7 @@ enum Msg {
     Lobby(lobby::Msg),
     Error(error::Msg),
     Kicked(kicked::Msg),
+    Game(game::Msg),
 
     // Page Loads
     LoadedLobby(Result<lobby::Flags, String>),
@@ -167,8 +168,32 @@ fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders
             }
         }
         Route::Kicked => Page::Kicked,
-        Route::Game(_) => {
-            panic!("TODO, navigate to game page")
+        Route::Game(id) => {
+            let maybe_game =
+                match &model.page {
+                    Page::Lobby(sub_model) => {
+                        sub_model.started_game().and_then(|(game_id, game)| {
+                            if game_id == id {
+                                Some(game)
+                            } else {
+                                None
+                            }
+                        })
+                    }
+                    _ => None,
+                };
+
+            match maybe_game {
+                None => {
+                    // TODO load game
+                    panic!("TODO load ganme");
+                    Page::Loading
+                }
+                Some(game) => Page::Game(game::init(
+                    game::Flags { game: game.clone() },
+                    &mut orders.proxy(Msg::Game),
+                )),
+            }
         }
     };
 
@@ -218,6 +243,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                 }
             }
             Err(error) => {
+                log!("B");
                 let flags =
                     error::Flags::from_title("could not load lobby".to_string()).with_msg(error);
 
@@ -234,6 +260,16 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
             global::update_from_toast_msg(sub_msg, &mut model.global);
         }
         Msg::Kicked(sub_msg) => kicked::update(sub_msg, &mut orders.proxy(Msg::Kicked)),
+        Msg::Game(sub_msg) => {
+            if let Page::Game(sub_model) = &mut model.page {
+                game::update(
+                    &model.global,
+                    sub_msg,
+                    sub_model,
+                    &mut orders.proxy(Msg::Game),
+                )
+            }
+        }
     }
 }
 
@@ -267,6 +303,10 @@ fn view(model: &Model) -> Node<Msg> {
                     .into_iter()
                     .map(|row| row.map_msg(Msg::Kicked))
                     .collect(),
+                Page::Game(sub_model) => vec![Row::from_cells(
+                    vec![],
+                    vec![game::view(sub_model).map_msg(Msg::Game)],
+                )],
             };
 
             let mut page_styles: Vec<Style> = Vec::new();
@@ -280,6 +320,7 @@ fn view(model: &Model) -> Node<Msg> {
                 Page::Loading => loading::PARENT_STYLES.to_vec(),
                 Page::Error(_) => error::PARENT_STYLES.to_vec(),
                 Page::Kicked => kicked::PARENT_STYLES.to_vec(),
+                Page::Game(_) => vec![],
             };
 
             page_styles.append(&mut from_page);

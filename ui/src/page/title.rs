@@ -1,3 +1,4 @@
+use crate::core_ext::route::go_to_route;
 use crate::route::Route;
 use crate::style::Style;
 use crate::view::button::Button;
@@ -6,7 +7,6 @@ use crate::view::cell::{Cell, Row};
 use crate::view::error_card::ErrorCard;
 use crate::view::loading_spinner::LoadingSpinner;
 use crate::{api, core_ext, global};
-use seed::log;
 use seed::prelude::Orders;
 use shared::api::endpoint::Endpoint;
 use shared::api::lobby::create;
@@ -65,7 +65,6 @@ impl Model {
 ///////////////////////////////////////////////////////////////
 
 pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
-    log!(msg);
     match msg {
         Msg::ClickedStartGame => {
             model.status = Status::WaitingForNewGame;
@@ -103,18 +102,18 @@ pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut 
                     lobby: res.lobby,
                 };
 
-                orders.request_url(Route::Lobby(lobby_id).to_url());
+                go_to_route(orders, Route::Lobby(lobby_id));
             }
             Err(err) => {
                 model.status = Status::CouldNotMakeNewGame(NewGameError::RemoteError(err));
             }
         },
         Msg::ClickedGoBackToTitle => {
-            orders.request_url(Route::Title.to_url());
+            go_to_route(orders, Route::Title);
         }
         Msg::ClickedGoToNewGame => {
             if let Status::NewGameLobbyCreated { lobby_id, lobby: _ } = &mut model.status {
-                orders.request_url(Route::Lobby(lobby_id.clone()).to_url());
+                go_to_route(orders, Route::Lobby(lobby_id.clone()));
             }
         }
     }

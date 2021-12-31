@@ -1,3 +1,4 @@
+use crate::core_ext::route::go_to_route;
 use crate::route::Route;
 use crate::style::Style;
 use crate::view::button::Button;
@@ -6,6 +7,7 @@ use crate::view::cell::{Cell, Row};
 use crate::view::text_field::TextField;
 use crate::view::toast::Toast;
 use crate::{api, core_ext, global};
+use seed::log;
 use seed::prelude::{cmds, CmdHandle, Orders};
 use shared::api::endpoint::Endpoint;
 use shared::api::lobby::get as lobby_get;
@@ -27,6 +29,7 @@ pub struct Model {
     lobby: Lobby,
     name_field: String,
     host_model: Option<HostModel>,
+    created_game: Option<Game>,
     handle_timeout: CmdHandle,
 }
 
@@ -93,7 +96,7 @@ impl Model {
         let lobby = flags.lobby.clone();
 
         if lobby.kicked_guests.contains(&global.viewer_id()) {
-            orders.request_url(Route::Kicked.to_url());
+            go_to_route(orders, Route::Kicked);
             Err(InitError::PlayerIsKicked)
         } else {
             let name_field = global.viewer_name.to_string();
@@ -104,6 +107,7 @@ impl Model {
                 name_field,
                 host_model: HostModel::init(global, flags.lobby),
                 handle_timeout: wait_to_poll_lobby(orders),
+                created_game: None,
             };
 
             Ok(model)
@@ -111,6 +115,12 @@ impl Model {
     }
     pub fn viewer_is_host(&self) -> bool {
         self.host_model.is_some()
+    }
+
+    pub fn started_game(&self) -> Option<(Id, &Game)> {
+        self.created_game
+            .as_ref()
+            .map(|game| (self.lobby_id.clone(), game))
     }
 }
 
@@ -130,11 +140,17 @@ pub fn update(
 ) {
     match msg {
         Msg::ClickedAddSlot => {
-            send_updates(model.lobby_id.clone(), vec![lobby::Update::AddSlot], orders);
+            send_updates(
+                global,
+                model.lobby_id.clone(),
+                vec![lobby::Update::AddSlot],
+                orders,
+            );
         }
         Msg::ClickedCloseSlot => {
             if !model.lobby.at_player_count_minimum() {
                 send_updates(
+                    global,
                     model.lobby_id.clone(),
                     vec![lobby::Update::CloseSlot],
                     orders,
@@ -145,7 +161,7 @@ pub fn update(
             Ok(res) => {
                 let lobby = res.get_lobby();
 
-                handle_updated_lobby(&global, model, lobby, orders);
+                handle_updated_lobby(&global, model, &lobby, orders);
             }
             Err(error) => global.toast(
                 Toast::init("error", "could not load lobby")
@@ -167,6 +183,7 @@ pub fn update(
                     global.toast(Toast::validation_error("game name cannot be blank"))
                 } else {
                     send_updates(
+                        global,
                         model.lobby_id.clone(),
                         vec![lobby::Update::ChangeName(
                             host_model.game_name_field.clone(),
@@ -182,6 +199,7 @@ pub fn update(
                 global.set_viewer_name(name.clone());
 
                 send_updates(
+                    global,
                     model.lobby_id.clone(),
                     vec![lobby::Update::ChangePlayerName {
                         player_id: global.viewer_id(),
@@ -194,6 +212,7 @@ pub fn update(
         Msg::ClickedKickGuest(guest_id) => {
             if model.host_model.is_some() {
                 send_updates(
+                    global,
                     model.lobby_id.clone(),
                     vec![lobby::Update::KickGuest { guest_id }],
                     orders,
@@ -223,7 +242,16 @@ pub fn update(
                             }
                         });
                     }
-                    Err(_) => {}
+                    Err(error) => {
+                        global.toast(
+                            Toast::init(
+                                "error",
+                                "could not start game, could not encode start request",
+                            )
+                            .error()
+                            .with_more_info(error.to_string().as_str()),
+                        );
+                    }
                 }
             }
         }
@@ -240,6 +268,8 @@ pub fn update(
                         Err(error) => Err(core_ext::http::fetch_error_to_string(error)),
                     };
 
+                    log!(result);
+
                     Msg::GotLobbyResponse(result)
                 }
             });
@@ -248,7 +278,7 @@ pub fn update(
             Ok(res) => {
                 let lobby = res.get_lobby();
 
-                handle_updated_lobby(&global, model, lobby, orders);
+                handle_updated_lobby(&global, model, &lobby, orders);
             }
             Err(error) => global.toast(
                 Toast::init("error", "could not load lobby")
@@ -257,8 +287,19 @@ pub fn update(
             ),
         },
         Msg::StartedGame(result) => match result {
-            Ok(_) => {}
-            Err(_) => {}
+            Ok(res) => {
+                model.created_game = Some(res.game);
+
+                // Games use the same id as the lobby they were
+                // created from. Should that ever change, this code
+                // should change too.
+                go_to_route(orders, Route::Game(model.lobby_id.clone()));
+            }
+            Err(error) => global.toast(
+                Toast::init("error", "could not load new game")
+                    .error()
+                    .with_more_info(error.as_str()),
+            ),
         },
     }
 }
@@ -266,18 +307,27 @@ pub fn update(
 fn handle_updated_lobby(
     global: &global::Model,
     model: &mut Model,
-    lobby: Lobby,
+    lobby: &Lobby,
     orders: &mut impl Orders<Msg>,
 ) {
     // Redirect out of here, if the viewer is kicked
     if lobby.kicked_guests.contains(&global.viewer_id()) {
-        orders.request_url(Route::Kicked.to_url());
+        go_to_route(orders, Route::Kicked);
     } else {
-        model.lobby = lobby;
+        model.lobby = lobby.clone();
+
+        if lobby.game_started {
+            go_to_route(orders, Route::Game(model.lobby_id.clone()))
+        }
     }
 }
 
-fn send_updates(lobby_id: Id, upts: Vec<lobby::Update>, orders: &mut impl Orders<Msg>) {
+fn send_updates(
+    global: &mut global::Model,
+    lobby_id: Id,
+    upts: Vec<lobby::Update>,
+    orders: &mut impl Orders<Msg>,
+) {
     let req = lobby_update::Request {
         lobby_id: lobby_id.clone(),
         updates: upts,
@@ -288,10 +338,18 @@ fn send_updates(lobby_id: Id, upts: Vec<lobby::Update>, orders: &mut impl Orders
             orders.skip().perform_cmd({
                 async {
                     let result = match api::post(Endpoint::update_lobby(), request_bytes).await {
-                        Ok(response_bytes) => lobby_update::Response::from_bytes(response_bytes)
-                            .map_err(|err| err.to_string()),
+                        Ok(response_bytes) => {
+                            let r = lobby_update::Response::from_bytes(response_bytes)
+                                .map_err(|err| err.to_string());
+
+                            log!(r);
+
+                            r
+                        }
                         Err(error) => {
                             let fetch_error = core_ext::http::fetch_error_to_string(error);
+
+                            log!(fetch_error);
                             Err(fetch_error)
                         }
                     };
@@ -300,8 +358,12 @@ fn send_updates(lobby_id: Id, upts: Vec<lobby::Update>, orders: &mut impl Orders
                 }
             });
         }
-        Err(_) => {
-            // TODO
+        Err(error) => {
+            global.toast(
+                Toast::init("error", "could not send update, could not encode update")
+                    .error()
+                    .with_more_info(error.to_string().as_str()),
+            );
         }
     };
 }

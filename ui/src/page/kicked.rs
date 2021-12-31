@@ -1,3 +1,4 @@
+use crate::core_ext::route::go_to_route;
 use crate::route::Route;
 use crate::style::Style;
 use crate::view::button::Button;
@@ -21,7 +22,7 @@ pub enum Msg {
 pub fn update(msg: Msg, orders: &mut impl Orders<Msg>) {
     match msg {
         Msg::ClickedGoBackToTitle => {
-            orders.request_url(Route::Title.to_url());
+            go_to_route(orders, Route::Title);
         }
     }
 }

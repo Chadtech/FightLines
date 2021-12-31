@@ -1,5 +1,6 @@
 pub mod component_library;
 pub mod error;
+pub mod game;
 pub mod kicked;
 pub mod loading;
 pub mod lobby;
@@ -15,6 +16,7 @@ pub enum Page {
     ComponentLibrary(component_library::Model),
     Lobby(lobby::Model),
     Kicked,
+    Game(game::Model),
     Loading,
     Error(error::Model),
     NotFound,

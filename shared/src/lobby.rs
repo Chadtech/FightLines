@@ -16,7 +16,7 @@ pub struct Lobby {
     pub num_players_limit: u8,
     pub name: String,
     pub kicked_guests: HashSet<Id>,
-    game_started: bool,
+    pub game_started: bool,
 }
 
 pub enum AddError {
