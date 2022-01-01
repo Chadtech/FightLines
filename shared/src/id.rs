@@ -20,6 +20,8 @@ pub struct UniformId(UniformInt<u8>);
 // Helpers //
 ////////////////////////////////////////////////////////////////////////////////
 
+const N: usize = 16;
+
 impl Id {
     pub fn new(rng: &mut RandGen) -> Id {
         let id_bytes: [u8; N] = [
@@ -143,8 +145,6 @@ impl UniformSampler for UniformId {
 impl SampleUniform for Id {
     type Sampler = UniformId;
 }
-
-const N: usize = 16;
 
 #[cfg(test)]
 mod test_id {

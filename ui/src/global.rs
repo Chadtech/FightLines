@@ -20,9 +20,13 @@ pub struct Model {
     viewer_id: Id,
     pub viewer_name: Name,
     random_seed: RandSeed,
+
+    // toasts
     toasts: Vec<Toast>,
     open_toast: Option<OpenToast>,
     first_toast_hidden: bool,
+
+    // timeouts
     handle_hide_toast_timeout: Option<CmdHandle>,
     handle_remove_toast_timeout: Option<CmdHandle>,
     handle_toast_check_timeout: CmdHandle,

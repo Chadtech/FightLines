@@ -1,5 +1,6 @@
 use crate::id::Id;
 use crate::lobby::Lobby;
+use crate::map::Map;
 use crate::player::Player;
 use serde::{Deserialize, Serialize};
 
@@ -17,6 +18,7 @@ pub struct Game {
     pub first_guest_id: Id,
     // remaining guests
     pub remaining_guests: Vec<(Id, Player)>,
+    pub map: Map,
 }
 
 pub enum FromLobbyError {
@@ -44,6 +46,7 @@ impl Game {
                     first_guest_id: first_guest_id.clone(),
 
                     remaining_guests: rest.to_vec(),
+                    map: Map::grass_square(),
                 };
 
                 Ok(game)
