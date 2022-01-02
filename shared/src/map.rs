@@ -9,6 +9,7 @@ use std::collections::HashMap;
 pub struct Map {
     base_tile: Tile,
     features: HashMap<Spot, Tile>,
+    pub grid: Vec<Vec<Tile>>,
     width: u8,
     height: u8,
 }
@@ -30,21 +31,47 @@ pub enum Tile {
 
 impl Map {
     pub fn grass_square() -> Map {
+        let features = HashMap::new();
+
         Map {
             base_tile: Tile::GrassPlain,
-            features: HashMap::new(),
+            features,
+            grid: Vec::new(),
             width: 16,
             height: 16,
         }
+        .sync_grid()
     }
-}
 
-impl Tile {
-    pub fn to_bytes(&self) -> &[u8] {
-        match self {
-            Tile::GrassPlain => GRASS_PLAIN_BYTES,
+    fn sync_grid(mut self) -> Map {
+        let mut grid = Vec::with_capacity(self.height as usize);
+
+        for y in 0..self.height {
+            let mut row = Vec::with_capacity(self.width as usize);
+
+            for x in 0..self.width {
+                let feature = self
+                    .features
+                    .get(&Spot { x, y })
+                    .map(|tile| tile.clone())
+                    .unwrap_or_else(|| self.base_tile.clone());
+
+                row.push(feature);
+            }
+
+            grid.push(row);
         }
+
+        self.grid = grid;
+
+        self
     }
 }
 
-const GRASS_PLAIN_BYTES: &[u8] = include_bytes!("sprites/grass_tile.png");
+// impl Tile {
+//     pub fn to_bytes(&self) -> &[u8] {
+//         match self {
+//             Tile::GrassPlain => GRASS_PLAIN_BYTES,
+//         }
+//     }
+// }

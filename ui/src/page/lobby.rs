@@ -268,8 +268,6 @@ pub fn update(
                         Err(error) => Err(core_ext::http::fetch_error_to_string(error)),
                     };
 
-                    log!(result);
-
                     Msg::GotLobbyResponse(result)
                 }
             });
@@ -338,18 +336,11 @@ fn send_updates(
             orders.skip().perform_cmd({
                 async {
                     let result = match api::post(Endpoint::update_lobby(), request_bytes).await {
-                        Ok(response_bytes) => {
-                            let r = lobby_update::Response::from_bytes(response_bytes)
-                                .map_err(|err| err.to_string());
-
-                            log!(r);
-
-                            r
-                        }
+                        Ok(response_bytes) => lobby_update::Response::from_bytes(response_bytes)
+                            .map_err(|err| err.to_string()),
                         Err(error) => {
                             let fetch_error = core_ext::http::fetch_error_to_string(error);
 
-                            log!(fetch_error);
                             Err(fetch_error)
                         }
                     };

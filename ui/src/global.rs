@@ -1,3 +1,4 @@
+use crate::assets::Assets;
 use crate::style::Style;
 use crate::view::button::Button;
 use crate::view::card::{Card, Header};
@@ -17,14 +18,19 @@ use shared::rng::{RandGen, RandSeed};
 ///////////////////////////////////////////////////////////////
 
 pub struct Model {
+    random_seed: RandSeed,
+
+    // Viewer
     viewer_id: Id,
     pub viewer_name: Name,
-    random_seed: RandSeed,
 
     // toasts
     toasts: Vec<Toast>,
     open_toast: Option<OpenToast>,
     first_toast_hidden: bool,
+
+    // game assets
+    assets: Assets,
 
     // timeouts
     handle_hide_toast_timeout: Option<CmdHandle>,
@@ -98,6 +104,7 @@ impl Model {
             viewer_id,
             viewer_name,
             random_seed,
+            assets: Assets::init(),
             toasts: Vec::new(),
             open_toast: None,
             first_toast_hidden: false,

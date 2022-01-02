@@ -16,6 +16,7 @@ use crate::view::toast;
 use crate::view::toast::Toast;
 
 mod api;
+mod assets;
 mod core_ext;
 mod global;
 mod page;
@@ -47,6 +48,7 @@ enum Msg {
     UrlChanged(subs::UrlChanged),
     Global(global::Msg),
     Toast(toast::Msg),
+    Assets(assets::Msg),
 }
 
 ///////////////////////////////////////////////////////////////
@@ -243,7 +245,6 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                 }
             }
             Err(error) => {
-                log!("B");
                 let flags =
                     error::Flags::from_title("could not load lobby".to_string()).with_msg(error);
 
@@ -270,6 +271,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                 )
             }
         }
+        Msg::Assets(_) => {}
     }
 }
 
@@ -335,6 +337,7 @@ fn view(model: &Model) -> Node<Msg> {
         page_body.html(),
         Toast::many_to_html(model.global.first_toast_hidden(), &model.global.toasts())
             .map_msg(Msg::Toast),
+        assets::view().map_msg(Msg::Assets).html(),
     ]
 }
 

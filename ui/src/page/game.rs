@@ -74,13 +74,6 @@ fn draw(canvas: &ElRef<HtmlCanvasElement>) {
     let width = 200.;
     let height = 100.;
 
-    let image = ctx.make_image(
-        16,
-        16,
-        Tile::GrassPlain.to_bytes(),
-        // ImageFormat::RgbaSeparate,
-    );
-
     ctx.rect(0., 0., width, height);
     ctx.set_fill_style(&JsValue::from_str("red"));
     ctx.fill();
