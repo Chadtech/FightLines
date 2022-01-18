@@ -1,6 +1,7 @@
 use crate::view::cell::Cell;
 use seed::img;
 use seed::prelude::{ev, El, Node, Tag};
+use shared::api::endpoint::Endpoint;
 use std::borrow::Cow;
 ///////////////////////////////////////////////////////////////
 // Types //
@@ -26,7 +27,10 @@ impl Assets {
 ///////////////////////////////////////////////////////////////
 
 pub fn view() -> Cell<Msg> {
-    Cell::from_html(vec![], vec![image_view("boobop")])
+    Cell::from_html(
+        vec![],
+        vec![image_view(Endpoint::GrassTileAsset.to_string().as_str())],
+    )
 }
 
 fn image_view(src: &str) -> Node<Msg> {

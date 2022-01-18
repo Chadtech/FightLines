@@ -23,6 +23,7 @@ use shared::map::Tile;
 
 pub struct Model {
     game: Game,
+    game_id: Id,
     canvas: ElRef<HtmlCanvasElement>,
 }
 
@@ -35,8 +36,10 @@ pub enum Msg {
 // init
 ///////////////////////////////////////////////////////////////
 
+#[derive(Clone)]
 pub struct Flags {
     pub game: Game,
+    pub game_id: Id,
 }
 
 pub fn init(flags: Flags, orders: &mut impl Orders<Msg>) -> Model {
@@ -44,6 +47,7 @@ pub fn init(flags: Flags, orders: &mut impl Orders<Msg>) -> Model {
 
     Model {
         game: flags.game,
+        game_id: flags.game_id,
         canvas: ElRef::<HtmlCanvasElement>::default(),
     }
 }

@@ -7,11 +7,13 @@ use actix_cors::Cors;
 use actix_web::{web, App, HttpResponse, HttpServer};
 use notify::{raw_watcher, RecursiveMode, Watcher};
 
+use route::game;
 use route::lobby;
 use shared::api::endpoint;
 
 use crate::model::Model;
 use shared::api::endpoint::Endpoint;
+use std::io::SeekFrom::End;
 
 mod dev;
 mod flags;
@@ -44,6 +46,10 @@ async fn main() -> Result<(), String> {
             .app_data(web_model.clone())
             .route("/package.js", web::get().to(js_asset_route))
             .route("/package_bg.wasm", web::get().to(wasm_asset_route))
+            .route(
+                Endpoint::GrassTileAsset.to_string().as_str(),
+                web::get().to(grass_tile_route),
+            )
             .service(
                 web::scope(endpoint::ROOT)
                     .route(
@@ -65,6 +71,10 @@ async fn main() -> Result<(), String> {
                     .route(
                         Endpoint::StartGame.to_string().as_str(),
                         web::post().to(lobby::start::handle),
+                    )
+                    .route(
+                        Endpoint::template_get_game().to_string().as_str(),
+                        web::get().to(game::get::handle),
                     ),
             )
             .default_service(web::get().to(frontend))
@@ -74,6 +84,14 @@ async fn main() -> Result<(), String> {
     .run()
     .await
     .map_err(|err| err.to_string())
+}
+
+async fn grass_tile_route() -> HttpResponse {
+    let bytes: &'static [u8] = include_bytes!("assets/grass_tile.png");
+
+    HttpResponse::Ok()
+        .header("Content-Type", "image/png")
+        .body(bytes)
 }
 
 async fn wasm_asset_route(model: web::Data<Model>) -> HttpResponse {

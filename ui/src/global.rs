@@ -214,6 +214,9 @@ pub fn update_from_toast_msg(msg: toast::Msg, global: &mut Model) {
                 .get(toast_index)
                 .and_then(|toast| toast.to_open_toast());
         }
+        toast::Msg::ClickedClose(toast_index) => {
+            global.toasts.remove(toast_index);
+        }
     }
 }
 

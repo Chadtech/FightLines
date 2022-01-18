@@ -5,6 +5,7 @@ use seed::{prelude::*, *};
 use page::Page;
 use route::Route;
 use shared::api::endpoint::Endpoint;
+use shared::api::game::get as get_game;
 use shared::api::lobby::join as join_lobby;
 use shared::lobby::Lobby;
 use style::Style;
@@ -44,6 +45,7 @@ enum Msg {
 
     // Page Loads
     LoadedLobby(Result<lobby::Flags, String>),
+    LoadedGame(Result<game::Flags, String>),
     //
     UrlChanged(subs::UrlChanged),
     Global(global::Msg),
@@ -187,12 +189,38 @@ fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders
 
             match maybe_game {
                 None => {
-                    // TODO load game
-                    panic!("TODO load ganme");
+                    let url = Endpoint::make_get_game(id.clone());
+
+                    orders.skip().perform_cmd({
+                        async {
+                            let result = match api::get(url).await {
+                                Ok(res_bytes) => match get_game::Response::from_bytes(res_bytes) {
+                                    Ok(res) => {
+                                        let flags = game::Flags {
+                                            game_id: res.get_game_id(),
+                                            game: res.get_game(),
+                                        };
+
+                                        Ok(flags)
+                                    }
+                                    Err(err) => Err(err.to_string()),
+                                },
+                                Err(error) => {
+                                    let fetch_error = core_ext::http::fetch_error_to_string(error);
+                                    Err(fetch_error)
+                                }
+                            };
+
+                            Msg::LoadedGame(result)
+                        }
+                    });
                     Page::Loading
                 }
                 Some(game) => Page::Game(game::init(
-                    game::Flags { game: game.clone() },
+                    game::Flags {
+                        game: game.clone(),
+                        game_id: id.clone(),
+                    },
                     &mut orders.proxy(Msg::Game),
                 )),
             }
@@ -272,6 +300,17 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
             }
         }
         Msg::Assets(_) => {}
+        Msg::LoadedGame(result) => match result {
+            Ok(flags) => {
+                model.page = Page::Game(game::init(flags, &mut orders.proxy(Msg::Game)));
+            }
+            Err(error) => {
+                let flags =
+                    error::Flags::from_title("could not load game".to_string()).with_msg(error);
+
+                model.page = Page::Error(error::init(flags));
+            }
+        },
     }
 }
 

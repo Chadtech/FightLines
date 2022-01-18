@@ -27,6 +27,7 @@ pub struct OpenToast {
 #[derive(Clone)]
 pub enum Msg {
     ClickedOpenToast(usize),
+    ClickedClose(usize),
 }
 
 #[derive(Clone, PartialEq)]
@@ -80,16 +81,20 @@ impl Toast {
 
         let text_cell = Cell::from_str(vec![], self.text.as_str());
 
-        let more_info_row = if self.more_info.is_some() {
-            Row::from_cells(
-                vec![Style::MT4],
-                vec![Button::simple("open")
-                    .on_click(move |_| Msg::ClickedOpenToast(index))
-                    .cell()],
-            )
+        let close_button = Button::simple("close")
+            .on_click(move |_| Msg::ClickedClose(index))
+            .cell();
+
+        let open_button = if self.more_info.is_some() {
+            Button::simple("open")
+                .on_click(move |_| Msg::ClickedOpenToast(index))
+                .cell()
         } else {
-            Row::none()
+            Cell::none()
         };
+
+        let more_info_row =
+            Row::from_cells(vec![Style::MT4, Style::G4], vec![close_button, open_button]);
 
         Card::init()
             .with_header(Header::from_title(self.title.as_str()))

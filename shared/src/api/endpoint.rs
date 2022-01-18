@@ -11,6 +11,8 @@ pub enum Endpoint {
     JoinLobby(Param<Id>),
     UpdateLobby,
     StartGame,
+    GetGame(Param<Id>),
+    GrassTileAsset,
 }
 
 #[derive(Clone)]
@@ -74,7 +76,19 @@ impl Endpoint {
             Endpoint::StartGame => {
                 vec!["lobby".to_string(), "start".to_string()]
             }
+            Endpoint::GetGame(param) => {
+                vec!["game".to_string(), "get".to_string(), param.to_string()]
+            }
+            Endpoint::GrassTileAsset => vec!["grass_tile.png".to_string()],
         }
+    }
+
+    pub fn make_get_game(id: Id) -> Endpoint {
+        Endpoint::GetGame(Param::Value(id))
+    }
+
+    pub fn template_get_game() -> Endpoint {
+        Endpoint::GetGame(Param::Template("id".to_string()))
     }
 
     pub fn update_lobby() -> Endpoint {

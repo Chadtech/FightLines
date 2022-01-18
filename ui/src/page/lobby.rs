@@ -13,7 +13,7 @@ use shared::api::endpoint::Endpoint;
 use shared::api::lobby::get as lobby_get;
 use shared::api::lobby::start as lobby_start;
 use shared::api::lobby::update as lobby_update;
-use shared::game::Game;
+use shared::game::{FromLobbyError, Game};
 use shared::id::Id;
 use shared::lobby;
 use shared::lobby::{Lobby, MAX_GUESTS};
@@ -31,6 +31,7 @@ pub struct Model {
     host_model: Option<HostModel>,
     created_game: Option<Game>,
     handle_timeout: CmdHandle,
+    load_failure_retries: u32,
 }
 
 struct HostModel {
@@ -101,13 +102,16 @@ impl Model {
         } else {
             let name_field = global.viewer_name.to_string();
 
+            let load_failure_retries = 0;
+
             let model = Model {
                 lobby_id: flags.lobby_id,
                 lobby,
                 name_field,
                 host_model: HostModel::init(global, flags.lobby),
-                handle_timeout: wait_to_poll_lobby(orders),
+                handle_timeout: wait_to_poll_lobby(load_failure_retries, orders),
                 created_game: None,
+                load_failure_retries,
             };
 
             Ok(model)
@@ -124,8 +128,10 @@ impl Model {
     }
 }
 
-fn wait_to_poll_lobby(orders: &mut impl Orders<Msg>) -> CmdHandle {
-    orders.perform_cmd_with_handle(cmds::timeout(2048, || Msg::PollTimeoutExpired))
+fn wait_to_poll_lobby(retries: u32, orders: &mut impl Orders<Msg>) -> CmdHandle {
+    let wait_time = 2048 * (2 ^ retries);
+
+    orders.perform_cmd_with_handle(cmds::timeout(wait_time, || Msg::PollTimeoutExpired))
 }
 
 ///////////////////////////////////////////////////////////////
@@ -220,43 +226,12 @@ pub fn update(
             }
         }
         Msg::ClickedStart => {
-            if Game::from_lobby(model.lobby.clone()).is_ok() && model.host_model.is_some() {
-                let req = lobby_start::Request {
-                    player_id: global.viewer_id(),
-                    lobby_id: model.lobby_id.clone(),
-                };
-
-                match req.to_bytes() {
-                    Ok(bytes) => {
-                        orders.skip().perform_cmd({
-                            async {
-                                let result = match api::post(Endpoint::StartGame, bytes).await {
-                                    Ok(response_bytes) => {
-                                        lobby_start::Response::from_bytes(response_bytes)
-                                            .map_err(|err| err.to_string())
-                                    }
-                                    Err(error) => Err(core_ext::http::fetch_error_to_string(error)),
-                                };
-
-                                Msg::StartedGame(result)
-                            }
-                        });
-                    }
-                    Err(error) => {
-                        global.toast(
-                            Toast::init(
-                                "error",
-                                "could not start game, could not encode start request",
-                            )
-                            .error()
-                            .with_more_info(error.to_string().as_str()),
-                        );
-                    }
-                }
+            if model.host_model.is_some() {
+                attempt_start_game(global, model, orders)
             }
         }
         Msg::PollTimeoutExpired => {
-            model.handle_timeout = wait_to_poll_lobby(orders);
+            model.handle_timeout = wait_to_poll_lobby(model.load_failure_retries, orders);
 
             let lobby_id = model.lobby_id.clone();
 
@@ -274,15 +249,22 @@ pub fn update(
         }
         Msg::GotLobbyResponse(result) => match result {
             Ok(res) => {
+                model.load_failure_retries = 0;
+
                 let lobby = res.get_lobby();
 
                 handle_updated_lobby(&global, model, &lobby, orders);
             }
-            Err(error) => global.toast(
-                Toast::init("error", "could not load lobby")
-                    .error()
-                    .with_more_info(error.as_str()),
-            ),
+            Err(error) => {
+                model.load_failure_retries += 1;
+                model.handle_timeout = wait_to_poll_lobby(model.load_failure_retries, orders);
+
+                global.toast(
+                    Toast::init("error", "could not load lobby")
+                        .error()
+                        .with_more_info(error.as_str()),
+                )
+            }
         },
         Msg::StartedGame(result) => match result {
             Ok(res) => {
@@ -299,6 +281,56 @@ pub fn update(
                     .with_more_info(error.as_str()),
             ),
         },
+    }
+}
+
+fn attempt_start_game(
+    global: &mut global::Model,
+    model: &mut Model,
+    orders: &mut impl Orders<Msg>,
+) {
+    match Game::from_lobby(model.lobby.clone()) {
+        Ok(_) => {
+            let req = lobby_start::Request {
+                player_id: global.viewer_id(),
+                lobby_id: model.lobby_id.clone(),
+            };
+
+            match req.to_bytes() {
+                Ok(bytes) => {
+                    orders.skip().perform_cmd({
+                        async {
+                            let result = match api::post(Endpoint::StartGame, bytes).await {
+                                Ok(response_bytes) => {
+                                    lobby_start::Response::from_bytes(response_bytes)
+                                        .map_err(|err| err.to_string())
+                                }
+                                Err(error) => Err(core_ext::http::fetch_error_to_string(error)),
+                            };
+
+                            Msg::StartedGame(result)
+                        }
+                    });
+                }
+                Err(error) => {
+                    global.toast(
+                        Toast::init(
+                            "error",
+                            "could not start game, could not encode start request",
+                        )
+                        .error()
+                        .with_more_info(error.to_string().as_str()),
+                    );
+                }
+            }
+        }
+        Err(error) => {
+            let text = match error {
+                FromLobbyError::NotEnoughPlayers => "could not start game, not enough players",
+            };
+
+            global.toast(Toast::init("error", text).error());
+        }
     }
 }
 
