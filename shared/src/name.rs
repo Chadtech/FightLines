@@ -1,3 +1,4 @@
+use crate::name::Error::NameCannotBeEmpty;
 use crate::rng::RandGen;
 use serde::{Deserialize, Serialize};
 
@@ -8,10 +9,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone, PartialOrd, Ord, PartialEq, Eq, Debug, Hash)]
 pub struct Name(String);
 
-///////////////////////////////////////////////////////////////
-// Helpers //
-///////////////////////////////////////////////////////////////
-
+pub enum Error {
+    NameCannotBeEmpty,
+}
 impl Name {
     pub fn random(rng: &mut RandGen) -> Name {
         let i = rng.gen::<u8>(0, 63);
@@ -21,11 +21,18 @@ impl Name {
         Name(name.to_string())
     }
 
-    pub fn from_string(s: String) -> Option<Name> {
+    pub fn new(s: &str) -> Name {
+        let mut buf = String::new();
+        buf.push_str("new ");
+        buf.push_str(s);
+
+        Name(buf)
+    }
+    pub fn from_string(s: String) -> Result<Error, Name> {
         if s.is_empty() {
-            None
+            Err(Error::NameCannotBeEmpty)
         } else {
-            Some(Name(s))
+            Ok(Name(s))
         }
     }
 

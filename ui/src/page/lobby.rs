@@ -1,4 +1,5 @@
 use crate::core_ext::route::go_to_route;
+use crate::route::component_library::Route::Button as ComponentLibraryButton;
 use crate::route::Route;
 use crate::style::Style;
 use crate::view::button::Button;
@@ -28,6 +29,7 @@ pub struct Model {
     lobby_id: Id,
     lobby: Lobby,
     name_field: String,
+    initial_name_field: String,
     host_model: Option<HostModel>,
     created_game: Option<Game>,
     handle_timeout: CmdHandle,
@@ -36,6 +38,7 @@ pub struct Model {
 
 struct HostModel {
     game_name_field: String,
+    initial_name_field: String,
 }
 
 #[derive(Clone, Debug)]
@@ -69,8 +72,11 @@ pub struct Flags {
 impl HostModel {
     pub fn init(global: &global::Model, lobby: Lobby) -> Option<HostModel> {
         if global.viewer_id() == lobby.host_id {
+            let name_str = lobby.name.to_string();
+
             let host_model = HostModel {
-                game_name_field: lobby.name,
+                game_name_field: name_str.clone(),
+                initial_name_field: name_str,
             };
 
             Some(host_model)
@@ -107,7 +113,8 @@ impl Model {
             let model = Model {
                 lobby_id: flags.lobby_id,
                 lobby,
-                name_field,
+                name_field: name_field.clone(),
+                initial_name_field: name_field,
                 host_model: HostModel::init(global, flags.lobby),
                 handle_timeout: wait_to_poll_lobby(load_failure_retries, orders),
                 created_game: None,
@@ -185,7 +192,8 @@ pub fn update(
         }
         Msg::ClickedSaveGameName => {
             if let Some(host_model) = &mut model.host_model {
-                if host_model.game_name_field.is_empty() {
+                if can_save_name_field(&host_model.game_name_field, &host_model.initial_name_field)
+                {
                     global.toast(Toast::validation_error("game name cannot be blank"))
                 } else {
                     send_updates(
@@ -414,6 +422,7 @@ pub fn view(global: &global::Model, model: &Model) -> Vec<Row<Msg>> {
             guest_id.clone(),
             guest.clone(),
             &model.name_field,
+            &model.initial_name_field,
             viewer_is_host,
         ));
 
@@ -447,6 +456,10 @@ fn header(maybe_host_model: Option<&HostModel>, lobby: Lobby) -> Cell<Msg> {
                 })
                 .cell(),
                 Button::simple("save")
+                    .disable(!can_save_name_field(
+                        &host_model.game_name_field,
+                        &host_model.initial_name_field,
+                    ))
                     .on_click(|_| Msg::ClickedSaveGameName)
                     .cell(),
                 Cell::group(
@@ -510,13 +523,14 @@ pub fn guest_card(
     viewer_id: Id,
     guest_id: Id,
     guest: Player,
-    viewer_name_field: &String,
+    user_name_field: &String,
+    initial_user_name_field: &String,
     viewer_is_host: bool,
 ) -> Cell<Msg> {
     let guest_is_viewer = viewer_id == guest_id;
 
     let name_row = if guest_is_viewer {
-        name_field(viewer_name_field)
+        name_field(user_name_field, &initial_user_name_field)
     } else {
         let remove_player_button = if viewer_is_host {
             Button::destructive("kick")
@@ -543,7 +557,7 @@ pub fn guest_card(
 
 pub fn host_card(viewer_is_host: bool, model: &Model) -> Cell<Msg> {
     let name_row = if viewer_is_host {
-        name_field(&model.name_field)
+        name_field(&model.name_field, &model.initial_name_field)
     } else {
         Row::from_str(model.lobby.host.name.to_string().as_str())
     };
@@ -551,16 +565,35 @@ pub fn host_card(viewer_is_host: bool, model: &Model) -> Cell<Msg> {
     player_card(viewer_is_host, vec![name_row])
 }
 
-fn name_field(field: &String) -> Row<Msg> {
+fn name_field(field: &String, initial_name: &String) -> Row<Msg> {
     Row::from_cells(
         vec![Style::G4],
         vec![
             TextField::simple(field.as_str(), |event| Msg::UpdatedNameField(event)).cell(),
             Button::simple("save")
+                .disable(!can_save_name_field(field, initial_name))
                 .on_click(|_| Msg::ClickedSavePlayerName)
                 .cell(),
         ],
     )
+}
+
+fn can_save_name_field(field: &String, initial_field: &String) -> bool {
+    let changed = field != initial_field;
+
+    let is_not_empty = !field.is_empty();
+
+    changed && is_not_empty
+}
+
+fn validate_name_field(field: &String, initial_field: &String) -> Result<Name, String> {
+    let changed = field != initial_field;
+
+    if changed {
+        Name::from_string(field)
+    } else {
+        Err("Name is unchaged".to_string())
+    }
 }
 
 fn player_card<Msg: 'static>(player_is_viewer: bool, rows: Vec<Row<Msg>>) -> Cell<Msg> {

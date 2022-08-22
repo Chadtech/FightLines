@@ -14,7 +14,7 @@ pub struct Lobby {
     pub host_id: Id,
     pub guests: HashMap<Id, Player>,
     pub num_players_limit: u8,
-    pub name: String,
+    pub name: Name,
     pub kicked_guests: HashSet<Id>,
     pub game_started: bool,
 }
@@ -27,7 +27,7 @@ pub enum AddError {
 pub enum Update {
     AddSlot,
     CloseSlot,
-    ChangeName(String),
+    ChangeName(Name),
     ChangePlayerName { player_id: Id, new_name: Name },
     KickGuest { guest_id: Id },
 }
@@ -37,7 +37,6 @@ pub enum Update {
 pub enum UpdateError {
     AtMaximumSlots,
     NoOpenSlotToClose,
-    GameNameCannotBeEmpty,
     CannotFindPlayer,
 }
 
@@ -64,7 +63,7 @@ impl Lobby {
             host_id,
             guests: HashMap::new(),
             game_started: false,
-            name: "new game".to_string(),
+            name: Name::new("game"),
             num_players_limit: 2,
             kicked_guests: HashSet::new(),
         }
@@ -154,12 +153,8 @@ impl Lobby {
                 }
             }
             Update::ChangeName(new_name) => {
-                if new_name.is_empty() {
-                    Err(UpdateError::GameNameCannotBeEmpty)
-                } else {
-                    self.name = new_name;
-                    Ok(self)
-                }
+                self.name = new_name;
+                Ok(self)
             }
             Update::ChangePlayerName {
                 player_id,
