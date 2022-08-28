@@ -1,21 +1,12 @@
-use crate::core_ext::route::go_to_route;
-use crate::route::Route;
-use crate::style::Style;
-use crate::view::button::Button;
-use crate::view::card::Card;
-use crate::view::cell::{Cell, Row};
-use crate::view::error_card::ErrorCard;
+use crate::global;
+use crate::global::WindowSize;
+use crate::view::cell::Cell;
 use crate::view::loading_spinner::LoadingSpinner;
 use crate::web_sys::HtmlCanvasElement;
-use crate::{api, core_ext, global};
-use seed::prelude::{el_ref, El, ElRef, JsValue, Orders, UpdateEl};
-use seed::{canvas, log};
-use shared::api::endpoint::Endpoint;
-use shared::api::lobby::create;
+use seed::prelude::{el_ref, At, El, ElRef, IndexMap, JsValue, Orders, UpdateEl};
+use seed::{attrs, canvas};
 use shared::game::Game;
 use shared::id::Id;
-use shared::lobby::Lobby;
-use shared::map::Tile;
 
 ///////////////////////////////////////////////////////////////
 // Types
@@ -59,7 +50,7 @@ pub fn init(flags: Flags, orders: &mut impl Orders<Msg>) -> Model {
 pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
     match msg {
         Msg::Rendered => {
-            draw(&model.canvas);
+            draw(global.window_size(), &model.canvas);
             orders
                 .after_next_render(|_render_info| Msg::Rendered)
                 .skip();
@@ -67,16 +58,16 @@ pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut 
     }
 }
 
-fn draw(canvas: &ElRef<HtmlCanvasElement>) {
-    let canvas = canvas.get().expect("get canvas element");
+fn draw(window_size: WindowSize, canvas: &ElRef<HtmlCanvasElement>) {
+    let canvas = canvas.get().expect("could not get canvas element");
     let ctx = seed::canvas_context_2d(&canvas);
+
+    let width = window_size.width;
+    let height = window_size.height;
 
     // clear canvas
     ctx.begin_path();
-    ctx.clear_rect(0., 0., 400., 200.);
-
-    let width = 200.;
-    let height = 100.;
+    ctx.clear_rect(0., 0., width, height);
 
     ctx.rect(0., 0., width, height);
     ctx.set_fill_style(&JsValue::from_str("red"));
@@ -91,14 +82,35 @@ fn draw(canvas: &ElRef<HtmlCanvasElement>) {
 // View
 ///////////////////////////////////////////////////////////////
 
-pub fn view(model: &Model) -> Cell<Msg> {
-    Cell::group(vec![], vec![canvas_cell(model), overlay_view(model)])
+pub fn view(global: &global::Model, model: &Model) -> Cell<Msg> {
+    Cell::group(
+        vec![],
+        vec![canvas_cell(global, model), overlay_view(model)],
+    )
 }
 
-fn canvas_cell(model: &Model) -> Cell<Msg> {
-    Cell::from_html(vec![], vec![canvas![el_ref(&model.canvas)]])
+fn canvas_cell(global: &global::Model, model: &Model) -> Cell<Msg> {
+    let window_size = global.window_size();
+
+    let px = |n: f64| -> String {
+        let mut n_str = n.to_string();
+        n_str.push_str("px");
+
+        n_str
+    };
+
+    Cell::from_html(
+        vec![],
+        vec![canvas![
+            attrs! {
+                At::Width => px(window_size.width).as_str(),
+                At::Height => px(window_size.height).as_str()
+            },
+            el_ref(&model.canvas)
+        ]],
+    )
 }
 
-fn overlay_view(mode: &Model) -> Cell<Msg> {
+fn overlay_view(model: &Model) -> Cell<Msg> {
     Cell::none()
 }

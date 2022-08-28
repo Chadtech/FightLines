@@ -13,7 +13,6 @@ use shared::api::endpoint;
 
 use crate::model::Model;
 use shared::api::endpoint::Endpoint;
-use std::io::SeekFrom::End;
 
 mod dev;
 mod flags;

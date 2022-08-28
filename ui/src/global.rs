@@ -8,10 +8,11 @@ use crate::view::toast;
 use crate::view::toast::{OpenToast, Toast};
 use rand::Rng;
 use seed::browser::web_storage::{LocalStorage, WebStorage, WebStorageError};
-use seed::prelude::{cmds, CmdHandle, Orders};
+use seed::prelude::{cmds, CmdHandle, JsValue, Orders};
 use shared::id::Id;
-use shared::name::Name;
+use shared::name::{Error, Name};
 use shared::rng::{RandGen, RandSeed};
+use std::str::FromStr;
 
 ///////////////////////////////////////////////////////////////
 // Types //
@@ -32,11 +33,20 @@ pub struct Model {
     // game assets
     assets: Assets,
 
+    // window
+    window_width: f64,
+    window_height: f64,
+
     // timeouts
     handle_hide_toast_timeout: Option<CmdHandle>,
     handle_remove_toast_timeout: Option<CmdHandle>,
     handle_toast_check_timeout: CmdHandle,
     handle_localstorage_save_timeout: CmdHandle,
+}
+
+pub struct WindowSize {
+    pub width: f64,
+    pub height: f64,
 }
 
 #[derive(Clone)]
@@ -86,7 +96,19 @@ const VIEWER_ID_KEY: &str = "fightlines-viewer-id";
 const VIEWER_NAME_KEY: &str = "fightlines-viewer-name";
 
 impl Model {
-    pub fn init(orders: &mut impl Orders<Msg>) -> Model {
+    pub fn init(orders: &mut impl Orders<Msg>) -> Result<Model, String> {
+        let inner_width_json: JsValue = seed::window().inner_width().map_err(|err| {
+            err.as_string()
+                .unwrap_or_else(|| "cannot unwrap inner width error".to_string())
+        })?;
+        let inner_height_json: JsValue = seed::window().inner_height().map_err(|err| {
+            err.as_string()
+                .unwrap_or_else(|| "cannot unwrap inner height error".to_string())
+        })?;
+
+        let inner_width = inner_width_json.as_f64().ok_or("no inner width")?;
+        let inner_height = inner_height_json.as_f64().ok_or("no inner height")?;
+
         let mut rng = rand::thread_rng();
         let seed: RandSeed = rng.gen();
 
@@ -100,7 +122,7 @@ impl Model {
 
         let random_seed: RandSeed = RandSeed::next(&mut rand_gen);
 
-        Model {
+        let model = Model {
             viewer_id,
             viewer_name,
             random_seed,
@@ -112,7 +134,11 @@ impl Model {
             handle_remove_toast_timeout: None,
             handle_toast_check_timeout: wait_to_check_toasts(orders),
             handle_localstorage_save_timeout: wait_to_save_localstorage(orders),
-        }
+            window_width: inner_width,
+            window_height: inner_height,
+        };
+
+        Ok(model)
     }
 
     pub fn viewer_id(&self) -> Id {
@@ -134,24 +160,35 @@ impl Model {
     pub fn set_viewer_name(&mut self, name: Name) {
         self.viewer_name = name;
     }
+
+    pub fn window_size(&self) -> WindowSize {
+        WindowSize {
+            width: self.window_width,
+            height: self.window_height,
+        }
+    }
 }
 
 fn get_viewer_name(rand_gen: &mut RandGen) -> Name {
     let viewer_name_result: Result<Name, WebStorageError> = LocalStorage::get(VIEWER_NAME_KEY)
-        .map(Name::from_string)
-        .and_then(|maybe_name| {
-            match maybe_name {
-                None => {
+        .and_then(|name_str: String| {
+            match Name::from_str(name_str.as_str()) {
+                Ok(name) => Ok(name),
+                Err(_) => {
                     // This shouldnt be possible
                     Err(WebStorageError::StorageNotFoundError)
                 }
-                Some(name) => Ok(name),
             }
         });
 
-    let new_viewer_name: Name = Name::random(rand_gen);
+    match viewer_name_result {
+        Ok(name) => name,
+        Err(_) => {
+            let new_viewer_name: Name = Name::random(rand_gen);
 
-    viewer_name_result.unwrap_or_else(|_err| new_viewer_name)
+            new_viewer_name
+        }
+    }
 }
 
 fn get_viewer_id(rand_gen: &mut RandGen) -> Id {

@@ -57,15 +57,17 @@ enum Msg {
 // Init //
 ///////////////////////////////////////////////////////////////
 
-fn init(url: Url, orders: &mut impl Orders<Msg>) -> Model {
+fn init(url: Url, orders: &mut impl Orders<Msg>) -> Result<Model, String> {
     orders
         .subscribe(Msg::UrlChanged)
         .notify(subs::UrlChanged(url));
 
-    Model {
+    let global_result = global::Model::init(&mut orders.proxy(Msg::Global));
+
+    global_result.map(|global| Model {
         page: Page::Blank,
-        global: global::Model::init(&mut orders.proxy(Msg::Global)),
-    }
+        global,
+    })
 }
 
 ///////////////////////////////////////////////////////////////
@@ -234,6 +236,12 @@ fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders
 // Update //
 ///////////////////////////////////////////////////////////////
 
+fn super_update(msg: Msg, model_result: &mut Result<Model, String>, orders: &mut impl Orders<Msg>) {
+    if let Ok(model) = model_result {
+        update(msg, model, orders)
+    }
+}
+
 fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
     match msg {
         Msg::Title(sub_msg) => {
@@ -318,6 +326,15 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
 // View //
 ///////////////////////////////////////////////////////////////
 
+fn super_view(model_result: &Result<Model, String>) -> Node<Msg> {
+    match model_result {
+        Ok(model) => view(model),
+        Err(err) => {
+            div![err]
+        }
+    }
+}
+
 fn view(model: &Model) -> Node<Msg> {
     let page_body = global::open_toast_view(&model.global)
         .map(|cell| cell.map_msg(Msg::Global))
@@ -346,7 +363,7 @@ fn view(model: &Model) -> Node<Msg> {
                     .collect(),
                 Page::Game(sub_model) => vec![Row::from_cells(
                     vec![],
-                    vec![game::view(sub_model).map_msg(Msg::Game)],
+                    vec![game::view(&model.global, sub_model).map_msg(Msg::Game)],
                 )],
             };
 
@@ -386,5 +403,5 @@ fn view(model: &Model) -> Node<Msg> {
 
 #[wasm_bindgen(start)]
 pub fn start() {
-    App::start("app", init, update, view);
+    App::start("app", init, super_update, super_view);
 }

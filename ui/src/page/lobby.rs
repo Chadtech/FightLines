@@ -1,5 +1,4 @@
 use crate::core_ext::route::go_to_route;
-use crate::route::component_library::Route::Button as ComponentLibraryButton;
 use crate::route::Route;
 use crate::style::Style;
 use crate::view::button::Button;
@@ -8,7 +7,6 @@ use crate::view::cell::{Cell, Row};
 use crate::view::text_field::TextField;
 use crate::view::toast::Toast;
 use crate::{api, core_ext, global};
-use seed::log;
 use seed::prelude::{cmds, CmdHandle, Orders};
 use shared::api::endpoint::Endpoint;
 use shared::api::lobby::get as lobby_get;
@@ -18,8 +16,9 @@ use shared::game::{FromLobbyError, Game};
 use shared::id::Id;
 use shared::lobby;
 use shared::lobby::{Lobby, MAX_GUESTS};
-use shared::name::Name;
+use shared::name::{Error, Name};
 use shared::player::Player;
+use std::str::FromStr;
 
 ///////////////////////////////////////////////////////////////
 // Types //
@@ -192,25 +191,35 @@ pub fn update(
         }
         Msg::ClickedSaveGameName => {
             if let Some(host_model) = &mut model.host_model {
-                if can_save_name_field(&host_model.game_name_field, &host_model.initial_name_field)
-                {
-                    global.toast(Toast::validation_error("game name cannot be blank"))
-                } else {
-                    send_updates(
-                        global,
-                        model.lobby_id.clone(),
-                        vec![lobby::Update::ChangeName(
-                            host_model.game_name_field.clone(),
-                        )],
-                        orders,
-                    )
+                match validate_name_field(
+                    &host_model.game_name_field,
+                    &host_model.initial_name_field,
+                ) {
+                    Ok(name) => {
+                        host_model.initial_name_field = host_model.game_name_field.clone();
+
+                        send_updates(
+                            global,
+                            model.lobby_id.clone(),
+                            vec![lobby::Update::ChangeName(name)],
+                            orders,
+                        )
+                    }
+                    Err(err) => global.toast(Toast::validation_error(err.as_str())),
                 }
             }
         }
-        Msg::ClickedSavePlayerName => match Name::from_string(model.name_field.clone()) {
-            None => global.toast(Toast::validation_error("player name cannot be blank")),
-            Some(name) => {
+        Msg::ClickedSavePlayerName => match Name::from_str(model.name_field.as_str()) {
+            Err(error) => {
+                let error_msg = match error {
+                    Error::NameCannotBeEmpty => "player name cannot be blank",
+                };
+                global.toast(Toast::validation_error(error_msg))
+            }
+            Ok(name) => {
                 global.set_viewer_name(name.clone());
+
+                model.initial_name_field = model.name_field.clone();
 
                 send_updates(
                     global,
@@ -590,7 +599,7 @@ fn validate_name_field(field: &String, initial_field: &String) -> Result<Name, S
     let changed = field != initial_field;
 
     if changed {
-        Name::from_string(field)
+        Name::from_str(field.as_str()).map_err(|err| err.to_string())
     } else {
         Err("Name is unchaged".to_string())
     }

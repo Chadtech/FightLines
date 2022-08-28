@@ -38,9 +38,6 @@ async fn from_req(req: Request, data: web::Data<Model>) -> HttpResponse {
                         .body("Cannot add slot. Lobby is at its maximum size"),
                     UpdateError::NoOpenSlotToClose => HttpResponse::Conflict()
                         .body("Cannot close slot. Lobby must have at least two players"),
-                    UpdateError::GameNameCannotBeEmpty => {
-                        HttpResponse::Conflict().body("Game name cannot be empty")
-                    }
                     UpdateError::CannotFindPlayer => {
                         HttpResponse::InternalServerError().body("Cannot find player")
                     }

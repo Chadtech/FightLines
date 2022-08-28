@@ -1,6 +1,5 @@
 use crate::view::cell::Cell;
-use seed::img;
-use seed::prelude::{ev, El, Node, Tag};
+use seed::prelude::{El, Node, Tag};
 use shared::api::endpoint::Endpoint;
 use std::borrow::Cow;
 ///////////////////////////////////////////////////////////////
