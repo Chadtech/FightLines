@@ -218,13 +218,25 @@ fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders
                     });
                     Page::Loading
                 }
-                Some(game) => Page::Game(game::init(
-                    game::Flags {
-                        game: game.clone(),
-                        game_id: id.clone(),
-                    },
-                    &mut orders.proxy(Msg::Game),
-                )),
+                Some(game) => {
+                    let sub_model_result = game::init(
+                        game::Flags {
+                            game: game.clone(),
+                            game_id: id.clone(),
+                        },
+                        &mut orders.proxy(Msg::Game),
+                    );
+
+                    match sub_model_result {
+                        Ok(sub_model) => Page::Game(sub_model),
+                        Err(err) => {
+                            let flags =
+                                error::Flags::from_title("Failed to load game").with_msg(err);
+
+                            Page::Error(error::init(flags))
+                        }
+                    }
+                }
             }
         }
     };
@@ -281,8 +293,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                 }
             }
             Err(error) => {
-                let flags =
-                    error::Flags::from_title("could not load lobby".to_string()).with_msg(error);
+                let flags = error::Flags::from_title("could not load lobby").with_msg(error);
 
                 model.page = Page::Error(error::init(flags));
             }
@@ -310,11 +321,16 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
         Msg::Assets(_) => {}
         Msg::LoadedGame(result) => match result {
             Ok(flags) => {
-                model.page = Page::Game(game::init(flags, &mut orders.proxy(Msg::Game)));
+                let new_page = match game::init(flags, &mut orders.proxy(Msg::Game)) {
+                    Ok(sub_model) => Page::Game(sub_model),
+                    Err(err) => Page::Error(error::init(
+                        error::Flags::from_title("Failed to load game page").with_msg(err),
+                    )),
+                };
+                model.page = new_page;
             }
             Err(error) => {
-                let flags =
-                    error::Flags::from_title("could not load game".to_string()).with_msg(error);
+                let flags = error::Flags::from_title("could not load game").with_msg(error);
 
                 model.page = Page::Error(error::init(flags));
             }

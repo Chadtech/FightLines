@@ -6,3 +6,4 @@ pub mod map;
 pub mod name;
 pub mod player;
 pub mod rng;
+pub mod sprite;

@@ -1,12 +1,13 @@
-use crate::global;
 use crate::global::WindowSize;
 use crate::view::cell::Cell;
 use crate::view::loading_spinner::LoadingSpinner;
-use crate::web_sys::HtmlCanvasElement;
+use crate::web_sys::{HtmlCanvasElement, HtmlImageElement};
+use crate::{global, web_sys};
 use seed::prelude::{el_ref, At, El, ElRef, IndexMap, JsValue, Orders, UpdateEl};
 use seed::{attrs, canvas};
 use shared::game::Game;
 use shared::id::Id;
+use shared::sprite::Sprite;
 
 ///////////////////////////////////////////////////////////////
 // Types
@@ -16,6 +17,7 @@ pub struct Model {
     game: Game,
     game_id: Id,
     canvas: ElRef<HtmlCanvasElement>,
+    grass_tile_asset: HtmlImageElement,
 }
 
 #[derive(Clone, Debug)]
@@ -33,14 +35,27 @@ pub struct Flags {
     pub game_id: Id,
 }
 
-pub fn init(flags: Flags, orders: &mut impl Orders<Msg>) -> Model {
+pub fn init(flags: Flags, orders: &mut impl Orders<Msg>) -> Result<Model, String> {
+    let window = web_sys::window().ok_or("Cannot find window".to_string())?;
+
+    let document = window.document().ok_or("Cannot get document".to_string())?;
+
+    let grass_tile_asset: HtmlImageElement = HtmlImageElement::from(JsValue::from(
+        document
+            .get_element_by_id(Sprite::GrassTile.html_id().as_str())
+            .ok_or("Cannot find grass tile asset".to_string())?,
+    ));
+
     orders.after_next_render(|_| Msg::Rendered);
 
-    Model {
+    let model = Model {
         game: flags.game,
         game_id: flags.game_id,
         canvas: ElRef::<HtmlCanvasElement>::default(),
-    }
+        grass_tile_asset,
+    };
+
+    Ok(model)
 }
 
 ///////////////////////////////////////////////////////////////
@@ -50,7 +65,7 @@ pub fn init(flags: Flags, orders: &mut impl Orders<Msg>) -> Model {
 pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
     match msg {
         Msg::Rendered => {
-            draw(global.window_size(), &model.canvas);
+            draw(global.window_size(), &model.canvas, &model.grass_tile_asset);
             orders
                 .after_next_render(|_render_info| Msg::Rendered)
                 .skip();
@@ -58,7 +73,11 @@ pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut 
     }
 }
 
-fn draw(window_size: WindowSize, canvas: &ElRef<HtmlCanvasElement>) {
+fn draw(
+    window_size: WindowSize,
+    canvas: &ElRef<HtmlCanvasElement>,
+    grass_tile_asset: &HtmlImageElement,
+) -> Result<(), String> {
     let canvas = canvas.get().expect("could not get canvas element");
     let ctx = seed::canvas_context_2d(&canvas);
 
@@ -69,13 +88,18 @@ fn draw(window_size: WindowSize, canvas: &ElRef<HtmlCanvasElement>) {
     ctx.begin_path();
     ctx.clear_rect(0., 0., width, height);
 
-    ctx.rect(0., 0., width, height);
-    ctx.set_fill_style(&JsValue::from_str("red"));
-    ctx.fill();
+    // ctx.rect(0., 0., width, height);
+    // ctx.set_fill_style(&JsValue::from_str("red"));
+    // ctx.fill();
+    //
+    // ctx.move_to(0., 0.);
+    // ctx.line_to(width, height);
+    // ctx.stroke();
 
-    ctx.move_to(0., 0.);
-    ctx.line_to(width, height);
-    ctx.stroke();
+    ctx.draw_image_with_html_image_element(grass_tile_asset, 50.0, 50.0)
+        .map_err(|_| "Could not draw image on canvas".to_string())?;
+
+    Ok(())
 }
 
 ///////////////////////////////////////////////////////////////

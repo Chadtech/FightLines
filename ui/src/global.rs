@@ -10,7 +10,7 @@ use rand::Rng;
 use seed::browser::web_storage::{LocalStorage, WebStorage, WebStorageError};
 use seed::prelude::{cmds, CmdHandle, JsValue, Orders};
 use shared::id::Id;
-use shared::name::{Error, Name};
+use shared::name::Name;
 use shared::rng::{RandGen, RandSeed};
 use std::str::FromStr;
 

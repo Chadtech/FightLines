@@ -26,8 +26,11 @@ pub struct Flags {
 }
 
 impl Flags {
-    pub fn from_title(title: String) -> Flags {
-        Flags { title, msg: None }
+    pub fn from_title(title: &str) -> Flags {
+        Flags {
+            title: title.to_string(),
+            msg: None,
+        }
     }
 
     pub fn with_msg(mut self, msg: String) -> Flags {

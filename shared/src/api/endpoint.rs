@@ -1,4 +1,5 @@
 use crate::id::Id;
+use crate::sprite::Sprite;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Types //
@@ -12,7 +13,7 @@ pub enum Endpoint {
     UpdateLobby,
     StartGame,
     GetGame(Param<Id>),
-    GrassTileAsset,
+    SpriteAsset(Sprite),
 }
 
 #[derive(Clone)]
@@ -79,7 +80,9 @@ impl Endpoint {
             Endpoint::GetGame(param) => {
                 vec!["game".to_string(), "get".to_string(), param.to_string()]
             }
-            Endpoint::GrassTileAsset => vec!["grass_tile.png".to_string()],
+            Endpoint::SpriteAsset(sprite) => {
+                vec![sprite.to_file_name()]
+            } // Endpoint::GrassTileAsset => vec!["grass_tile.png".to_string()],
         }
     }
 

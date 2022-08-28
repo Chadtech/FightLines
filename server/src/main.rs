@@ -13,6 +13,7 @@ use shared::api::endpoint;
 
 use crate::model::Model;
 use shared::api::endpoint::Endpoint;
+use shared::sprite::Sprite;
 
 mod dev;
 mod flags;
@@ -46,7 +47,9 @@ async fn main() -> Result<(), String> {
             .route("/package.js", web::get().to(js_asset_route))
             .route("/package_bg.wasm", web::get().to(wasm_asset_route))
             .route(
-                Endpoint::GrassTileAsset.to_string().as_str(),
+                Endpoint::SpriteAsset(Sprite::GrassTile)
+                    .to_string()
+                    .as_str(),
                 web::get().to(grass_tile_route),
             )
             .service(
