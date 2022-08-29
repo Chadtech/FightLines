@@ -28,7 +28,10 @@ pub fn view() -> Cell<Msg> {
 fn image_view(sprite: Sprite) -> Node<Msg> {
     let mut element: El<Msg> = El::empty(Tag::Custom(Cow::Borrowed("img")));
 
-    element.add_attr("src", sprite.to_file_name().as_str());
+    let mut file_name = "/".to_string();
+    file_name.push_str(sprite.to_file_name().as_str());
+
+    element.add_attr("src", file_name);
     element.add_attr("id", sprite.html_id().as_str());
 
     Node::Element(element)

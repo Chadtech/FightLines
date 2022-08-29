@@ -1,33 +1,25 @@
+use crate::tile::Tile;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
-////////////////////////////////////////////////////////////////////////////////
-// Types //
-////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct Map {
     base_tile: Tile,
     features: HashMap<Spot, Tile>,
-    pub grid: Vec<Vec<Tile>>,
+    pub grid: Vec<Vec<Cell>>,
     width: u8,
     height: u8,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Debug)]
-pub struct Spot {
-    x: u8,
-    y: u8,
-}
-
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub enum Tile {
-    GrassPlain,
+pub struct Cell {
+    pub tile: Tile,
+    // These x and y are positions within the width and height of the map.
+    // They are u16 to make them more compatible with the rendering math,
+    // which will be in terms of pixels on screens wider than what a u8 can hold
+    pub x: u16,
+    pub y: u16,
 }
-
-////////////////////////////////////////////////////////////////////////////////
-// Api //
-////////////////////////////////////////////////////////////////////////////////
 
 impl Map {
     pub fn grass_square() -> Map {
@@ -56,7 +48,13 @@ impl Map {
                     .map(|tile| tile.clone())
                     .unwrap_or_else(|| self.base_tile.clone());
 
-                row.push(feature);
+                let cell = Cell {
+                    tile: feature,
+                    x: x as u16,
+                    y: y as u16,
+                };
+
+                row.push(cell);
             }
 
             grid.push(row);
@@ -66,12 +64,14 @@ impl Map {
 
         self
     }
+
+    pub fn dimensions(&self) -> (u8, u8) {
+        (self.width, self.height)
+    }
 }
 
-// impl Tile {
-//     pub fn to_bytes(&self) -> &[u8] {
-//         match self {
-//             Tile::GrassPlain => GRASS_PLAIN_BYTES,
-//         }
-//     }
-// }
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Spot {
+    x: u8,
+    y: u8,
+}

@@ -1,13 +1,13 @@
 use crate::global::WindowSize;
 use crate::view::cell::Cell;
-use crate::view::loading_spinner::LoadingSpinner;
 use crate::web_sys::{HtmlCanvasElement, HtmlImageElement};
-use crate::{global, web_sys};
+use crate::{global, web_sys, Toast};
 use seed::prelude::{el_ref, At, El, ElRef, IndexMap, JsValue, Orders, UpdateEl};
 use seed::{attrs, canvas};
 use shared::game::Game;
 use shared::id::Id;
 use shared::sprite::Sprite;
+use shared::tile;
 
 ///////////////////////////////////////////////////////////////
 // Types
@@ -23,6 +23,7 @@ pub struct Model {
 #[derive(Clone, Debug)]
 pub enum Msg {
     Rendered,
+    RenderedFirstTime,
 }
 
 ///////////////////////////////////////////////////////////////
@@ -47,6 +48,7 @@ pub fn init(flags: Flags, orders: &mut impl Orders<Msg>) -> Result<Model, String
     ));
 
     orders.after_next_render(|_| Msg::Rendered);
+    orders.after_next_render(|_| Msg::RenderedFirstTime);
 
     let model = Model {
         game: flags.game,
@@ -62,23 +64,34 @@ pub fn init(flags: Flags, orders: &mut impl Orders<Msg>) -> Result<Model, String
 // Update
 ///////////////////////////////////////////////////////////////
 
-pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
+pub fn update(
+    global: &mut global::Model,
+    msg: Msg,
+    model: &mut Model,
+    orders: &mut impl Orders<Msg>,
+) {
     match msg {
         Msg::Rendered => {
-            draw(global.window_size(), &model.canvas, &model.grass_tile_asset);
             orders
                 .after_next_render(|_render_info| Msg::Rendered)
                 .skip();
         }
+        Msg::RenderedFirstTime => {
+            let draw_result = draw_map(global.window_size(), &model);
+
+            if let Err(err) = draw_result {
+                global.toast(
+                    Toast::init("error", "map rendering problem")
+                        .error()
+                        .with_more_info(err.as_str()),
+                );
+            }
+        }
     }
 }
 
-fn draw(
-    window_size: WindowSize,
-    canvas: &ElRef<HtmlCanvasElement>,
-    grass_tile_asset: &HtmlImageElement,
-) -> Result<(), String> {
-    let canvas = canvas.get().expect("could not get canvas element");
+fn draw_map(window_size: WindowSize, model: &Model) -> Result<(), String> {
+    let canvas = model.canvas.get().expect("could not get canvas element");
     let ctx = seed::canvas_context_2d(&canvas);
 
     let width = window_size.width;
@@ -88,16 +101,23 @@ fn draw(
     ctx.begin_path();
     ctx.clear_rect(0., 0., width, height);
 
-    // ctx.rect(0., 0., width, height);
-    // ctx.set_fill_style(&JsValue::from_str("red"));
-    // ctx.fill();
-    //
-    // ctx.move_to(0., 0.);
-    // ctx.line_to(width, height);
-    // ctx.stroke();
+    let grid = &model.game.map.grid;
 
-    ctx.draw_image_with_html_image_element(grass_tile_asset, 50.0, 50.0)
-        .map_err(|_| "Could not draw image on canvas".to_string())?;
+    for row in grid {
+        for cell in row {
+            let x = (cell.x * tile::PIXEL_WIDTH) as f64;
+            let y = (cell.y * tile::PIXEL_HEIGHT) as f64;
+
+            ctx.draw_image_with_html_image_element_and_dw_and_dh(
+                &model.grass_tile_asset,
+                x,
+                y,
+                tile::PIXEL_WIDTH_FL,
+                tile::PIXEL_HEIGHT_FL,
+            )
+            .map_err(|_| "Could not draw image on canvas".to_string())?;
+        }
+    }
 
     Ok(())
 }
@@ -109,11 +129,11 @@ fn draw(
 pub fn view(global: &global::Model, model: &Model) -> Cell<Msg> {
     Cell::group(
         vec![],
-        vec![canvas_cell(global, model), overlay_view(model)],
+        vec![map_canvas_cell(global, model), overlay_view(model)],
     )
 }
 
-fn canvas_cell(global: &global::Model, model: &Model) -> Cell<Msg> {
+fn map_canvas_cell(global: &global::Model, model: &Model) -> Cell<Msg> {
     let window_size = global.window_size();
 
     let px = |n: f64| -> String {

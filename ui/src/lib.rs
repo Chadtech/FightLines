@@ -311,7 +311,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
         Msg::Game(sub_msg) => {
             if let Page::Game(sub_model) = &mut model.page {
                 game::update(
-                    &model.global,
+                    &mut model.global,
                     sub_msg,
                     sub_model,
                     &mut orders.proxy(Msg::Game),

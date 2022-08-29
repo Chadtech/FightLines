@@ -53,4 +53,8 @@ impl Game {
             }
         }
     }
+
+    pub fn dimensions(&self) -> (u8, u8) {
+        self.map.dimensions()
+    }
 }
