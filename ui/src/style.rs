@@ -54,6 +54,10 @@ pub enum Style {
     Implode,
     Screen,
     AbsoluteCenter,
+    Left0,
+    Right0,
+    Top0,
+    Bottom0,
 }
 
 impl Style {
@@ -114,6 +118,10 @@ impl Style {
             Style::Implode => vec!["implode"],
             Style::Screen => vec!["screen"],
             Style::AbsoluteCenter => vec!["absolute-center"],
+            Style::Left0 => vec!["left-0"],
+            Style::Right0 => vec!["right-0"],
+            Style::Top0 => vec!["top-0"],
+            Style::Bottom0 => vec!["bottom-0"],
         }
     }
 }

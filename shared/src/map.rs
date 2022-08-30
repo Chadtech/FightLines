@@ -7,8 +7,8 @@ pub struct Map {
     base_tile: Tile,
     features: HashMap<Spot, Tile>,
     pub grid: Vec<Vec<Cell>>,
-    width: u8,
-    height: u8,
+    pub width: u8,
+    pub height: u8,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]

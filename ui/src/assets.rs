@@ -1,4 +1,5 @@
 use crate::view::cell::Cell;
+use crate::Style;
 use seed::prelude::{El, Node, Tag};
 use shared::sprite::Sprite;
 use std::borrow::Cow;
@@ -22,7 +23,7 @@ pub enum Msg {}
 ///////////////////////////////////////////////////////////////
 
 pub fn view() -> Cell<Msg> {
-    Cell::from_html(vec![], vec![image_view(Sprite::GrassTile)])
+    Cell::from_html(vec![Style::Hide], vec![image_view(Sprite::GrassTile)])
 }
 
 fn image_view(sprite: Sprite) -> Node<Msg> {

@@ -19,6 +19,7 @@ use crate::view::toast::Toast;
 mod api;
 mod assets;
 mod core_ext;
+mod domain;
 mod global;
 mod page;
 mod route;
@@ -220,6 +221,7 @@ fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders
                 }
                 Some(game) => {
                     let sub_model_result = game::init(
+                        &model.global,
                         game::Flags {
                             game: game.clone(),
                             game_id: id.clone(),
@@ -321,7 +323,8 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
         Msg::Assets(_) => {}
         Msg::LoadedGame(result) => match result {
             Ok(flags) => {
-                let new_page = match game::init(flags, &mut orders.proxy(Msg::Game)) {
+                let new_page = match game::init(&model.global, flags, &mut orders.proxy(Msg::Game))
+                {
                     Ok(sub_model) => Page::Game(sub_model),
                     Err(err) => Page::Error(error::init(
                         error::Flags::from_title("Failed to load game page").with_msg(err),

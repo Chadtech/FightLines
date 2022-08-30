@@ -1,8 +1,10 @@
 use crate::style::Style;
 use crate::view::text::text;
 use seed::dom_entity_names::Tag;
-use seed::prelude::{El, MessageMapper, Node};
+use seed::prelude::{mouse_ev, El, Ev, MessageMapper, Node};
 use std::borrow::Cow;
+use std::rc::Rc;
+use web_sys::MouseEvent;
 
 ////////////////////////////////////////////////////////////////
 // Types //
@@ -19,6 +21,9 @@ pub struct Model<Msg> {
     styles: Vec<Style>,
     children: Vec<Node<Msg>>,
     tag_name: &'static str,
+    mouse_down_handler: Option<Rc<dyn Fn(MouseEvent) -> Msg>>,
+    mouse_up_handler: Option<Rc<dyn Fn(MouseEvent) -> Msg>>,
+    mouse_move_handler: Option<Rc<dyn Fn(MouseEvent) -> Msg>>,
 }
 
 #[derive(Clone)]
@@ -86,6 +91,18 @@ impl<Msg: 'static> Cell<Msg> {
                     element.children.push(child);
                 }
 
+                if let Some(msg) = model.mouse_down_handler {
+                    element.add_event_handler(mouse_ev(Ev::MouseDown, move |event| msg(event)));
+                }
+
+                if let Some(msg) = model.mouse_up_handler {
+                    element.add_event_handler(mouse_ev(Ev::MouseUp, move |event| msg(event)));
+                }
+
+                if let Some(msg) = model.mouse_move_handler {
+                    element.add_event_handler(mouse_ev(Ev::MouseMove, move |event| msg(event)));
+                }
+
                 Node::Element(element)
             }
         }
@@ -109,6 +126,66 @@ impl<Msg: 'static> Cell<Msg> {
                 model.styles.append(&mut styles);
                 Cell::Model(model)
             }
+        }
+    }
+
+    pub fn on_mouse_down(self, msg: impl FnOnce(MouseEvent) -> Msg + Clone + 'static) -> Cell<Msg> {
+        self.on_mouse_down_helper(Some(msg))
+    }
+
+    fn on_mouse_down_helper(
+        self,
+        maybe_msg: Option<impl FnOnce(MouseEvent) -> Msg + Clone + 'static>,
+    ) -> Cell<Msg> {
+        match self {
+            Cell::None => Cell::None,
+            Cell::Model(mut model) => match maybe_msg {
+                Some(msg) => {
+                    model.mouse_down_handler = Some(Rc::new(move |event| msg.clone()(event)));
+                    Cell::Model(model)
+                }
+                None => Cell::Model(model),
+            },
+        }
+    }
+
+    pub fn on_mouse_up(self, msg: impl FnOnce(MouseEvent) -> Msg + Clone + 'static) -> Cell<Msg> {
+        self.on_mouse_up_helper(Some(msg))
+    }
+
+    fn on_mouse_up_helper(
+        self,
+        maybe_msg: Option<impl FnOnce(MouseEvent) -> Msg + Clone + 'static>,
+    ) -> Cell<Msg> {
+        match self {
+            Cell::None => Cell::None,
+            Cell::Model(mut model) => match maybe_msg {
+                Some(msg) => {
+                    model.mouse_up_handler = Some(Rc::new(move |event| msg.clone()(event)));
+                    Cell::Model(model)
+                }
+                None => Cell::Model(model),
+            },
+        }
+    }
+
+    pub fn on_mouse_move(self, msg: impl FnOnce(MouseEvent) -> Msg + Clone + 'static) -> Cell<Msg> {
+        self.on_mouse_move_helper(Some(msg))
+    }
+
+    fn on_mouse_move_helper(
+        self,
+        maybe_msg: Option<impl FnOnce(MouseEvent) -> Msg + Clone + 'static>,
+    ) -> Cell<Msg> {
+        match self {
+            Cell::None => Cell::None,
+            Cell::Model(mut model) => match maybe_msg {
+                Some(msg) => {
+                    model.mouse_move_handler = Some(Rc::new(move |event| msg.clone()(event)));
+                    Cell::Model(model)
+                }
+                None => Cell::Model(model),
+            },
         }
     }
 
@@ -141,6 +218,9 @@ impl<Msg: 'static> Cell<Msg> {
             styles,
             children: html_children,
             tag_name,
+            mouse_down_handler: None,
+            mouse_up_handler: None,
+            mouse_move_handler: None,
         })
     }
 
@@ -160,7 +240,20 @@ impl<Msg: 'static> Cell<Msg> {
                     .into_iter()
                     .map(|html| html.map_msg(f.clone()))
                     .collect();
+
+                let new_on_mouse_down = model.mouse_down_handler.map(|msg| {
+                    let msg_mapper = f.clone();
+                    move |event| msg_mapper(msg(event))
+                });
+
+                let new_on_mouse_up = model.mouse_up_handler.map(|msg| {
+                    let msg_mapper = f.clone();
+                    move |event| msg_mapper(msg(event))
+                });
+
                 Cell::new(model.styles, new_children, model.tag_name)
+                    .on_mouse_down_helper(new_on_mouse_down)
+                    .on_mouse_up_helper((new_on_mouse_up))
             }
         }
     }
@@ -170,6 +263,9 @@ impl<Msg: 'static> Cell<Msg> {
             styles,
             children,
             tag_name,
+            mouse_down_handler: None,
+            mouse_up_handler: None,
+            mouse_move_handler: None,
         })
     }
 }
