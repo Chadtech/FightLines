@@ -75,8 +75,8 @@ pub fn init(
 
     let window_size = global.window_size();
 
-    let game_pixel_width = ((flags.game.map.width.clone() as u16) * tile::PIXEL_WIDTH);
-    let game_pixel_height = ((flags.game.map.height.clone() as u16) * tile::PIXEL_HEIGHT);
+    let game_pixel_width = (flags.game.map.width.clone() as u16) * tile::PIXEL_WIDTH;
+    let game_pixel_height = (flags.game.map.height.clone() as u16) * tile::PIXEL_HEIGHT;
 
     let mut game_x = window_size.width / 2.0;
     game_x -= (game_pixel_width as f64) / 2.0;
