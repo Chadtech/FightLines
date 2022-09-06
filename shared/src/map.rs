@@ -1,4 +1,6 @@
+use crate::located::Located;
 use crate::tile::Tile;
+use crate::unit::{FacingDirection, Unit};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -6,19 +8,9 @@ use std::collections::HashMap;
 pub struct Map {
     base_tile: Tile,
     features: HashMap<Spot, Tile>,
-    pub grid: Vec<Vec<Cell>>,
+    pub grid: Vec<Vec<Located<Tile>>>,
     pub width: u8,
     pub height: u8,
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct Cell {
-    pub tile: Tile,
-    // These x and y are positions within the width and height of the map.
-    // They are u16 to make them more compatible with the rendering math,
-    // which will be in terms of pixels on screens wider than what a u8 can hold
-    pub x: u16,
-    pub y: u16,
 }
 
 impl Map {
@@ -48,13 +40,13 @@ impl Map {
                     .map(|tile| tile.clone())
                     .unwrap_or_else(|| self.base_tile.clone());
 
-                let cell = Cell {
-                    tile: feature,
+                let loc_tile = Located::<Tile> {
+                    value: feature,
                     x: x as u16,
                     y: y as u16,
                 };
 
-                row.push(cell);
+                row.push(loc_tile);
             }
 
             grid.push(row);
@@ -74,4 +66,45 @@ impl Map {
 pub struct Spot {
     x: u8,
     y: u8,
+}
+
+pub enum MapOpt {
+    GrassSquare,
+}
+
+pub struct Militaries {
+    pub first_player_military: Vec<Located<(FacingDirection, Unit)>>,
+    pub second_player_military: Vec<Located<(FacingDirection, Unit)>>,
+    pub rest_players_miliatries: Vec<Vec<Located<(FacingDirection, Unit)>>>,
+}
+
+impl MapOpt {
+    pub fn initial_militaries(&self) -> Militaries {
+        let map = self.to_map();
+        match self {
+            MapOpt::GrassSquare => Militaries {
+                first_player_military: vec![Located::<(FacingDirection, Unit)> {
+                    value: (FacingDirection::Right, Unit::Infantry),
+                    x: 1,
+                    y: 1,
+                }],
+                second_player_military: vec![Located::<(FacingDirection, Unit)> {
+                    value: (FacingDirection::Left, Unit::Infantry),
+                    x: (map.width as u16) - 2,
+                    y: (map.height as u16) - 2,
+                }],
+                rest_players_miliatries: vec![],
+            },
+        }
+    }
+
+    pub fn player_count(&self) -> u8 {
+        2 + (self.initial_militaries().rest_players_miliatries.len() as u8)
+    }
+
+    pub fn to_map(&self) -> Map {
+        match self {
+            MapOpt::GrassSquare => Map::grass_square(),
+        }
+    }
 }

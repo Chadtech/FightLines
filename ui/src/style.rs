@@ -30,6 +30,7 @@ pub enum Style {
     W8,
     W9,
     WA,
+    W512px,
     WFull,
     BgContent0,
     BgContent1,
@@ -44,6 +45,7 @@ pub enum Style {
     H4,
     H5,
     H8,
+    H512px,
     HFull,
     Relative,
     Absolute,
@@ -122,6 +124,8 @@ impl Style {
             Style::Right0 => vec!["right-0"],
             Style::Top0 => vec!["top-0"],
             Style::Bottom0 => vec!["bottom-0"],
+            Style::W512px => vec!["w-512px"],
+            Style::H512px => vec!["h-512px"],
         }
     }
 }

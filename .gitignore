@@ -3,3 +3,5 @@
 /server/target
 /target
 .idea
+**/*/.DS_Store
+.DS_Store

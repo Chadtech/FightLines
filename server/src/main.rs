@@ -52,6 +52,16 @@ async fn main() -> Result<(), String> {
                     .as_str(),
                 web::get().to(grass_tile_route),
             )
+            .route(
+                Endpoint::SpriteAsset(Sprite::Infantry).to_string().as_str(),
+                web::get().to(infantry_route),
+            )
+            .route(
+                Endpoint::SpriteAsset(Sprite::InfantryLeft)
+                    .to_string()
+                    .as_str(),
+                web::get().to(infantry_l_route),
+            )
             .service(
                 web::scope(endpoint::ROOT)
                     .route(
@@ -90,6 +100,22 @@ async fn main() -> Result<(), String> {
 
 async fn grass_tile_route() -> HttpResponse {
     let bytes: &'static [u8] = include_bytes!("assets/grass_tile.png");
+
+    HttpResponse::Ok()
+        .header("Content-Type", "image/png")
+        .body(bytes)
+}
+
+async fn infantry_route() -> HttpResponse {
+    let bytes: &'static [u8] = include_bytes!("assets/infantry.png");
+
+    HttpResponse::Ok()
+        .header("Content-Type", "image/png")
+        .body(bytes)
+}
+
+async fn infantry_l_route() -> HttpResponse {
+    let bytes: &'static [u8] = include_bytes!("assets/infantry-l.png");
 
     HttpResponse::Ok()
         .header("Content-Type", "image/png")

@@ -382,7 +382,7 @@ fn view(model: &Model) -> Node<Msg> {
                     .collect(),
                 Page::Game(sub_model) => vec![Row::from_cells(
                     vec![],
-                    vec![game::view(&model.global, sub_model).map_msg(Msg::Game)],
+                    vec![game::view(sub_model).map_msg(Msg::Game)],
                 )],
             };
 

@@ -253,7 +253,7 @@ impl<Msg: 'static> Cell<Msg> {
 
                 Cell::new(model.styles, new_children, model.tag_name)
                     .on_mouse_down_helper(new_on_mouse_down)
-                    .on_mouse_up_helper((new_on_mouse_up))
+                    .on_mouse_up_helper(new_on_mouse_up)
             }
         }
     }

@@ -1,4 +1,3 @@
-use crate::assets::Assets;
 use crate::style::Style;
 use crate::view::button::Button;
 use crate::view::card::{Card, Header};
@@ -29,9 +28,6 @@ pub struct Model {
     toasts: Vec<Toast>,
     open_toast: Option<OpenToast>,
     first_toast_hidden: bool,
-
-    // game assets
-    assets: Assets,
 
     // window
     window_width: f64,
@@ -126,7 +122,6 @@ impl Model {
             viewer_id,
             viewer_name,
             random_seed,
-            assets: Assets::init(),
             toasts: Vec::new(),
             open_toast: None,
             first_toast_hidden: false,
@@ -139,6 +134,15 @@ impl Model {
         };
 
         Ok(model)
+    }
+
+    pub fn new_rand_gen(&mut self) -> RandGen {
+        let mut rand_gen = RandGen::from_seed(self.random_seed.clone());
+        let new_seed = RandSeed::next(&mut rand_gen);
+
+        self.random_seed = new_seed;
+
+        rand_gen
     }
 
     pub fn viewer_id(&self) -> Id {
@@ -272,7 +276,7 @@ pub fn open_toast_view(global: &Model) -> Option<Cell<Msg>> {
                     Row::from_cells(vec![], vec![text_cell]),
                     Row::from_cells(
                         vec![],
-                        vec![Textarea::simple(open_toast.text.clone()).cell(vec![Style::WFull])],
+                        vec![Textarea::simple(open_toast.info.clone()).cell(vec![Style::WFull])],
                     ),
                     Row::from_cells(
                         vec![],

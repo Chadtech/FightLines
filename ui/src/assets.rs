@@ -7,14 +7,6 @@ use std::borrow::Cow;
 // Types //
 ///////////////////////////////////////////////////////////////
 
-pub struct Assets {}
-
-impl Assets {
-    pub fn init() -> Assets {
-        Assets {}
-    }
-}
-
 #[derive(Clone)]
 pub enum Msg {}
 
@@ -23,7 +15,14 @@ pub enum Msg {}
 ///////////////////////////////////////////////////////////////
 
 pub fn view() -> Cell<Msg> {
-    Cell::from_html(vec![Style::Hide], vec![image_view(Sprite::GrassTile)])
+    Cell::from_html(
+        vec![Style::Hide],
+        vec![
+            image_view(Sprite::GrassTile),
+            image_view(Sprite::Infantry),
+            image_view(Sprite::InfantryLeft),
+        ],
+    )
 }
 
 fn image_view(sprite: Sprite) -> Node<Msg> {

@@ -259,6 +259,10 @@ a.button {
     width: var(--s-a);
 }
 
+.w-512px {
+    width: 512px;
+}
+
 .w-full {
     width: 100%;
 }
@@ -294,6 +298,10 @@ a.button {
 
 .relative {
     position: relative;
+}
+
+canvas {
+    image-rendering: pixelated;
 }
 
 .absolute {
@@ -350,6 +358,10 @@ spinner {
 
 .h-8 {
     height: var(--s-8);
+}
+
+.h-512px {
+    height: 512px;
 }
 
 .h-full {

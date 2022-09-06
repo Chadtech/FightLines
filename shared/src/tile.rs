@@ -14,8 +14,8 @@ impl Tile {
     }
 }
 
-pub const PIXEL_WIDTH: u16 = 32;
-pub const PIXEL_HEIGHT: u16 = 32;
+pub const PIXEL_WIDTH: u16 = 16;
+pub const PIXEL_HEIGHT: u16 = 16;
 
-pub const PIXEL_WIDTH_FL: f64 = 32.0;
-pub const PIXEL_HEIGHT_FL: f64 = 32.0;
+pub const PIXEL_WIDTH_FL: f64 = 16.0;
+pub const PIXEL_HEIGHT_FL: f64 = 16.0;

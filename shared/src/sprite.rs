@@ -1,6 +1,8 @@
 #[derive(Clone)]
 pub enum Sprite {
     GrassTile,
+    Infantry,
+    InfantryLeft,
 }
 
 impl Sprite {
@@ -10,6 +12,8 @@ impl Sprite {
     pub fn to_pieces(&self) -> &[&str] {
         match self {
             Sprite::GrassTile => &["grass", "tile"],
+            Sprite::Infantry => &["infantry"],
+            Sprite::InfantryLeft => &["infantry-l"],
         }
     }
     pub fn to_file_name(&self) -> String {

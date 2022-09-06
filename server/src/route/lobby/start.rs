@@ -2,7 +2,7 @@ use actix_web::{web, HttpResponse};
 
 use crate::model::Model;
 use shared::api::lobby::start::{Request, Response};
-use shared::game::{FromLobbyError, Game};
+use shared::game::FromLobbyError;
 
 pub async fn handle(body: String, data: web::Data<Model>) -> HttpResponse {
     match hex::decode(body) {
@@ -21,7 +21,7 @@ async fn from_req(req: Request, data: web::Data<Model>) -> HttpResponse {
     match &mut lobbies.get_lobby(req.lobby_id.clone()) {
         None => HttpResponse::NotFound().body("Lobby not found"),
 
-        Some(lobby) => match Game::from_lobby(lobby.clone()) {
+        Some(lobby) => match games.new_game_from_lobby(lobby.clone()) {
             Ok(game) => {
                 games.upsert(req.lobby_id.clone(), game.clone());
 
@@ -34,6 +34,9 @@ async fn from_req(req: Request, data: web::Data<Model>) -> HttpResponse {
                 FromLobbyError::NotEnoughPlayers => {
                     HttpResponse::Conflict().body("Lobby does not have enough players")
                 }
+                FromLobbyError::CouldNotFindInitialMapMilitary { .. } => HttpResponse::Conflict().body(
+                    "Map selected requires a different number of players than the number of players in the lobby"
+                ),
             },
         },
     }

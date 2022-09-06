@@ -306,7 +306,9 @@ fn attempt_start_game(
     model: &mut Model,
     orders: &mut impl Orders<Msg>,
 ) {
-    match Game::from_lobby(model.lobby.clone()) {
+    let mut rand_gen = global.new_rand_gen();
+
+    match Game::from_lobby(model.lobby.clone(), &mut rand_gen) {
         Ok(_) => {
             let req = lobby_start::Request {
                 player_id: global.viewer_id(),
@@ -342,11 +344,19 @@ fn attempt_start_game(
             }
         }
         Err(error) => {
-            let text = match error {
-                FromLobbyError::NotEnoughPlayers => "could not start game, not enough players",
+            let text: String = match error {
+                FromLobbyError::NotEnoughPlayers => {
+                    "could not start game, not enough players".to_string()
+                }
+                FromLobbyError::CouldNotFindInitialMapMilitary {
+                    required_player_count,
+                    found_player_count: _,
+                } => "could not start game, map requires ${required} players"
+                    .replace("${required}", required_player_count.to_string().as_str())
+                    .to_string(),
             };
 
-            global.toast(Toast::init("error", text).error());
+            global.toast(Toast::init("error", text.as_str()).error());
         }
     }
 }

@@ -1,5 +1,7 @@
+use shared::game;
 use shared::game::Game;
 use shared::id::Id;
+use shared::lobby::Lobby;
 use shared::rng::{RandGen, RandSeed};
 use std::collections::HashMap;
 
@@ -32,17 +34,15 @@ impl Games {
         self.games.insert(id, game);
     }
 
-    pub fn new_game(&mut self, game: Game) -> Id {
+    pub fn new_game_from_lobby(&mut self, lobby: Lobby) -> Result<Game, game::FromLobbyError> {
         let mut rand_gen = RandGen::from_seed(self.random_seed.clone());
 
-        let new_id: Id = Id::new(&mut rand_gen);
-
-        self.upsert(new_id.clone(), game);
+        let game = Game::from_lobby(lobby, &mut rand_gen)?;
 
         let new_seed: RandSeed = RandSeed::next(&mut rand_gen);
 
         self.random_seed = new_seed;
 
-        new_id
+        Ok(game)
     }
 }
