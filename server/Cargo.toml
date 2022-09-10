@@ -17,6 +17,7 @@ hex = "0.4.2"
 shared = { path = "../shared" }
 bincode = "1.0"
 actix-web-actors = "3.0.0"
+image = "0.24.3"
 
 [dev-dependencies]
 pretty_assertions = "1.0.0"

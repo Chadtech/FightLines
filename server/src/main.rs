@@ -1,16 +1,20 @@
 use std::fs;
+use std::path::PathBuf;
 use std::process::Command;
 use std::sync::mpsc::channel;
 use std::thread;
 
 use actix_cors::Cors;
 use actix_web::{web, App, HttpResponse, HttpServer};
+use image::imageops::flip_horizontal;
+use image::io::Reader as ImageReader;
 use notify::{raw_watcher, RecursiveMode, Watcher};
 
 use route::game;
 use route::lobby;
 use shared::api::endpoint;
 
+use crate::flags::Flags;
 use crate::model::Model;
 use shared::api::endpoint::Endpoint;
 use shared::sprite::Sprite;
@@ -25,77 +29,122 @@ mod setting;
 
 #[actix_web::main]
 async fn main() -> Result<(), String> {
-    let model = Model::init()?;
+    let flags = Flags::get()?;
 
-    let setting = model.setting.clone();
+    match flags {
+        Flags::Main(main_flags) => {
+            let model = Model::init(main_flags);
 
-    if setting.is_dev() {
-        thread::spawn(move || {
-            build_frontend().unwrap();
-            watch_and_recompile_ui();
-        });
-    };
+            let setting = model.setting.clone();
 
-    let web_model = actix_web::web::Data::new(model);
+            if setting.is_dev() {
+                thread::spawn(move || {
+                    build_frontend().unwrap();
+                    watch_and_recompile_ui();
+                });
+            };
 
-    HttpServer::new(move || {
-        let cors = Cors::permissive();
+            let web_model = actix_web::web::Data::new(model);
 
-        App::new()
-            .wrap(cors)
-            .app_data(web_model.clone())
-            .route("/package.js", web::get().to(js_asset_route))
-            .route("/package_bg.wasm", web::get().to(wasm_asset_route))
-            .route(
-                Endpoint::SpriteAsset(Sprite::GrassTile)
-                    .to_string()
-                    .as_str(),
-                web::get().to(grass_tile_route),
-            )
-            .route(
-                Endpoint::SpriteAsset(Sprite::Infantry).to_string().as_str(),
-                web::get().to(infantry_route),
-            )
-            .route(
-                Endpoint::SpriteAsset(Sprite::InfantryLeft)
-                    .to_string()
-                    .as_str(),
-                web::get().to(infantry_l_route),
-            )
-            .service(
-                web::scope(endpoint::ROOT)
+            HttpServer::new(move || {
+                let cors = Cors::permissive();
+
+                App::new()
+                    .wrap(cors)
+                    .app_data(web_model.clone())
+                    .route("/package.js", web::get().to(js_asset_route))
+                    .route("/package_bg.wasm", web::get().to(wasm_asset_route))
                     .route(
-                        Endpoint::CreateLobby.to_string().as_str(),
-                        web::post().to(lobby::create::handle),
+                        Endpoint::SpriteAsset(Sprite::GrassTile)
+                            .to_string()
+                            .as_str(),
+                        web::get().to(grass_tile_route),
                     )
                     .route(
-                        Endpoint::template_get_lobby().to_string().as_str(),
-                        web::get().to(lobby::get::handle),
+                        Endpoint::SpriteAsset(Sprite::Infantry).to_string().as_str(),
+                        web::get().to(infantry_route),
                     )
                     .route(
-                        Endpoint::template_join_lobby().to_string().as_str(),
-                        web::post().to(lobby::join::handle),
+                        Endpoint::SpriteAsset(Sprite::InfantryLeft)
+                            .to_string()
+                            .as_str(),
+                        web::get().to(infantry_l_route),
                     )
-                    .route(
-                        Endpoint::update_lobby().to_string().as_str(),
-                        web::post().to(lobby::update::handle),
+                    .service(
+                        web::scope(endpoint::ROOT)
+                            .route(
+                                Endpoint::CreateLobby.to_string().as_str(),
+                                web::post().to(lobby::create::handle),
+                            )
+                            .route(
+                                Endpoint::template_get_lobby().to_string().as_str(),
+                                web::get().to(lobby::get::handle),
+                            )
+                            .route(
+                                Endpoint::template_join_lobby().to_string().as_str(),
+                                web::post().to(lobby::join::handle),
+                            )
+                            .route(
+                                Endpoint::update_lobby().to_string().as_str(),
+                                web::post().to(lobby::update::handle),
+                            )
+                            .route(
+                                Endpoint::StartGame.to_string().as_str(),
+                                web::post().to(lobby::start::handle),
+                            )
+                            .route(
+                                Endpoint::template_get_game().to_string().as_str(),
+                                web::get().to(game::get::handle),
+                            ),
                     )
-                    .route(
-                        Endpoint::StartGame.to_string().as_str(),
-                        web::post().to(lobby::start::handle),
-                    )
-                    .route(
-                        Endpoint::template_get_game().to_string().as_str(),
-                        web::get().to(game::get::handle),
-                    ),
-            )
-            .default_service(web::get().to(frontend))
-    })
-    .bind("127.0.0.1:8080")
-    .map_err(|err| err.to_string())?
-    .run()
-    .await
-    .map_err(|err| err.to_string())
+                    .default_service(web::get().to(frontend))
+            })
+            .bind("127.0.0.1:8080")
+            .map_err(|err| err.to_string())?
+            .run()
+            .await
+            .map_err(|err| err.to_string())
+        }
+        Flags::Sprites => {
+            let paths = fs::read_dir("./shared/src/sprites").unwrap();
+
+            let mut images_to_flip: Vec<PathBuf> = vec![];
+
+            for path_result in paths {
+                let path = path_result.unwrap().path();
+
+                let ext = path.extension().unwrap().to_str().unwrap();
+
+                let path_str = path.to_str().unwrap();
+                let is_flip = path_str.ends_with("-l.png");
+
+                if ext == "png" && !is_flip {
+                    println!("Path {}", &path.display());
+                    images_to_flip.push(path);
+                }
+            }
+
+            for image_path in images_to_flip {
+                let img = ImageReader::open(image_path.to_str().unwrap())
+                    .map_err(|err| err.to_string())?
+                    .decode()
+                    .map_err(|err| err.to_string())?;
+
+                let name = image_path
+                    .with_extension("")
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap();
+
+                println!("Name {}", name);
+
+                // let flipped_img = flip_horizontal(img);
+            }
+
+            Ok(())
+        }
+    }
 }
 
 async fn grass_tile_route() -> HttpResponse {

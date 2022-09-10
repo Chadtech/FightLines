@@ -4,7 +4,11 @@ use std::env;
 // TYPES //
 ////////////////////////////////////////////////////////////////////////////////
 
-pub struct Flags {
+pub enum Flags {
+    Main(MainFlags),
+    Sprites,
+}
+pub struct MainFlags {
     pub ip_address: String,
     pub admin_password: String,
     pub port_number: u64,
@@ -17,6 +21,12 @@ impl Flags {
         let mut args: Vec<String> = env::args().collect();
 
         args.remove(0);
+
+        let first_arg = args.first();
+
+        if first_arg == Some(&"sprites".to_string()) {
+            return Ok(Flags::Sprites);
+        }
 
         let mut maybe_ip_address: Result<String, String> = Err("ip address not set".to_string());
 
@@ -98,13 +108,13 @@ impl Flags {
         let admin_password = maybe_admin_password?;
         let port_number = maybe_port?;
 
-        Ok(Flags {
+        Ok(Flags::Main(MainFlags {
             ip_address,
             admin_password,
             port_number,
             dev_mode,
 
             show_elm_output,
-        })
+        }))
     }
 }

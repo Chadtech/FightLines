@@ -1,4 +1,4 @@
-use crate::flags::Flags;
+use crate::flags;
 use crate::games::Games;
 use crate::lobbies::Lobbies;
 use crate::setting::Setting;
@@ -24,9 +24,7 @@ pub struct Model {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl Model {
-    pub fn init() -> Result<Model, String> {
-        let flags = Flags::get()?;
-
+    pub fn init(flags: flags::MainFlags) -> Model {
         let setting: Setting = if flags.dev_mode {
             Setting::init_dev()
         } else {
@@ -43,13 +41,13 @@ impl Model {
         let lobbies_seed: RandSeed = RandSeed::next(&mut rand_gen);
         let games_seed: RandSeed = RandSeed::next(&mut rand_gen);
 
-        Ok(Model {
+        Model {
             ip_address: flags.ip_address,
             admin_password: flags.admin_password,
             port_number: flags.port_number,
             setting,
             lobbies: Mutex::new(Lobbies::init(lobbies_seed)),
             games: Mutex::new(Games::init(games_seed)),
-        })
+        }
     }
 }
