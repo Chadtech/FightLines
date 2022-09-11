@@ -13,6 +13,12 @@ impl FacingDirection {
             FacingDirection::Right => "",
         }
     }
+    pub fn to_human_readable_label(&self) -> &str {
+        match self {
+            FacingDirection::Left => "left",
+            FacingDirection::Right => "right",
+        }
+    }
 }
 
 pub const ALL: &[FacingDirection] = &[FacingDirection::Left, FacingDirection::Right];

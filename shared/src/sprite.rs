@@ -38,6 +38,16 @@ impl Sprite {
 
         file
     }
+    pub fn to_human_readable_label(&self) -> String {
+        match self {
+            Sprite::GrassTile => "grass tile".to_string(),
+            Sprite::Infantry { frame, dir } => {
+                vec!["infantry", frame.to_str(), dir.to_human_readable_label()]
+                    .join(" ")
+                    .to_string()
+            }
+        }
+    }
 }
 
 pub const ALL_SPRITES: &[Sprite] = &[Sprite::GrassTile];

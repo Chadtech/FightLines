@@ -1,7 +1,7 @@
 use crate::domain::point::Point;
 use crate::view::cell::Cell;
 use crate::web_sys::{HtmlCanvasElement, HtmlImageElement};
-use crate::{global, web_sys, Style, Toast};
+use crate::{assets, global, web_sys, Style, Toast};
 use seed::app::{CmdHandle, RenderInfo};
 use seed::prelude::{
     cmds, el_ref, At, El, ElRef, IndexMap, JsValue, Node, Orders, St, ToClasses, UpdateEl,
@@ -37,15 +37,7 @@ pub struct Model {
     game_id: Id,
     map_canvas: ElRef<HtmlCanvasElement>,
     units_canvas: ElRef<HtmlCanvasElement>,
-    grass_tile_asset: HtmlImageElement,
-    infantry1_asset: HtmlImageElement,
-    infantry1_l_asset: HtmlImageElement,
-    infantry2_asset: HtmlImageElement,
-    infantry2_l_asset: HtmlImageElement,
-    infantry3_asset: HtmlImageElement,
-    infantry3_l_asset: HtmlImageElement,
-    infantry4_asset: HtmlImageElement,
-    infantry4_l_asset: HtmlImageElement,
+    assets: assets::Model,
     game_pixel_width: u16,
     game_pixel_height: u16,
     game_x: i16,
@@ -96,116 +88,6 @@ pub fn init(
 
     let document = window.document().ok_or("Cannot get document".to_string())?;
 
-    let grass_tile_asset: HtmlImageElement = HtmlImageElement::from(JsValue::from(
-        document
-            .get_element_by_id(Sprite::GrassTile.html_id().as_str())
-            .ok_or("Cannot find grass tile asset".to_string())?,
-    ));
-
-    let infantry1_asset: HtmlImageElement = HtmlImageElement::from(JsValue::from(
-        document
-            .get_element_by_id(
-                Sprite::Infantry {
-                    frame: FrameCount::F1,
-                    dir: FacingDirection::Right,
-                }
-                .html_id()
-                .as_str(),
-            )
-            .ok_or("Cannot find infantry sprite asset".to_string())?,
-    ));
-
-    let infantry1_l_asset: HtmlImageElement = HtmlImageElement::from(JsValue::from(
-        document
-            .get_element_by_id(
-                Sprite::Infantry {
-                    frame: FrameCount::F1,
-                    dir: FacingDirection::Left,
-                }
-                .html_id()
-                .as_str(),
-            )
-            .ok_or("Cannot find infantry sprite asset".to_string())?,
-    ));
-
-    let infantry2_asset: HtmlImageElement = HtmlImageElement::from(JsValue::from(
-        document
-            .get_element_by_id(
-                Sprite::Infantry {
-                    frame: FrameCount::F2,
-                    dir: FacingDirection::Right,
-                }
-                .html_id()
-                .as_str(),
-            )
-            .ok_or("Cannot find infantry sprite asset".to_string())?,
-    ));
-
-    let infantry2_l_asset: HtmlImageElement = HtmlImageElement::from(JsValue::from(
-        document
-            .get_element_by_id(
-                Sprite::Infantry {
-                    frame: FrameCount::F2,
-                    dir: FacingDirection::Left,
-                }
-                .html_id()
-                .as_str(),
-            )
-            .ok_or("Cannot find infantry sprite asset".to_string())?,
-    ));
-
-    let infantry3_asset: HtmlImageElement = HtmlImageElement::from(JsValue::from(
-        document
-            .get_element_by_id(
-                Sprite::Infantry {
-                    frame: FrameCount::F3,
-                    dir: FacingDirection::Right,
-                }
-                .html_id()
-                .as_str(),
-            )
-            .ok_or("Cannot find infantry sprite asset".to_string())?,
-    ));
-
-    let infantry3_l_asset: HtmlImageElement = HtmlImageElement::from(JsValue::from(
-        document
-            .get_element_by_id(
-                Sprite::Infantry {
-                    frame: FrameCount::F3,
-                    dir: FacingDirection::Left,
-                }
-                .html_id()
-                .as_str(),
-            )
-            .ok_or("Cannot find infantry sprite asset".to_string())?,
-    ));
-
-    let infantry4_asset: HtmlImageElement = HtmlImageElement::from(JsValue::from(
-        document
-            .get_element_by_id(
-                Sprite::Infantry {
-                    frame: FrameCount::F4,
-                    dir: FacingDirection::Right,
-                }
-                .html_id()
-                .as_str(),
-            )
-            .ok_or("Cannot find infantry sprite asset".to_string())?,
-    ));
-
-    let infantry4_l_asset: HtmlImageElement = HtmlImageElement::from(JsValue::from(
-        document
-            .get_element_by_id(
-                Sprite::Infantry {
-                    frame: FrameCount::F4,
-                    dir: FacingDirection::Left,
-                }
-                .html_id()
-                .as_str(),
-            )
-            .ok_or("Cannot find infantry sprite asset".to_string())?,
-    ));
-
     let window_size = global.window_size();
 
     let game_pixel_width = (flags.game.map.width.clone() as u16) * tile::PIXEL_WIDTH;
@@ -219,21 +101,14 @@ pub fn init(
 
     orders.after_next_render(|_| Msg::RenderedFirstTime);
 
+    let assets = assets::init()?;
+
     let model = Model {
         game: flags.game.clone(),
         game_id: flags.game_id,
         map_canvas: ElRef::<HtmlCanvasElement>::default(),
         units_canvas: ElRef::<HtmlCanvasElement>::default(),
-        grass_tile_asset,
-        infantry1_l_asset,
-        infantry1_asset,
-        infantry2_l_asset,
-        infantry2_asset,
-        infantry3_l_asset,
-        infantry3_asset,
-        infantry4_l_asset,
-        infantry4_asset,
-
+        assets,
         game_pixel_width,
         game_pixel_height,
         game_x: game_x as i16,
@@ -323,19 +198,20 @@ fn draw_units(model: &Model) -> Result<(), String> {
 
         let unit_model = located_unit.clone().value;
 
+        let assets = &model.assets;
         let asset = match unit_model.unit {
             Unit::Infantry => match unit_model.facing {
                 FacingDirection::Left => match model.frame_count {
-                    FrameCount::F1 => &model.infantry1_l_asset,
-                    FrameCount::F2 => &model.infantry2_l_asset,
-                    FrameCount::F3 => &model.infantry3_l_asset,
-                    FrameCount::F4 => &model.infantry4_l_asset,
+                    FrameCount::F1 => &assets.infantry1_l,
+                    FrameCount::F2 => &assets.infantry2_l,
+                    FrameCount::F3 => &assets.infantry3_l,
+                    FrameCount::F4 => &assets.infantry4_l,
                 },
                 FacingDirection::Right => match model.frame_count {
-                    FrameCount::F1 => &model.infantry1_asset,
-                    FrameCount::F2 => &model.infantry2_asset,
-                    FrameCount::F3 => &model.infantry3_asset,
-                    FrameCount::F4 => &model.infantry4_asset,
+                    FrameCount::F1 => &assets.infantry1,
+                    FrameCount::F2 => &assets.infantry2,
+                    FrameCount::F3 => &assets.infantry3,
+                    FrameCount::F4 => &assets.infantry4,
                 },
             },
         };
@@ -375,7 +251,7 @@ fn draw_map(model: &Model) -> Result<(), String> {
             let y = (located_tile.y * tile::PIXEL_HEIGHT) as f64;
 
             let tile_asset = match located_tile.value {
-                Tile::GrassPlain => &model.grass_tile_asset,
+                Tile::GrassPlain => &model.assets.grass_tile,
             };
 
             ctx.draw_image_with_html_image_element_and_dw_and_dh(
