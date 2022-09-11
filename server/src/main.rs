@@ -1,4 +1,5 @@
 use std::fs;
+use std::fs::ReadDir;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::mpsc::channel;
@@ -17,6 +18,8 @@ use shared::api::endpoint;
 use crate::flags::Flags;
 use crate::model::Model;
 use shared::api::endpoint::Endpoint;
+use shared::facing_direction::FacingDirection;
+use shared::frame_count::FrameCount;
 use shared::sprite::Sprite;
 
 mod dev;
@@ -61,14 +64,22 @@ async fn main() -> Result<(), String> {
                         web::get().to(grass_tile_route),
                     )
                     .route(
-                        Endpoint::SpriteAsset(Sprite::Infantry).to_string().as_str(),
-                        web::get().to(infantry_route),
+                        Endpoint::SpriteAsset(Sprite::Infantry {
+                            frame: FrameCount::F1,
+                            dir: FacingDirection::Right,
+                        })
+                        .to_string()
+                        .as_str(),
+                        web::get().to(infantry1_route),
                     )
                     .route(
-                        Endpoint::SpriteAsset(Sprite::InfantryLeft)
-                            .to_string()
-                            .as_str(),
-                        web::get().to(infantry_l_route),
+                        Endpoint::SpriteAsset(Sprite::Infantry {
+                            frame: FrameCount::F1,
+                            dir: FacingDirection::Left,
+                        })
+                        .to_string()
+                        .as_str(),
+                        web::get().to(infantry1_l_route),
                     )
                     .service(
                         web::scope(endpoint::ROOT)
@@ -106,66 +117,88 @@ async fn main() -> Result<(), String> {
             .map_err(|err| err.to_string())
         }
         Flags::Sprites => {
-            let paths = fs::read_dir("./shared/src/sprites").unwrap();
-
-            let mut images_to_flip: Vec<PathBuf> = vec![];
-
-            for path_result in paths {
-                let path = path_result.unwrap().path();
-
-                let ext = path.extension().unwrap().to_str().unwrap();
-
-                let path_str = path.to_str().unwrap();
-                let is_flip = path_str.ends_with("-l.png");
-
-                if ext == "png" && !is_flip {
-                    println!("Path {}", &path.display());
-                    images_to_flip.push(path);
-                }
-            }
-
-            for image_path in images_to_flip {
-                let img = ImageReader::open(image_path.to_str().unwrap())
-                    .map_err(|err| err.to_string())?
-                    .decode()
-                    .map_err(|err| err.to_string())?;
-
-                let name = image_path
-                    .with_extension("")
-                    .file_name()
-                    .unwrap()
-                    .to_str()
-                    .unwrap();
-
-                println!("Name {}", name);
-
-                // let flipped_img = flip_horizontal(img);
-            }
+            flip_sprites()?;
+            move_sprites();
 
             Ok(())
         }
     }
 }
 
+fn move_sprites() -> Result<(), String> {
+    for path_result in read_sprite_dir() {
+        let path = path_result.unwrap().path();
+
+        let ext = path.extension().unwrap().to_str().unwrap();
+
+        if ext == "png" {
+            let img = ImageReader::open(path.to_str().unwrap())
+                .map_err(|err| err.to_string())?
+                .decode()
+                .map_err(|err| err.to_string())?;
+
+            let file_name_os_str = path.file_name().unwrap();
+
+            let file_name = file_name_os_str.to_str().unwrap();
+
+            let mut dest_file_path = "./server/src/assets/".to_string();
+            dest_file_path.push_str(file_name);
+
+            img.save(dest_file_path);
+        }
+    }
+
+    Ok(())
+}
+
+fn flip_sprites() -> Result<(), String> {
+    for path_result in read_sprite_dir() {
+        let path = path_result.unwrap().path();
+
+        let ext = path.extension().unwrap().to_str().unwrap();
+
+        let path_str = path.to_str().unwrap();
+        let is_flip = path_str.ends_with("-l.png");
+
+        // If its a png and it isnt itself a flipped image, flip it.
+        if ext == "png" && !is_flip {
+            let img = ImageReader::open(path.to_str().unwrap())
+                .map_err(|err| err.to_string())?
+                .decode()
+                .map_err(|err| err.to_string())?;
+
+            let path_no_extension = path.with_extension("");
+
+            let name = path_no_extension.to_str().unwrap();
+
+            let flipped_img = flip_horizontal(&img);
+
+            let mut save_name = name.to_string();
+            save_name.push_str("-l.png");
+
+            flipped_img.save(save_name);
+        }
+    }
+    Ok(())
+}
+
+fn read_sprite_dir() -> ReadDir {
+    fs::read_dir("./shared/src/sprites").unwrap()
+}
+
 async fn grass_tile_route() -> HttpResponse {
-    let bytes: &'static [u8] = include_bytes!("assets/grass_tile.png");
-
-    HttpResponse::Ok()
-        .header("Content-Type", "image/png")
-        .body(bytes)
+    sprite_route(include_bytes!("assets/grass_tile.png")).await
 }
 
-async fn infantry_route() -> HttpResponse {
-    let bytes: &'static [u8] = include_bytes!("assets/infantry.png");
-
-    HttpResponse::Ok()
-        .header("Content-Type", "image/png")
-        .body(bytes)
+async fn infantry1_route() -> HttpResponse {
+    sprite_route(include_bytes!("assets/infantry1.png")).await
 }
 
-async fn infantry_l_route() -> HttpResponse {
-    let bytes: &'static [u8] = include_bytes!("assets/infantry-l.png");
+async fn infantry1_l_route() -> HttpResponse {
+    sprite_route(include_bytes!("assets/infantry1-l.png")).await
+}
 
+async fn sprite_route(bytes: &'static [u8]) -> HttpResponse {
     HttpResponse::Ok()
         .header("Content-Type", "image/png")
         .body(bytes)

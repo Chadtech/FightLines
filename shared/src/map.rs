@@ -1,6 +1,7 @@
+use crate::facing_direction::FacingDirection;
 use crate::located::Located;
 use crate::tile::Tile;
-use crate::unit::{FacingDirection, Unit};
+use crate::unit::Unit;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

@@ -1,4 +1,6 @@
 pub mod api;
+pub mod facing_direction;
+pub mod frame_count;
 pub mod game;
 pub mod id;
 pub mod lobby;

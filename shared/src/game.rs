@@ -1,3 +1,4 @@
+use crate::facing_direction::FacingDirection;
 use crate::game::FromLobbyError::CouldNotFindInitialMapMilitary;
 use crate::id::Id;
 use crate::lobby::Lobby;
@@ -6,7 +7,7 @@ use crate::map::{Map, MapOpt};
 use crate::owner::Owned;
 use crate::player::Player;
 use crate::rng::RandGen;
-use crate::unit::{FacingDirection, Unit, UnitId};
+use crate::unit::{Unit, UnitId};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

@@ -6,12 +6,14 @@ use seed::prelude::{
     el_ref, At, El, ElRef, IndexMap, JsValue, Node, Orders, St, ToClasses, UpdateEl,
 };
 use seed::{attrs, canvas, style, C};
+use shared::facing_direction::FacingDirection;
+use shared::frame_count::FrameCount;
 use shared::game::Game;
 use shared::id::Id;
 use shared::sprite::Sprite;
 use shared::tile;
 use shared::tile::Tile;
-use shared::unit::{FacingDirection, Unit};
+use shared::unit::Unit;
 
 ///////////////////////////////////////////////////////////////
 // Types //
@@ -81,13 +83,27 @@ pub fn init(
 
     let infantry_asset: HtmlImageElement = HtmlImageElement::from(JsValue::from(
         document
-            .get_element_by_id(Sprite::Infantry.html_id().as_str())
+            .get_element_by_id(
+                Sprite::Infantry {
+                    frame: FrameCount::F1,
+                    dir: FacingDirection::Right,
+                }
+                .html_id()
+                .as_str(),
+            )
             .ok_or("Cannot find infantry sprite asset".to_string())?,
     ));
 
     let infantry_l_asset: HtmlImageElement = HtmlImageElement::from(JsValue::from(
         document
-            .get_element_by_id(Sprite::InfantryLeft.html_id().as_str())
+            .get_element_by_id(
+                Sprite::Infantry {
+                    frame: FrameCount::F1,
+                    dir: FacingDirection::Left,
+                }
+                .html_id()
+                .as_str(),
+            )
             .ok_or("Cannot find infantry sprite asset".to_string())?,
     ));
 

@@ -21,17 +21,3 @@ impl UnitId {
 pub enum Unit {
     Infantry,
 }
-
-impl Unit {
-    pub fn to_sprite(&self) -> Sprite {
-        match self {
-            Unit::Infantry => Sprite::Infantry,
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub enum FacingDirection {
-    Left,
-    Right,
-}

@@ -1,7 +1,9 @@
 use crate::view::cell::Cell;
 use crate::Style;
 use seed::prelude::{El, Node, Tag};
+use shared::facing_direction::FacingDirection;
 use shared::sprite::Sprite;
+use shared::{facing_direction, frame_count};
 use std::borrow::Cow;
 ///////////////////////////////////////////////////////////////
 // Types //
@@ -15,13 +17,26 @@ pub enum Msg {}
 ///////////////////////////////////////////////////////////////
 
 pub fn view() -> Cell<Msg> {
+    let mut infantry_images = vec![];
+
+    for dir in facing_direction::ALL {
+        for frame in frame_count::ALL {
+            infantry_images.push(image_view(Sprite::Infantry {
+                frame: frame.clone(),
+                dir: dir.clone(),
+            }))
+        }
+    }
+
     Cell::from_html(
         vec![Style::Hide],
-        vec![
-            image_view(Sprite::GrassTile),
-            image_view(Sprite::Infantry),
-            image_view(Sprite::InfantryLeft),
-        ],
+        (vec![
+            vec![image_view(Sprite::GrassTile)],
+            infantry_images,
+            // image_view(Sprite::Infantry { frame: Fra }),
+            // image_view(Sprite::InfantryLeft),
+        ]
+        .concat()),
     )
 }
 
