@@ -1,6 +1,5 @@
 use crate::id::Id;
 use crate::rng::RandGen;
-use crate::sprite::Sprite;
 use serde::{Deserialize, Serialize};
 
 ///////////////////////////////////////////////////////////////

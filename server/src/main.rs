@@ -1,6 +1,5 @@
 use std::fs;
 use std::fs::ReadDir;
-use std::path::PathBuf;
 use std::process::Command;
 use std::sync::mpsc::channel;
 use std::thread;
@@ -81,6 +80,60 @@ async fn main() -> Result<(), String> {
                         .as_str(),
                         web::get().to(infantry1_l_route),
                     )
+                    .route(
+                        Endpoint::SpriteAsset(Sprite::Infantry {
+                            frame: FrameCount::F2,
+                            dir: FacingDirection::Right,
+                        })
+                        .to_string()
+                        .as_str(),
+                        web::get().to(infantry2_route),
+                    )
+                    .route(
+                        Endpoint::SpriteAsset(Sprite::Infantry {
+                            frame: FrameCount::F2,
+                            dir: FacingDirection::Left,
+                        })
+                        .to_string()
+                        .as_str(),
+                        web::get().to(infantry2_l_route),
+                    )
+                    .route(
+                        Endpoint::SpriteAsset(Sprite::Infantry {
+                            frame: FrameCount::F3,
+                            dir: FacingDirection::Right,
+                        })
+                        .to_string()
+                        .as_str(),
+                        web::get().to(infantry3_route),
+                    )
+                    .route(
+                        Endpoint::SpriteAsset(Sprite::Infantry {
+                            frame: FrameCount::F3,
+                            dir: FacingDirection::Left,
+                        })
+                        .to_string()
+                        .as_str(),
+                        web::get().to(infantry3_l_route),
+                    )
+                    .route(
+                        Endpoint::SpriteAsset(Sprite::Infantry {
+                            frame: FrameCount::F4,
+                            dir: FacingDirection::Right,
+                        })
+                        .to_string()
+                        .as_str(),
+                        web::get().to(infantry4_route),
+                    )
+                    .route(
+                        Endpoint::SpriteAsset(Sprite::Infantry {
+                            frame: FrameCount::F4,
+                            dir: FacingDirection::Left,
+                        })
+                        .to_string()
+                        .as_str(),
+                        web::get().to(infantry4_l_route),
+                    )
                     .service(
                         web::scope(endpoint::ROOT)
                             .route(
@@ -118,7 +171,7 @@ async fn main() -> Result<(), String> {
         }
         Flags::Sprites => {
             flip_sprites()?;
-            move_sprites();
+            move_sprites()?;
 
             Ok(())
         }
@@ -144,7 +197,7 @@ fn move_sprites() -> Result<(), String> {
             let mut dest_file_path = "./server/src/assets/".to_string();
             dest_file_path.push_str(file_name);
 
-            img.save(dest_file_path);
+            img.save(dest_file_path).map_err(|err| err.to_string())?;
         }
     }
 
@@ -176,7 +229,7 @@ fn flip_sprites() -> Result<(), String> {
             let mut save_name = name.to_string();
             save_name.push_str("-l.png");
 
-            flipped_img.save(save_name);
+            flipped_img.save(save_name).map_err(|err| err.to_string())?;
         }
     }
     Ok(())
@@ -196,6 +249,30 @@ async fn infantry1_route() -> HttpResponse {
 
 async fn infantry1_l_route() -> HttpResponse {
     sprite_route(include_bytes!("assets/infantry1-l.png")).await
+}
+
+async fn infantry2_route() -> HttpResponse {
+    sprite_route(include_bytes!("assets/infantry2.png")).await
+}
+
+async fn infantry2_l_route() -> HttpResponse {
+    sprite_route(include_bytes!("assets/infantry2-l.png")).await
+}
+
+async fn infantry3_route() -> HttpResponse {
+    sprite_route(include_bytes!("assets/infantry3.png")).await
+}
+
+async fn infantry3_l_route() -> HttpResponse {
+    sprite_route(include_bytes!("assets/infantry3-l.png")).await
+}
+
+async fn infantry4_route() -> HttpResponse {
+    sprite_route(include_bytes!("assets/infantry4.png")).await
+}
+
+async fn infantry4_l_route() -> HttpResponse {
+    sprite_route(include_bytes!("assets/infantry4-l.png")).await
 }
 
 async fn sprite_route(bytes: &'static [u8]) -> HttpResponse {

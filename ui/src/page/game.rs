@@ -2,10 +2,11 @@ use crate::domain::point::Point;
 use crate::view::cell::Cell;
 use crate::web_sys::{HtmlCanvasElement, HtmlImageElement};
 use crate::{global, web_sys, Style, Toast};
+use seed::app::{CmdHandle, RenderInfo};
 use seed::prelude::{
-    el_ref, At, El, ElRef, IndexMap, JsValue, Node, Orders, St, ToClasses, UpdateEl,
+    cmds, el_ref, At, El, ElRef, IndexMap, JsValue, Node, Orders, St, ToClasses, UpdateEl,
 };
-use seed::{attrs, canvas, style, C};
+use seed::{attrs, canvas, log, style, C};
 use shared::facing_direction::FacingDirection;
 use shared::frame_count::FrameCount;
 use shared::game::Game;
@@ -14,6 +15,18 @@ use shared::sprite::Sprite;
 use shared::tile;
 use shared::tile::Tile;
 use shared::unit::Unit;
+
+///////////////////////////////////////////////////////////////
+// Helpers //
+///////////////////////////////////////////////////////////////
+
+fn wait_for_timeout(orders: &mut impl Orders<Msg>) -> CmdHandle {
+    orders.perform_cmd_with_handle(cmds::timeout(MIN_RENDER_TIME, || {
+        Msg::MinimumRenderTimeExpired
+    }))
+}
+
+const MIN_RENDER_TIME: u32 = 256;
 
 ///////////////////////////////////////////////////////////////
 // Types //
@@ -25,22 +38,30 @@ pub struct Model {
     map_canvas: ElRef<HtmlCanvasElement>,
     units_canvas: ElRef<HtmlCanvasElement>,
     grass_tile_asset: HtmlImageElement,
-    infantry_asset: HtmlImageElement,
-    infantry_l_asset: HtmlImageElement,
+    infantry1_asset: HtmlImageElement,
+    infantry1_l_asset: HtmlImageElement,
+    infantry2_asset: HtmlImageElement,
+    infantry2_l_asset: HtmlImageElement,
+    infantry3_asset: HtmlImageElement,
+    infantry3_l_asset: HtmlImageElement,
+    infantry4_asset: HtmlImageElement,
+    infantry4_l_asset: HtmlImageElement,
     game_pixel_width: u16,
     game_pixel_height: u16,
     game_x: i16,
     game_y: i16,
     dragging_map: Option<Point<i32>>,
+    handle_minimum_framerate_timeout: CmdHandle,
+    frame_count: FrameCount,
 }
 
 #[derive(Clone, Debug)]
 pub enum Msg {
-    Rendered,
     RenderedFirstTime,
     MouseDownOnScreen(Point<i32>),
     MouseUpOnScreen(Point<i32>),
     MouseMoveOnScreen(Point<i32>),
+    MinimumRenderTimeExpired,
 }
 
 impl Model {
@@ -81,7 +102,7 @@ pub fn init(
             .ok_or("Cannot find grass tile asset".to_string())?,
     ));
 
-    let infantry_asset: HtmlImageElement = HtmlImageElement::from(JsValue::from(
+    let infantry1_asset: HtmlImageElement = HtmlImageElement::from(JsValue::from(
         document
             .get_element_by_id(
                 Sprite::Infantry {
@@ -94,11 +115,89 @@ pub fn init(
             .ok_or("Cannot find infantry sprite asset".to_string())?,
     ));
 
-    let infantry_l_asset: HtmlImageElement = HtmlImageElement::from(JsValue::from(
+    let infantry1_l_asset: HtmlImageElement = HtmlImageElement::from(JsValue::from(
         document
             .get_element_by_id(
                 Sprite::Infantry {
                     frame: FrameCount::F1,
+                    dir: FacingDirection::Left,
+                }
+                .html_id()
+                .as_str(),
+            )
+            .ok_or("Cannot find infantry sprite asset".to_string())?,
+    ));
+
+    let infantry2_asset: HtmlImageElement = HtmlImageElement::from(JsValue::from(
+        document
+            .get_element_by_id(
+                Sprite::Infantry {
+                    frame: FrameCount::F2,
+                    dir: FacingDirection::Right,
+                }
+                .html_id()
+                .as_str(),
+            )
+            .ok_or("Cannot find infantry sprite asset".to_string())?,
+    ));
+
+    let infantry2_l_asset: HtmlImageElement = HtmlImageElement::from(JsValue::from(
+        document
+            .get_element_by_id(
+                Sprite::Infantry {
+                    frame: FrameCount::F2,
+                    dir: FacingDirection::Left,
+                }
+                .html_id()
+                .as_str(),
+            )
+            .ok_or("Cannot find infantry sprite asset".to_string())?,
+    ));
+
+    let infantry3_asset: HtmlImageElement = HtmlImageElement::from(JsValue::from(
+        document
+            .get_element_by_id(
+                Sprite::Infantry {
+                    frame: FrameCount::F3,
+                    dir: FacingDirection::Right,
+                }
+                .html_id()
+                .as_str(),
+            )
+            .ok_or("Cannot find infantry sprite asset".to_string())?,
+    ));
+
+    let infantry3_l_asset: HtmlImageElement = HtmlImageElement::from(JsValue::from(
+        document
+            .get_element_by_id(
+                Sprite::Infantry {
+                    frame: FrameCount::F3,
+                    dir: FacingDirection::Left,
+                }
+                .html_id()
+                .as_str(),
+            )
+            .ok_or("Cannot find infantry sprite asset".to_string())?,
+    ));
+
+    let infantry4_asset: HtmlImageElement = HtmlImageElement::from(JsValue::from(
+        document
+            .get_element_by_id(
+                Sprite::Infantry {
+                    frame: FrameCount::F4,
+                    dir: FacingDirection::Right,
+                }
+                .html_id()
+                .as_str(),
+            )
+            .ok_or("Cannot find infantry sprite asset".to_string())?,
+    ));
+
+    let infantry4_l_asset: HtmlImageElement = HtmlImageElement::from(JsValue::from(
+        document
+            .get_element_by_id(
+                Sprite::Infantry {
+                    frame: FrameCount::F4,
                     dir: FacingDirection::Left,
                 }
                 .html_id()
@@ -118,7 +217,6 @@ pub fn init(
     let mut game_y = window_size.height / 2.0;
     game_y -= (game_pixel_height as f64) / 2.0;
 
-    orders.after_next_render(|_| Msg::Rendered);
     orders.after_next_render(|_| Msg::RenderedFirstTime);
 
     let model = Model {
@@ -127,13 +225,22 @@ pub fn init(
         map_canvas: ElRef::<HtmlCanvasElement>::default(),
         units_canvas: ElRef::<HtmlCanvasElement>::default(),
         grass_tile_asset,
-        infantry_l_asset,
-        infantry_asset,
+        infantry1_l_asset,
+        infantry1_asset,
+        infantry2_l_asset,
+        infantry2_asset,
+        infantry3_l_asset,
+        infantry3_asset,
+        infantry4_l_asset,
+        infantry4_asset,
+
         game_pixel_width,
         game_pixel_height,
         game_x: game_x as i16,
         game_y: game_y as i16,
         dragging_map: None,
+        handle_minimum_framerate_timeout: wait_for_timeout(orders),
+        frame_count: FrameCount::F1,
     };
 
     Ok(model)
@@ -150,27 +257,21 @@ pub fn update(
     orders: &mut impl Orders<Msg>,
 ) {
     match msg {
-        Msg::Rendered => {
-            let draw_result = draw_units(&model);
+        Msg::RenderedFirstTime => {
+            let map_draw_result = draw_map(&model);
+            let unit_draw_result = draw_units(&model);
 
-            if let Err(err) = draw_result {
+            if let Err(err) = map_draw_result {
                 global.toast(
-                    Toast::init("error", "units rendering problem")
+                    Toast::init("error", "map rendering problem")
                         .error()
                         .with_more_info(err.as_str()),
                 );
             }
 
-            orders
-                .after_next_render(|_render_info| Msg::Rendered)
-                .skip();
-        }
-        Msg::RenderedFirstTime => {
-            let draw_result = draw_map(&model);
-
-            if let Err(err) = draw_result {
+            if let Err(err) = unit_draw_result {
                 global.toast(
-                    Toast::init("error", "map rendering problem")
+                    Toast::init("error", "units rendering problem")
                         .error()
                         .with_more_info(err.as_str()),
                 );
@@ -185,6 +286,20 @@ pub fn update(
         }
         Msg::MouseMoveOnScreen(page_pos) => {
             model.adjust_map_position_by_mouse_position(page_pos);
+        }
+        Msg::MinimumRenderTimeExpired => {
+            model.frame_count = model.frame_count.succ();
+
+            let draw_result = draw_units(&model);
+
+            if let Err(err) = draw_result {
+                global.toast(
+                    Toast::init("error", "units rendering problem")
+                        .error()
+                        .with_more_info(err.as_str()),
+                );
+            }
+            model.handle_minimum_framerate_timeout = wait_for_timeout(orders);
         }
     }
 }
@@ -210,8 +325,18 @@ fn draw_units(model: &Model) -> Result<(), String> {
 
         let asset = match unit_model.unit {
             Unit::Infantry => match unit_model.facing {
-                FacingDirection::Left => &model.infantry_l_asset,
-                FacingDirection::Right => &model.infantry_asset,
+                FacingDirection::Left => match model.frame_count {
+                    FrameCount::F1 => &model.infantry1_l_asset,
+                    FrameCount::F2 => &model.infantry2_l_asset,
+                    FrameCount::F3 => &model.infantry3_l_asset,
+                    FrameCount::F4 => &model.infantry4_l_asset,
+                },
+                FacingDirection::Right => match model.frame_count {
+                    FrameCount::F1 => &model.infantry1_asset,
+                    FrameCount::F2 => &model.infantry2_asset,
+                    FrameCount::F3 => &model.infantry3_asset,
+                    FrameCount::F4 => &model.infantry4_asset,
+                },
             },
         };
 

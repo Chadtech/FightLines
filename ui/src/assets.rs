@@ -1,7 +1,6 @@
 use crate::view::cell::Cell;
 use crate::Style;
 use seed::prelude::{El, Node, Tag};
-use shared::facing_direction::FacingDirection;
 use shared::sprite::Sprite;
 use shared::{facing_direction, frame_count};
 use std::borrow::Cow;
@@ -30,13 +29,7 @@ pub fn view() -> Cell<Msg> {
 
     Cell::from_html(
         vec![Style::Hide],
-        (vec![
-            vec![image_view(Sprite::GrassTile)],
-            infantry_images,
-            // image_view(Sprite::Infantry { frame: Fra }),
-            // image_view(Sprite::InfantryLeft),
-        ]
-        .concat()),
+        vec![vec![image_view(Sprite::GrassTile)], infantry_images].concat(),
     )
 }
 
