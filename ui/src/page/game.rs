@@ -1,17 +1,14 @@
 use crate::domain::point::Point;
 use crate::view::cell::Cell;
-use crate::web_sys::{HtmlCanvasElement, HtmlImageElement};
-use crate::{assets, global, web_sys, Style, Toast};
-use seed::app::{CmdHandle, RenderInfo};
-use seed::prelude::{
-    cmds, el_ref, At, El, ElRef, IndexMap, JsValue, Node, Orders, St, ToClasses, UpdateEl,
-};
-use seed::{attrs, canvas, log, style, C};
+use crate::web_sys::HtmlCanvasElement;
+use crate::{assets, global, Style, Toast};
+use seed::app::CmdHandle;
+use seed::prelude::{cmds, el_ref, At, El, ElRef, IndexMap, Node, Orders, St, ToClasses, UpdateEl};
+use seed::{attrs, canvas, style, C};
 use shared::facing_direction::FacingDirection;
 use shared::frame_count::FrameCount;
 use shared::game::Game;
 use shared::id::Id;
-use shared::sprite::Sprite;
 use shared::tile;
 use shared::tile::Tile;
 use shared::unit::Unit;
@@ -84,10 +81,6 @@ pub fn init(
     flags: Flags,
     orders: &mut impl Orders<Msg>,
 ) -> Result<Model, String> {
-    let window = web_sys::window().ok_or("Cannot find window".to_string())?;
-
-    let document = window.document().ok_or("Cannot get document".to_string())?;
-
     let window_size = global.window_size();
 
     let game_pixel_width = (flags.game.map.width.clone() as u16) * tile::PIXEL_WIDTH;

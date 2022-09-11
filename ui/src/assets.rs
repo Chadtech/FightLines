@@ -1,6 +1,5 @@
 use crate::view::cell::Cell;
 use crate::Style;
-use seed::log;
 use seed::prelude::{El, JsValue, Node, Tag};
 use shared::facing_direction::FacingDirection;
 use shared::frame_count::FrameCount;
@@ -40,7 +39,6 @@ pub fn init() -> Result<Model, String> {
         match doc.get_element_by_id(sprite.html_id().as_str()) {
             Some(el) => Ok(HtmlImageElement::from(JsValue::from(el))),
             None => {
-                log!("Here");
                 let err_msg = vec![
                     "Cannot find",
                     sprite.to_human_readable_label().as_str(),
