@@ -11,5 +11,6 @@ pub mod owner;
 pub mod player;
 pub mod rng;
 pub mod sprite;
+pub mod team_color;
 pub mod tile;
 pub mod unit;

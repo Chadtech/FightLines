@@ -82,7 +82,7 @@ impl Endpoint {
             }
             Endpoint::SpriteAsset(sprite) => {
                 vec![sprite.to_file_name()]
-            } // Endpoint::GrassTileAsset => vec!["grass_tile.png".to_string()],
+            }
         }
     }
 

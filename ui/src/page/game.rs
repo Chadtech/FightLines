@@ -191,26 +191,28 @@ fn draw_units(model: &Model) -> Result<(), String> {
 
         let unit_model = located_unit.clone().value;
 
-        let assets = &model.assets;
-        let asset = match unit_model.unit {
-            Unit::Infantry => match unit_model.facing {
-                FacingDirection::Left => match model.frame_count {
-                    FrameCount::F1 => &assets.infantry1_l,
-                    FrameCount::F2 => &assets.infantry2_l,
-                    FrameCount::F3 => &assets.infantry3_l,
-                    FrameCount::F4 => &assets.infantry4_l,
-                },
-                FacingDirection::Right => match model.frame_count {
-                    FrameCount::F1 => &assets.infantry1,
-                    FrameCount::F2 => &assets.infantry2,
-                    FrameCount::F3 => &assets.infantry3,
-                    FrameCount::F4 => &assets.infantry4,
-                },
-            },
+        let sheet = match unit_model.facing {
+            FacingDirection::Left => &model.assets.sheet_flipped,
+            FacingDirection::Right => &model.assets.sheet,
         };
 
-        ctx.draw_image_with_html_image_element_and_dw_and_dh(
-            asset,
+        let (sx, sy) = {
+            let sx = match model.frame_count {
+                FrameCount::F1 => 0.0,
+                FrameCount::F2 => 1.0,
+                FrameCount::F3 => 2.0,
+                FrameCount::F4 => 3.0,
+            };
+
+            (sx * tile::PIXEL_WIDTH_FL, 0.0)
+        };
+
+        ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+            sheet,
+            sx,
+            sy,
+            tile::PIXEL_WIDTH_FL,
+            tile::PIXEL_HEIGHT_FL,
             x,
             y,
             tile::PIXEL_WIDTH_FL,
@@ -243,12 +245,12 @@ fn draw_map(model: &Model) -> Result<(), String> {
             let x = (located_tile.x * tile::PIXEL_WIDTH) as f64;
             let y = (located_tile.y * tile::PIXEL_HEIGHT) as f64;
 
-            let tile_asset = match located_tile.value {
-                Tile::GrassPlain => &model.assets.grass_tile,
-            };
-
-            ctx.draw_image_with_html_image_element_and_dw_and_dh(
-                tile_asset,
+            ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+                &model.assets.sheet,
+                0.0,
+                32.0,
+                tile::PIXEL_WIDTH_FL,
+                tile::PIXEL_HEIGHT_FL,
                 x,
                 y,
                 tile::PIXEL_WIDTH_FL,

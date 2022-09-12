@@ -17,9 +17,6 @@ use shared::api::endpoint;
 use crate::flags::Flags;
 use crate::model::Model;
 use shared::api::endpoint::Endpoint;
-use shared::facing_direction::FacingDirection;
-use shared::frame_count::FrameCount;
-use shared::sprite::Sprite;
 
 mod dev;
 mod flags;
@@ -51,89 +48,14 @@ async fn main() -> Result<(), String> {
             HttpServer::new(move || {
                 let cors = Cors::permissive();
 
-                App::new()
+                let app_serving_frontend_code = App::new()
                     .wrap(cors)
                     .app_data(web_model.clone())
                     .route("/package.js", web::get().to(js_asset_route))
-                    .route("/package_bg.wasm", web::get().to(wasm_asset_route))
-                    .route(
-                        Endpoint::SpriteAsset(Sprite::GrassTile)
-                            .to_string()
-                            .as_str(),
-                        web::get().to(grass_tile_route),
-                    )
-                    .route(
-                        Endpoint::SpriteAsset(Sprite::Infantry {
-                            frame: FrameCount::F1,
-                            dir: FacingDirection::Right,
-                        })
-                        .to_string()
-                        .as_str(),
-                        web::get().to(infantry1_route),
-                    )
-                    .route(
-                        Endpoint::SpriteAsset(Sprite::Infantry {
-                            frame: FrameCount::F1,
-                            dir: FacingDirection::Left,
-                        })
-                        .to_string()
-                        .as_str(),
-                        web::get().to(infantry1_l_route),
-                    )
-                    .route(
-                        Endpoint::SpriteAsset(Sprite::Infantry {
-                            frame: FrameCount::F2,
-                            dir: FacingDirection::Right,
-                        })
-                        .to_string()
-                        .as_str(),
-                        web::get().to(infantry2_route),
-                    )
-                    .route(
-                        Endpoint::SpriteAsset(Sprite::Infantry {
-                            frame: FrameCount::F2,
-                            dir: FacingDirection::Left,
-                        })
-                        .to_string()
-                        .as_str(),
-                        web::get().to(infantry2_l_route),
-                    )
-                    .route(
-                        Endpoint::SpriteAsset(Sprite::Infantry {
-                            frame: FrameCount::F3,
-                            dir: FacingDirection::Right,
-                        })
-                        .to_string()
-                        .as_str(),
-                        web::get().to(infantry3_route),
-                    )
-                    .route(
-                        Endpoint::SpriteAsset(Sprite::Infantry {
-                            frame: FrameCount::F3,
-                            dir: FacingDirection::Left,
-                        })
-                        .to_string()
-                        .as_str(),
-                        web::get().to(infantry3_l_route),
-                    )
-                    .route(
-                        Endpoint::SpriteAsset(Sprite::Infantry {
-                            frame: FrameCount::F4,
-                            dir: FacingDirection::Right,
-                        })
-                        .to_string()
-                        .as_str(),
-                        web::get().to(infantry4_route),
-                    )
-                    .route(
-                        Endpoint::SpriteAsset(Sprite::Infantry {
-                            frame: FrameCount::F4,
-                            dir: FacingDirection::Left,
-                        })
-                        .to_string()
-                        .as_str(),
-                        web::get().to(infantry4_l_route),
-                    )
+                    .route("/package_bg.wasm", web::get().to(wasm_asset_route));
+
+                app_serving_frontend_code
+                    .service(route::assets::routes())
                     .service(
                         web::scope(endpoint::ROOT)
                             .route(
@@ -170,12 +92,28 @@ async fn main() -> Result<(), String> {
             .map_err(|err| err.to_string())
         }
         Flags::Sprites => {
+            flip_sprite_sheet()?;
             flip_sprites()?;
             move_sprites()?;
 
             Ok(())
         }
     }
+}
+
+fn flip_sprite_sheet() -> Result<(), String> {
+    let sheet = ImageReader::open("./server/src/assets/sheet.png")
+        .map_err(|err| err.to_string())?
+        .decode()
+        .map_err(|err| err.to_string())?;
+
+    let flipped_sheet = flip_horizontal(&sheet);
+
+    flipped_sheet
+        .save("./server/src/assets/sheet-flipped.png")
+        .map_err(|err| err.to_string())?;
+
+    Ok(())
 }
 
 fn move_sprites() -> Result<(), String> {
@@ -237,48 +175,6 @@ fn flip_sprites() -> Result<(), String> {
 
 fn read_sprite_dir() -> ReadDir {
     fs::read_dir("./shared/src/sprites").unwrap()
-}
-
-async fn grass_tile_route() -> HttpResponse {
-    sprite_route(include_bytes!("assets/grass_tile.png")).await
-}
-
-async fn infantry1_route() -> HttpResponse {
-    sprite_route(include_bytes!("assets/infantry1.png")).await
-}
-
-async fn infantry1_l_route() -> HttpResponse {
-    sprite_route(include_bytes!("assets/infantry1-l.png")).await
-}
-
-async fn infantry2_route() -> HttpResponse {
-    sprite_route(include_bytes!("assets/infantry2.png")).await
-}
-
-async fn infantry2_l_route() -> HttpResponse {
-    sprite_route(include_bytes!("assets/infantry2-l.png")).await
-}
-
-async fn infantry3_route() -> HttpResponse {
-    sprite_route(include_bytes!("assets/infantry3.png")).await
-}
-
-async fn infantry3_l_route() -> HttpResponse {
-    sprite_route(include_bytes!("assets/infantry3-l.png")).await
-}
-
-async fn infantry4_route() -> HttpResponse {
-    sprite_route(include_bytes!("assets/infantry4.png")).await
-}
-
-async fn infantry4_l_route() -> HttpResponse {
-    sprite_route(include_bytes!("assets/infantry4-l.png")).await
-}
-
-async fn sprite_route(bytes: &'static [u8]) -> HttpResponse {
-    HttpResponse::Ok()
-        .header("Content-Type", "image/png")
-        .body(bytes)
 }
 
 async fn wasm_asset_route(model: web::Data<Model>) -> HttpResponse {
