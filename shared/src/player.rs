@@ -1,4 +1,5 @@
 use crate::name::Name;
+use crate::team_color::TeamColor;
 use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -8,6 +9,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct Player {
     pub name: Name,
+    pub color: TeamColor,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -15,7 +17,10 @@ pub struct Player {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl Player {
-    pub fn new(name: Name) -> Player {
-        Player { name }
+    pub fn new(name: Name, team_color: TeamColor) -> Player {
+        Player {
+            name,
+            color: team_color,
+        }
     }
 }

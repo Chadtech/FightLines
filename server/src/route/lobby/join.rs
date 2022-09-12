@@ -4,6 +4,7 @@ use crate::model::Model;
 use shared::api::lobby::join::{Request, Response};
 use shared::lobby::AddError;
 use shared::player::Player;
+use shared::team_color::TeamColor;
 
 pub async fn handle(body: String, data: web::Data<Model>) -> HttpResponse {
     match hex::decode(body) {
@@ -16,7 +17,7 @@ pub async fn handle(body: String, data: web::Data<Model>) -> HttpResponse {
 }
 
 async fn from_req(req: Request, data: web::Data<Model>) -> HttpResponse {
-    let guest = Player::new(req.guest_name);
+    let guest = Player::new(req.guest_name, TeamColor::Blue);
 
     let mut lobbies = data.lobbies.lock().unwrap();
 

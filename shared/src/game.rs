@@ -7,6 +7,7 @@ use crate::map::{Map, MapOpt};
 use crate::owner::Owned;
 use crate::player::Player;
 use crate::rng::RandGen;
+use crate::team_color::TeamColor;
 use crate::unit::{Unit, UnitId};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -34,6 +35,7 @@ pub struct UnitModel {
     pub unit: Unit,
     pub facing: FacingDirection,
     pub owner: Id,
+    pub color: TeamColor,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -72,7 +74,8 @@ impl Game {
                 let (first_guest_id, first_guest) = first;
 
                 let mut id_units = |units: Vec<Located<(FacingDirection, Unit)>>,
-                                    owner_id: &Id|
+                                    owner_id: &Id,
+                                    color: &TeamColor|
                  -> Vec<(UnitId, Located<UnitModel>)> {
                     let mut units_with_ids: Vec<(UnitId, Located<UnitModel>)> = vec![];
 
@@ -86,6 +89,7 @@ impl Game {
                                 unit,
                                 owner: owner_id.clone(),
                                 facing,
+                                color: color.clone(),
                             },
                             x: located_unit.x,
                             y: located_unit.y,
@@ -100,7 +104,7 @@ impl Game {
                 let mut remaining_guests_with_militaries: Vec<(UnitId, Located<UnitModel>)> =
                     vec![];
 
-                for (index, (guest_id, _)) in rest.into_iter().enumerate() {
+                for (index, (guest_id, guest)) in rest.into_iter().enumerate() {
                     let initial_military = initial_militaries
                         .rest_players_miliatries
                         .get(index)
@@ -109,15 +113,22 @@ impl Game {
                             found_player_count: num_players,
                         })?;
 
-                    let mut military = id_units(initial_military.clone(), guest_id);
+                    let mut military = id_units(initial_military.clone(), guest_id, &guest.color);
 
                     remaining_guests_with_militaries.append(&mut military);
                 }
 
-                let host_units = id_units(initial_militaries.first_player_military, &lobby.host_id);
+                let host_units = id_units(
+                    initial_militaries.first_player_military,
+                    &lobby.host_id,
+                    &lobby.host.color,
+                );
 
-                let first_guest_units =
-                    id_units(initial_militaries.second_player_military, &first_guest_id);
+                let first_guest_units = id_units(
+                    initial_militaries.second_player_military,
+                    &first_guest_id,
+                    &first_guest.color,
+                );
 
                 let units: Vec<(UnitId, Located<UnitModel>)> = vec![
                     vec![host_units, first_guest_units].concat().to_vec(),

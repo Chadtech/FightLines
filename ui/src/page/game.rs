@@ -9,6 +9,7 @@ use shared::facing_direction::FacingDirection;
 use shared::frame_count::FrameCount;
 use shared::game::Game;
 use shared::id::Id;
+use shared::team_color::TeamColor;
 use shared::tile;
 use shared::tile::Tile;
 use shared::unit::Unit;
@@ -204,7 +205,12 @@ fn draw_units(model: &Model) -> Result<(), String> {
                 FrameCount::F4 => 3.0,
             };
 
-            (sx * tile::PIXEL_WIDTH_FL, 0.0)
+            let sy = match unit_model.color {
+                TeamColor::Red => 0.0,
+                TeamColor::Blue => 1.0,
+            };
+
+            (sx * tile::PIXEL_WIDTH_FL, sy * tile::PIXEL_WIDTH_FL)
         };
 
         ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
