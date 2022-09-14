@@ -10,7 +10,7 @@ use crate::rng::RandGen;
 use crate::team_color::TeamColor;
 use crate::unit::{Unit, UnitId};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Types //
@@ -21,11 +21,13 @@ pub struct Game {
     // host
     pub host: Player,
     pub host_id: Id,
+    pub host_visibility: HashSet<Located<()>>,
     // first guest
     pub first_guest: Player,
     pub first_guest_id: Id,
+    pub first_guest_visibility: HashSet<Located<()>>,
     // remaining guests
-    pub remaining_guests: Vec<(Id, Player)>,
+    pub remaining_guests: Vec<(Id, Guest)>,
     pub units: HashMap<UnitId, Located<UnitModel>>,
     pub map: Map,
 }
@@ -41,7 +43,7 @@ pub struct UnitModel {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct Guest {
     player: Player,
-    military: Military,
+    visibility: HashSet<Located<()>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -143,14 +145,33 @@ impl Game {
                     unit_hashmap.insert(unit_id, unit);
                 }
 
+                let host_id = lobby.host_id.clone();
+
+                let remaining_guests: Vec<(Id, Guest)> = rest
+                    .into_iter()
+                    .map(|(guest_id, guest_player)| {
+                        let guest = Guest {
+                            player: guest_player.clone(),
+                            visibility: calculate_player_visibility(&guest_id, &map, &unit_hashmap),
+                        };
+
+                        (guest_id.clone(), guest)
+                    })
+                    .collect();
+
                 let game = Game {
                     host: lobby.host,
-                    host_id: lobby.host_id.clone(),
+                    host_id: host_id.clone(),
+                    host_visibility: calculate_player_visibility(&host_id, &map, &unit_hashmap),
 
                     first_guest: first_guest.clone(),
                     first_guest_id: first_guest_id.clone(),
-
-                    remaining_guests: rest.to_vec(),
+                    first_guest_visibility: calculate_player_visibility(
+                        &first_guest_id,
+                        &map,
+                        &unit_hashmap,
+                    ),
+                    remaining_guests,
                     units: unit_hashmap,
                     map,
                 };
@@ -163,4 +184,69 @@ impl Game {
     pub fn dimensions(&self) -> (u8, u8) {
         self.map.dimensions()
     }
+
+    pub fn get_players_visibility(&self, player_id: &Id) -> Result<&HashSet<Located<()>>, String> {
+        if &self.host_id == player_id {
+            return Ok(&self.host_visibility);
+        }
+
+        if &self.first_guest_id == player_id {
+            return Ok(&self.first_guest_visibility);
+        }
+
+        let mut ret_guest_visibility: Result<&HashSet<Located<()>>, String> =
+            Err("Player not found when finding visibility".to_string());
+
+        for (guest_id, guest) in self.remaining_guests.iter() {
+            if guest_id == player_id {
+                ret_guest_visibility = Ok(&guest.visibility);
+            }
+        }
+
+        ret_guest_visibility
+    }
+}
+
+fn calculate_player_visibility(
+    player_id: &Id,
+    map: &Map,
+    units: &HashMap<UnitId, Located<UnitModel>>,
+) -> HashSet<Located<()>> {
+    let mut visible_spots = HashSet::new();
+
+    for loc_unit in units.values() {
+        if &loc_unit.value.owner == player_id {
+            visible_spots.insert(Located {
+                value: (),
+                x: loc_unit.x - 1,
+                y: loc_unit.y,
+            });
+
+            visible_spots.insert(Located {
+                value: (),
+                x: loc_unit.x + 1,
+                y: loc_unit.y,
+            });
+
+            visible_spots.insert(Located {
+                value: (),
+                x: loc_unit.x,
+                y: loc_unit.y - 1,
+            });
+
+            visible_spots.insert(Located {
+                value: (),
+                x: loc_unit.x,
+                y: loc_unit.y + 1,
+            });
+
+            visible_spots.insert(Located {
+                value: (),
+                x: loc_unit.x,
+                y: loc_unit.y,
+            });
+        }
+    }
+
+    visible_spots
 }

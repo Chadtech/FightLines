@@ -9,10 +9,12 @@ use shared::facing_direction::FacingDirection;
 use shared::frame_count::FrameCount;
 use shared::game::Game;
 use shared::id::Id;
+use shared::located::Located;
 use shared::team_color::TeamColor;
 use shared::tile;
 use shared::tile::Tile;
 use shared::unit::Unit;
+use std::collections::HashSet;
 
 ///////////////////////////////////////////////////////////////
 // Helpers //
@@ -35,6 +37,7 @@ pub struct Model {
     game_id: Id,
     map_canvas: ElRef<HtmlCanvasElement>,
     units_canvas: ElRef<HtmlCanvasElement>,
+    visibility_canvas: ElRef<HtmlCanvasElement>,
     assets: assets::Model,
     game_pixel_width: u16,
     game_pixel_height: u16,
@@ -102,6 +105,7 @@ pub fn init(
         game_id: flags.game_id,
         map_canvas: ElRef::<HtmlCanvasElement>::default(),
         units_canvas: ElRef::<HtmlCanvasElement>::default(),
+        visibility_canvas: ElRef::<HtmlCanvasElement>::default(),
         assets,
         game_pixel_width,
         game_pixel_height,
@@ -127,8 +131,9 @@ pub fn update(
 ) {
     match msg {
         Msg::RenderedFirstTime => {
+            let viewer_id = global.viewer_id();
+
             let map_draw_result = draw_map(&model);
-            let unit_draw_result = draw_units(&model);
 
             if let Err(err) = map_draw_result {
                 global.toast(
@@ -138,11 +143,11 @@ pub fn update(
                 );
             }
 
-            if let Err(err) = unit_draw_result {
+            if let Err((err_title, err_detail)) = draw(&viewer_id, &model) {
                 global.toast(
-                    Toast::init("error", "units rendering problem")
+                    Toast::init("error", err_title.as_str())
                         .error()
-                        .with_more_info(err.as_str()),
+                        .with_more_info(err_detail.as_str()),
                 );
             }
         }
@@ -159,21 +164,88 @@ pub fn update(
         Msg::MinimumRenderTimeExpired => {
             model.frame_count = model.frame_count.succ();
 
-            let draw_result = draw_units(&model);
+            let viewer_id = global.viewer_id();
 
-            if let Err(err) = draw_result {
+            if let Err((err_title, err_detail)) = draw(&viewer_id, &model) {
                 global.toast(
-                    Toast::init("error", "units rendering problem")
+                    Toast::init("error", err_title.as_str())
                         .error()
-                        .with_more_info(err.as_str()),
+                        .with_more_info(err_detail.as_str()),
                 );
             }
+
             model.handle_minimum_framerate_timeout = wait_for_timeout(orders);
         }
     }
 }
 
-fn draw_units(model: &Model) -> Result<(), String> {
+fn draw(viewer_id: &Id, model: &Model) -> Result<(), (String, String)> {
+    let visibility = model
+        .game
+        .get_players_visibility(viewer_id)
+        .map_err(|err_msg| ("visibility rendering problem".to_string(), err_msg))?;
+
+    draw_units(visibility, &model)
+        .map_err(|err_msg| ("units rendering problem".to_string(), err_msg))?;
+
+    draw_visibility(visibility, &model);
+
+    Ok(())
+}
+
+fn draw_visibility(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), String> {
+    let canvas = model
+        .visibility_canvas
+        .get()
+        .expect("could not get visibility canvas element");
+    let ctx = seed::canvas_context_2d(&canvas);
+
+    let width = model.game_pixel_width as f64;
+    let height = model.game_pixel_height as f64;
+
+    ctx.begin_path();
+    ctx.clear_rect(0., 0., width, height);
+
+    for x in 0..model.game.map.width {
+        for y in 0..model.game.map.height {
+            let x_u16 = x as u16;
+            let y_u16 = y as u16;
+
+            let loc = Located {
+                value: (),
+                x: x_u16,
+                y: y_u16,
+            };
+
+            if !visibility.contains(&loc) {
+                let sheet = &model.assets.sheet;
+
+                let sx = 0.0;
+                let sy = 48.0;
+
+                let x_fl = (x_u16 * tile::PIXEL_WIDTH) as f64;
+                let y_fl = (y_u16 * tile::PIXEL_HEIGHT) as f64;
+
+                ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+                    sheet,
+                    sx,
+                    sy,
+                    tile::PIXEL_WIDTH_FL,
+                    tile::PIXEL_HEIGHT_FL,
+                    x_fl,
+                    y_fl,
+                    tile::PIXEL_WIDTH_FL,
+                    tile::PIXEL_HEIGHT_FL,
+                )
+                .map_err(|_| "Could not draw unit image on canvas".to_string())?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), String> {
     let canvas = model
         .units_canvas
         .get()
@@ -187,44 +259,52 @@ fn draw_units(model: &Model) -> Result<(), String> {
     ctx.clear_rect(0., 0., width, height);
 
     for located_unit in model.game.units.values() {
-        let x = (located_unit.x * tile::PIXEL_WIDTH) as f64;
-        let y = (located_unit.y * tile::PIXEL_HEIGHT) as f64;
-
-        let unit_model = located_unit.clone().value;
-
-        let sheet = match unit_model.facing {
-            FacingDirection::Left => &model.assets.sheet_flipped,
-            FacingDirection::Right => &model.assets.sheet,
+        let location = Located {
+            x: located_unit.x,
+            y: located_unit.y,
+            value: (),
         };
 
-        let (sx, sy) = {
-            let sx = match model.frame_count {
-                FrameCount::F1 => 0.0,
-                FrameCount::F2 => 1.0,
-                FrameCount::F3 => 2.0,
-                FrameCount::F4 => 3.0,
+        if visibility.contains(&location) {
+            let x = (located_unit.x * tile::PIXEL_WIDTH) as f64;
+            let y = (located_unit.y * tile::PIXEL_HEIGHT) as f64;
+
+            let unit_model = located_unit.clone().value;
+
+            let sheet = match unit_model.facing {
+                FacingDirection::Left => &model.assets.sheet_flipped,
+                FacingDirection::Right => &model.assets.sheet,
             };
 
-            let sy = match unit_model.color {
-                TeamColor::Red => 0.0,
-                TeamColor::Blue => 1.0,
+            let (sx, sy) = {
+                let sx = match model.frame_count {
+                    FrameCount::F1 => 0.0,
+                    FrameCount::F2 => 1.0,
+                    FrameCount::F3 => 2.0,
+                    FrameCount::F4 => 3.0,
+                };
+
+                let sy = match unit_model.color {
+                    TeamColor::Red => 0.0,
+                    TeamColor::Blue => 1.0,
+                };
+
+                (sx * tile::PIXEL_WIDTH_FL, sy * tile::PIXEL_WIDTH_FL)
             };
 
-            (sx * tile::PIXEL_WIDTH_FL, sy * tile::PIXEL_WIDTH_FL)
-        };
-
-        ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-            sheet,
-            sx,
-            sy,
-            tile::PIXEL_WIDTH_FL,
-            tile::PIXEL_HEIGHT_FL,
-            x,
-            y,
-            tile::PIXEL_WIDTH_FL,
-            tile::PIXEL_HEIGHT_FL,
-        )
-        .map_err(|_| "Could not draw unit image on canvas".to_string())?;
+            ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+                sheet,
+                sx,
+                sy,
+                tile::PIXEL_WIDTH_FL,
+                tile::PIXEL_HEIGHT_FL,
+                x,
+                y,
+                tile::PIXEL_WIDTH_FL,
+                tile::PIXEL_HEIGHT_FL,
+            )
+            .map_err(|_| "Could not draw unit image on canvas".to_string())?;
+        }
     }
 
     Ok(())
@@ -279,10 +359,15 @@ pub fn view(model: &Model) -> Cell<Msg> {
         vec![
             map_canvas_cell(model),
             units_canvas_cell(model),
+            visibility_canvas_cell(model),
             click_screen(),
             overlay_view(model),
         ],
     )
+}
+
+fn visibility_canvas_cell(model: &Model) -> Cell<Msg> {
+    Cell::from_html(vec![], vec![game_canvas(model, &model.visibility_canvas)])
 }
 
 fn units_canvas_cell(model: &Model) -> Cell<Msg> {
