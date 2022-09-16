@@ -12,8 +12,6 @@ use shared::id::Id;
 use shared::located::Located;
 use shared::team_color::TeamColor;
 use shared::tile;
-use shared::tile::Tile;
-use shared::unit::Unit;
 use std::collections::HashSet;
 
 ///////////////////////////////////////////////////////////////
@@ -188,7 +186,8 @@ fn draw(viewer_id: &Id, model: &Model) -> Result<(), (String, String)> {
     draw_units(visibility, &model)
         .map_err(|err_msg| ("units rendering problem".to_string(), err_msg))?;
 
-    draw_visibility(visibility, &model);
+    draw_visibility(visibility, &model)
+        .map_err(|err_msg| ("visibility rendering problem".to_string(), err_msg))?;
 
     Ok(())
 }

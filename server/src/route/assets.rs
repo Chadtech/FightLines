@@ -1,8 +1,4 @@
 use actix_web::{web, HttpResponse};
-use shared::api::endpoint::Endpoint;
-use shared::facing_direction::FacingDirection;
-use shared::frame_count::FrameCount;
-use shared::sprite::Sprite;
 
 pub fn routes() -> actix_web::Scope {
     web::scope("/asset")

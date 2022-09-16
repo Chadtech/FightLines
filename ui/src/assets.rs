@@ -1,10 +1,6 @@
 use crate::view::cell::Cell;
 use crate::Style;
 use seed::prelude::{El, JsValue, Node, Tag};
-use shared::facing_direction::FacingDirection;
-use shared::frame_count::FrameCount;
-use shared::sprite::Sprite;
-use shared::{facing_direction, frame_count};
 use std::borrow::Cow;
 use web_sys::HtmlImageElement;
 ///////////////////////////////////////////////////////////////
