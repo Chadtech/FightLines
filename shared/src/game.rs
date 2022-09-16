@@ -22,14 +22,28 @@ pub struct Game {
     pub host: Player,
     pub host_id: Id,
     pub host_visibility: HashSet<Located<()>>,
+    pub hosts_turn: Turn,
     // first guest
     pub first_guest: Player,
     pub first_guest_id: Id,
     pub first_guest_visibility: HashSet<Located<()>>,
+    pub first_guests_turn: Turn,
     // remaining guests
     pub remaining_guests: Vec<(Id, Guest)>,
     pub units: HashMap<UnitId, Located<UnitModel>>,
     pub map: Map,
+    pub turn_number: u32,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub enum Turn {
+    Waiting,
+    Turn { moves: Vec<Move> },
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub enum Move {
+    Travel { unit_id: UnitId, dest: Located<()> },
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -44,6 +58,7 @@ pub struct UnitModel {
 pub struct Guest {
     player: Player,
     visibility: HashSet<Located<()>>,
+    turn: Turn,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -153,6 +168,7 @@ impl Game {
                         let guest = Guest {
                             player: guest_player.clone(),
                             visibility: calculate_player_visibility(&guest_id, &map, &unit_hashmap),
+                            turn: Turn::Waiting,
                         };
 
                         (guest_id.clone(), guest)
@@ -163,6 +179,7 @@ impl Game {
                     host: lobby.host,
                     host_id: host_id.clone(),
                     host_visibility: calculate_player_visibility(&host_id, &map, &unit_hashmap),
+                    hosts_turn: Turn::Waiting,
 
                     first_guest: first_guest.clone(),
                     first_guest_id: first_guest_id.clone(),
@@ -171,9 +188,11 @@ impl Game {
                         &map,
                         &unit_hashmap,
                     ),
+                    first_guests_turn: Turn::Waiting,
                     remaining_guests,
                     units: unit_hashmap,
                     map,
+                    turn_number: 0,
                 };
 
                 Ok(game)

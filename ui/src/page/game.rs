@@ -1,7 +1,8 @@
 use crate::domain::point::Point;
+use crate::view::card::Card;
 use crate::view::cell::Cell;
 use crate::web_sys::HtmlCanvasElement;
-use crate::{assets, global, Style, Toast};
+use crate::{assets, global, Row, Style, Toast};
 use seed::app::CmdHandle;
 use seed::prelude::{cmds, el_ref, At, El, ElRef, IndexMap, Node, Orders, St, ToClasses, UpdateEl};
 use seed::{attrs, canvas, style, C};
@@ -442,5 +443,11 @@ fn click_screen() -> Cell<Msg> {
 }
 
 fn overlay_view(model: &Model) -> Cell<Msg> {
-    Cell::none()
+    Card::cell_from_rows(
+        vec![],
+        vec![Row::from_cells(
+            vec![],
+            vec![Cell::from_str(vec![], "Waiting..")],
+        )],
+    )
 }
