@@ -41,6 +41,15 @@ pub enum Turn {
     Turn { moves: Vec<Move> },
 }
 
+impl Turn {
+    pub fn is_waiting(&self) -> bool {
+        match self {
+            Turn::Waiting => true,
+            Turn::Turn { .. } => false,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum Move {
     Travel { unit_id: UnitId, dest: Located<()> },
@@ -223,6 +232,24 @@ impl Game {
         }
 
         ret_guest_visibility
+    }
+
+    pub fn waiting_on_player(&self, player_id: &Id) -> bool {
+        let mut has_submitted: bool = false;
+
+        if &self.host_id == player_id {
+            has_submitted = self.hosts_turn.is_waiting();
+        } else if &self.first_guest_id == player_id {
+            has_submitted = self.first_guests_turn.is_waiting();
+        } else {
+            for (guest_id, guest) in self.remaining_guests.iter() {
+                if guest_id == player_id {
+                    has_submitted = guest.turn.is_waiting();
+                }
+            }
+        }
+
+        has_submitted
     }
 }
 

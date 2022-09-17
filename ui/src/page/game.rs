@@ -13,6 +13,7 @@ use shared::id::Id;
 use shared::located::Located;
 use shared::team_color::TeamColor;
 use shared::tile;
+use shared::unit::UnitId;
 use std::collections::HashSet;
 
 ///////////////////////////////////////////////////////////////
@@ -45,6 +46,7 @@ pub struct Model {
     dragging_map: Option<Point<i32>>,
     handle_minimum_framerate_timeout: CmdHandle,
     frame_count: FrameCount,
+    moved_units: HashSet<UnitId>,
 }
 
 #[derive(Clone, Debug)]
@@ -113,6 +115,7 @@ pub fn init(
         dragging_map: None,
         handle_minimum_framerate_timeout: wait_for_timeout(orders),
         frame_count: FrameCount::F1,
+        moved_units: HashSet::new(),
     };
 
     Ok(model)
@@ -132,7 +135,7 @@ pub fn update(
         Msg::RenderedFirstTime => {
             let viewer_id = global.viewer_id();
 
-            let map_draw_result = draw_map(&model);
+            let map_draw_result = draw_terrain(&model);
 
             if let Err(err) = map_draw_result {
                 global.toast(
@@ -220,8 +223,8 @@ fn draw_visibility(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(
             if !visibility.contains(&loc) {
                 let sheet = &model.assets.sheet;
 
-                let sx = 0.0;
-                let sy = 48.0;
+                let sx = MISC_SPRITE_SHEET_ROW;
+                let sy = 16.0;
 
                 let x_fl = (x_u16 * tile::PIXEL_WIDTH) as f64;
                 let y_fl = (y_u16 * tile::PIXEL_HEIGHT) as f64;
@@ -258,7 +261,7 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
     ctx.begin_path();
     ctx.clear_rect(0., 0., width, height);
 
-    for located_unit in model.game.units.values() {
+    for (unit_id, located_unit) in model.game.units.iter() {
         let location = Located {
             x: located_unit.x,
             y: located_unit.y,
@@ -277,11 +280,17 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
             };
 
             let (sx, sy) = {
-                let sx = match model.frame_count {
-                    FrameCount::F1 => 0.0,
-                    FrameCount::F2 => 1.0,
-                    FrameCount::F3 => 2.0,
-                    FrameCount::F4 => 3.0,
+                let sx = {
+                    let sprite_sheet_x = match model.frame_count {
+                        FrameCount::F1 => 0.0,
+                        FrameCount::F2 => 1.0,
+                        FrameCount::F3 => 2.0,
+                        FrameCount::F4 => 3.0,
+                    };
+                    match unit_model.facing {
+                        FacingDirection::Left => SPRITE_SHEET_WIDTH - sprite_sheet_x - 1.0,
+                        FacingDirection::Right => sprite_sheet_x,
+                    }
                 };
 
                 let sy = match unit_model.color {
@@ -292,25 +301,40 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
                 (sx * tile::PIXEL_WIDTH_FL, sy * tile::PIXEL_WIDTH_FL)
             };
 
-            ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                sheet,
-                sx,
-                sy,
-                tile::PIXEL_WIDTH_FL,
-                tile::PIXEL_HEIGHT_FL,
-                x,
-                y,
-                tile::PIXEL_WIDTH_FL,
-                tile::PIXEL_HEIGHT_FL,
-            )
-            .map_err(|_| "Could not draw unit image on canvas".to_string())?;
+            if model.moved_units.contains(unit_id) {
+                ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+                    &model.assets.sheet,
+                    sx + 64.0,
+                    sy,
+                    tile::PIXEL_WIDTH_FL,
+                    tile::PIXEL_HEIGHT_FL,
+                    x,
+                    y,
+                    tile::PIXEL_WIDTH_FL,
+                    tile::PIXEL_HEIGHT_FL,
+                )
+                .map_err(|_| "Could not draw unit outline image on canvas".to_string())?;
+            } else {
+                ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+                    sheet,
+                    sx,
+                    sy,
+                    tile::PIXEL_WIDTH_FL,
+                    tile::PIXEL_HEIGHT_FL,
+                    x,
+                    y,
+                    tile::PIXEL_WIDTH_FL,
+                    tile::PIXEL_HEIGHT_FL,
+                )
+                .map_err(|_| "Could not draw unit image on canvas".to_string())?;
+            }
         }
     }
 
     Ok(())
 }
 
-fn draw_map(model: &Model) -> Result<(), String> {
+fn draw_terrain(model: &Model) -> Result<(), String> {
     let canvas = model
         .map_canvas
         .get()
@@ -333,8 +357,8 @@ fn draw_map(model: &Model) -> Result<(), String> {
 
             ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
                 &model.assets.sheet,
+                MISC_SPRITE_SHEET_ROW,
                 0.0,
-                32.0,
                 tile::PIXEL_WIDTH_FL,
                 tile::PIXEL_HEIGHT_FL,
                 x,
@@ -353,7 +377,7 @@ fn draw_map(model: &Model) -> Result<(), String> {
 // View
 ///////////////////////////////////////////////////////////////
 
-pub fn view(model: &Model) -> Cell<Msg> {
+pub fn view(global: &global::Model, model: &Model) -> Cell<Msg> {
     Cell::group(
         vec![],
         vec![
@@ -361,7 +385,7 @@ pub fn view(model: &Model) -> Cell<Msg> {
             units_canvas_cell(model),
             visibility_canvas_cell(model),
             click_screen(),
-            overlay_view(model),
+            overlay_view(global, model),
         ],
     )
 }
@@ -442,12 +466,22 @@ fn click_screen() -> Cell<Msg> {
     })
 }
 
-fn overlay_view(model: &Model) -> Cell<Msg> {
-    Card::cell_from_rows(
-        vec![],
-        vec![Row::from_cells(
-            vec![],
-            vec![Cell::from_str(vec![], "Waiting..")],
-        )],
-    )
+fn overlay_view(global: &global::Model, model: &Model) -> Cell<Msg> {
+    if model.game.waiting_on_player(&global.viewer_id()) {
+        Cell::none()
+    } else {
+        Cell::group(
+            vec![Style::Absolute, Style::Bottom4, Style::Left50Pct],
+            vec![Card::cell_from_rows(
+                vec![],
+                vec![Row::from_cells(
+                    vec![],
+                    vec![Cell::from_str(vec![], "waiting for other players..")],
+                )],
+            )],
+        )
+    }
 }
+
+const MISC_SPRITE_SHEET_ROW: f64 = 128.0;
+const SPRITE_SHEET_WIDTH: f64 = 9.0;

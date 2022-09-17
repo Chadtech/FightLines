@@ -312,6 +312,10 @@ canvas {
     left: 0px;
 }
 
+.left-0-pct {
+    left: 50%;
+}
+
 .right-0 {
     right: 0px;
 }
@@ -322,6 +326,10 @@ canvas {
 
 .bottom-0 {
     bottom: 0px;
+}
+
+.bottom-4 {
+    bottom: var(--s-4);
 }
 
 .overflow-hidden {

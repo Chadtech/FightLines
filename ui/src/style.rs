@@ -57,9 +57,11 @@ pub enum Style {
     Screen,
     AbsoluteCenter,
     Left0,
+    Left50Pct,
     Right0,
     Top0,
     Bottom0,
+    Bottom4,
 }
 
 impl Style {
@@ -121,9 +123,11 @@ impl Style {
             Style::Screen => vec!["screen"],
             Style::AbsoluteCenter => vec!["absolute-center"],
             Style::Left0 => vec!["left-0"],
+            Style::Left50Pct => vec!["left-0-pct"],
             Style::Right0 => vec!["right-0"],
             Style::Top0 => vec!["top-0"],
             Style::Bottom0 => vec!["bottom-0"],
+            Style::Bottom4 => vec!["bottom-4"],
             Style::W512px => vec!["w-512px"],
             Style::H512px => vec!["h-512px"],
         }
