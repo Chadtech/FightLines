@@ -4,7 +4,6 @@ use crate::id::Id;
 use crate::lobby::Lobby;
 use crate::located::Located;
 use crate::map::{Map, MapOpt};
-use crate::nonempty::Nonempty;
 use crate::owner::Owned;
 use crate::player::Player;
 use crate::point::Point;
@@ -249,77 +248,104 @@ impl Game {
                 let x = loc_unit.x;
                 let y = loc_unit.y;
 
-                mobility.insert(Located {
-                    value: (),
-                    x: x + 1,
-                    y,
-                });
+                let game_width = self.map.width as u16;
+                let game_height = self.map.height as u16;
 
-                mobility.insert(Located {
-                    value: (),
-                    x: x - 1,
-                    y,
-                });
+                if x < (game_width - 1) {
+                    mobility.insert(Located {
+                        value: (),
+                        x: x + 1,
+                        y,
+                    });
+                }
 
-                mobility.insert(Located {
-                    value: (),
-                    x: x + 2,
-                    y,
-                });
+                if 0 < x {
+                    mobility.insert(Located {
+                        value: (),
+                        x: x - 1,
+                        y,
+                    });
+                }
 
-                mobility.insert(Located {
-                    value: (),
-                    x: x - 2,
-                    y,
-                });
+                if x < (game_width - 2) {
+                    mobility.insert(Located {
+                        value: (),
+                        x: x + 2,
+                        y,
+                    });
+                }
 
-                mobility.insert(Located {
-                    value: (),
-                    x: x + 1,
-                    y: y + 1,
-                });
+                if 1 < x {
+                    mobility.insert(Located {
+                        value: (),
+                        x: x - 2,
+                        y,
+                    });
+                }
 
-                mobility.insert(Located {
-                    value: (),
-                    x: x - 1,
-                    y: y + 1,
-                });
+                if x < (game_width - 1) && y < (game_height - 1) {
+                    mobility.insert(Located {
+                        value: (),
+                        x: x + 1,
+                        y: y + 1,
+                    });
+                }
 
-                mobility.insert(Located {
-                    value: (),
-                    x: x - 1,
-                    y: y - 1,
-                });
+                if 0 < x && y < (game_height - 1) {
+                    mobility.insert(Located {
+                        value: (),
+                        x: x - 1,
+                        y: y + 1,
+                    });
+                }
 
-                mobility.insert(Located {
-                    value: (),
-                    x: x + 1,
-                    y: y - 1,
-                });
+                if 0 < x && 0 < y {
+                    mobility.insert(Located {
+                        value: (),
+                        x: x - 1,
+                        y: y - 1,
+                    });
+                }
 
-                mobility.insert(Located {
-                    value: (),
-                    x,
-                    y: y + 1,
-                });
+                if x < (game_width - 1) && 0 < y {
+                    mobility.insert(Located {
+                        value: (),
+                        x: x + 1,
+                        y: y - 1,
+                    });
+                }
 
-                mobility.insert(Located {
-                    value: (),
-                    x,
-                    y: y - 1,
-                });
+                if y < (game_height - 1) {
+                    mobility.insert(Located {
+                        value: (),
+                        x,
+                        y: y + 1,
+                    });
+                }
 
-                mobility.insert(Located {
-                    value: (),
-                    x,
-                    y: y + 2,
-                });
+                if 0 < y {
+                    mobility.insert(Located {
+                        value: (),
+                        x,
+                        y: y - 1,
+                    });
+                }
 
-                mobility.insert(Located {
-                    value: (),
-                    x,
-                    y: y - 2,
-                });
+                if y < (game_height - 2) {
+                    mobility.insert(Located {
+                        value: (),
+                        x,
+                        y: y + 2,
+                    });
+                }
+
+                if 1 < y {
+                    mobility.insert(Located {
+                        value: (),
+                        x,
+                        y: y - 2,
+                    });
+                }
 
                 Ok(mobility)
             }
@@ -364,7 +390,7 @@ fn index_units_by_location(
 
         let val = || (unit_id.clone(), unit.clone());
 
-        let mut entry = ret.entry(key).or_insert_with(|| vec![val()]);
+        let entry = ret.entry(key).or_insert_with(|| vec![]);
 
         entry.push(val());
     }
@@ -374,7 +400,7 @@ fn index_units_by_location(
 
 fn calculate_player_visibility(
     player_id: &Id,
-    map: &Map,
+    _map: &Map,
     units: &HashMap<UnitId, Located<UnitModel>>,
 ) -> HashSet<Located<()>> {
     let mut visible_spots = HashSet::new();

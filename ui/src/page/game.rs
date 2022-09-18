@@ -4,10 +4,10 @@ use crate::web_sys::HtmlCanvasElement;
 use crate::{assets, global, Row, Style, Toast};
 use seed::app::CmdHandle;
 use seed::prelude::{cmds, el_ref, At, El, ElRef, IndexMap, Node, Orders, St, ToClasses, UpdateEl};
-use seed::{attrs, canvas, log, style, C};
+use seed::{attrs, canvas, style, C};
 use shared::facing_direction::FacingDirection;
 use shared::frame_count::FrameCount;
-use shared::game::{Game, UnitModel};
+use shared::game::Game;
 use shared::id::Id;
 use shared::located::Located;
 use shared::point::Point;
@@ -167,26 +167,30 @@ pub fn update(
         Msg::MouseDownOnScreen(page_pos) => {}
         Msg::MouseUpOnScreen(page_pos) => {
             let Point { x, y } = click_pos_to_game_pos(page_pos, model);
-            log!("a");
             if x > 0 && y > 0 {
                 let x = x as u16;
                 let y = y as u16;
-                log!("b");
                 if let Some(units_at_pos) = model.game.get_units_by_location(&Point { x, y }) {
-                    log!("c");
                     if let Some((first, rest)) = units_at_pos.split_first() {
-                        log!("d", first, rest);
                         if rest.is_empty() {
-                            log!("e");
                             let (unit_id, _) = first;
 
                             match model.game.get_units_mobility(unit_id) {
                                 Ok(mobility) => {
-                                    log!("f");
                                     model.mode = Mode::MovingUnit {
                                         unit_id: unit_id.clone(),
                                         mobility,
                                     };
+
+                                    let draw_result = draw_mode(model);
+
+                                    if let Err((err_title, err_msg)) = draw_result {
+                                        global.toast(
+                                            Toast::init("error", err_title.as_str())
+                                                .error()
+                                                .with_more_info(err_msg.as_str()),
+                                        );
+                                    }
                                 }
                                 Err(err_msg) => {
                                     global.toast(
@@ -220,7 +224,15 @@ pub fn update(
                 })
             };
 
-            draw_cursor(&model);
+            let draw_result = draw_cursor(&model);
+
+            if let Err(err_msg) = draw_result {
+                global.toast(
+                    Toast::init("error", "could not render cursor")
+                        .error()
+                        .with_more_info(err_msg.as_str()),
+                );
+            }
         }
         Msg::MinimumRenderTimeExpired => {
             model.frame_count = model.frame_count.succ();
@@ -249,7 +261,7 @@ fn draw(viewer_id: &Id, model: &Model) -> Result<(), (String, String)> {
     draw_units(visibility, &model)
         .map_err(|err_msg| ("units rendering problem".to_string(), err_msg))?;
 
-    draw_mode(&model);
+    draw_mode(&model)?;
 
     draw_visibility(visibility, &model)
         .map_err(|err_msg| ("visibility rendering problem".to_string(), err_msg))?;
