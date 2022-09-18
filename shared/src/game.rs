@@ -4,8 +4,10 @@ use crate::id::Id;
 use crate::lobby::Lobby;
 use crate::located::Located;
 use crate::map::{Map, MapOpt};
+use crate::nonempty::Nonempty;
 use crate::owner::Owned;
 use crate::player::Player;
+use crate::point::Point;
 use crate::rng::RandGen;
 use crate::team_color::TeamColor;
 use crate::unit::{Unit, UnitId};
@@ -31,6 +33,7 @@ pub struct Game {
     // remaining guests
     pub remaining_guests: Vec<(Id, Guest)>,
     pub units: HashMap<UnitId, Located<UnitModel>>,
+    pub units_by_location_index: HashMap<Point<u16>, Vec<(UnitId, UnitModel)>>,
     pub map: Map,
     pub turn_number: u32,
 }
@@ -199,6 +202,7 @@ impl Game {
                     ),
                     first_guests_turn: Turn::Waiting,
                     remaining_guests,
+                    units_by_location_index: index_units_by_location(&unit_hashmap),
                     units: unit_hashmap,
                     map,
                     turn_number: 0,
@@ -223,7 +227,7 @@ impl Game {
         }
 
         let mut ret_guest_visibility: Result<&HashSet<Located<()>>, String> =
-            Err("Player not found when finding visibility".to_string());
+            Err("player not found when finding visibility".to_string());
 
         for (guest_id, guest) in self.remaining_guests.iter() {
             if guest_id == player_id {
@@ -232,6 +236,94 @@ impl Game {
         }
 
         ret_guest_visibility
+    }
+
+    pub fn get_units_mobility(&self, unit_id: &UnitId) -> Result<HashSet<Located<()>>, String> {
+        let maybe_loc_unit = self.units.get(unit_id);
+
+        match maybe_loc_unit {
+            None => Err("unit not found when getting units mobility".to_string()),
+            Some(loc_unit) => {
+                let mut mobility = HashSet::new();
+
+                let x = loc_unit.x;
+                let y = loc_unit.y;
+
+                mobility.insert(Located {
+                    value: (),
+                    x: x + 1,
+                    y,
+                });
+
+                mobility.insert(Located {
+                    value: (),
+                    x: x - 1,
+                    y,
+                });
+
+                mobility.insert(Located {
+                    value: (),
+                    x: x + 2,
+                    y,
+                });
+
+                mobility.insert(Located {
+                    value: (),
+                    x: x - 2,
+                    y,
+                });
+
+                mobility.insert(Located {
+                    value: (),
+                    x: x + 1,
+                    y: y + 1,
+                });
+
+                mobility.insert(Located {
+                    value: (),
+                    x: x - 1,
+                    y: y + 1,
+                });
+
+                mobility.insert(Located {
+                    value: (),
+                    x: x - 1,
+                    y: y - 1,
+                });
+
+                mobility.insert(Located {
+                    value: (),
+                    x: x + 1,
+                    y: y - 1,
+                });
+
+                mobility.insert(Located {
+                    value: (),
+                    x,
+                    y: y + 1,
+                });
+
+                mobility.insert(Located {
+                    value: (),
+                    x,
+                    y: y - 1,
+                });
+
+                mobility.insert(Located {
+                    value: (),
+                    x,
+                    y: y + 2,
+                });
+
+                mobility.insert(Located {
+                    value: (),
+                    x,
+                    y: y - 2,
+                });
+
+                Ok(mobility)
+            }
+        }
     }
 
     pub fn waiting_on_player(&self, player_id: &Id) -> bool {
@@ -251,6 +343,33 @@ impl Game {
 
         has_submitted
     }
+
+    pub fn get_units_by_location(&self, key: &Point<u16>) -> Option<&Vec<(UnitId, UnitModel)>> {
+        self.units_by_location_index.get(key)
+    }
+}
+
+fn index_units_by_location(
+    units: &HashMap<UnitId, Located<UnitModel>>,
+) -> HashMap<Point<u16>, Vec<(UnitId, UnitModel)>> {
+    let mut ret = HashMap::new();
+
+    for (unit_id, loc_unit) in units.into_iter() {
+        let key = Point {
+            x: loc_unit.x,
+            y: loc_unit.y,
+        };
+
+        let unit = &loc_unit.value;
+
+        let val = || (unit_id.clone(), unit.clone());
+
+        let mut entry = ret.entry(key).or_insert_with(|| vec![val()]);
+
+        entry.push(val());
+    }
+
+    ret
 }
 
 fn calculate_player_visibility(

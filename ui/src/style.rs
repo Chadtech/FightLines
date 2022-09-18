@@ -62,6 +62,8 @@ pub enum Style {
     Top0,
     Bottom0,
     Bottom4,
+    CursorPointer,
+    CursorNone,
 }
 
 impl Style {
@@ -130,6 +132,8 @@ impl Style {
             Style::Bottom4 => vec!["bottom-4"],
             Style::W512px => vec!["w-512px"],
             Style::H512px => vec!["h-512px"],
+            Style::CursorPointer => vec!["cursor-pointer"],
+            Style::CursorNone => vec!["cursor-none"],
         }
     }
 }

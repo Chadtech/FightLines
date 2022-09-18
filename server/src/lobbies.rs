@@ -55,6 +55,7 @@ mod test_lobbies {
     use shared::name::Name;
     use shared::player::Player;
     use shared::rng::{RandGen, RandSeed};
+    use shared::team_color::TeamColor;
 
     #[test]
     fn can_join_lobby() {
@@ -62,12 +63,12 @@ mod test_lobbies {
 
         let mut lobbies = Lobbies::init(RandSeed::next(&mut rng));
 
-        let host = Player::new(Name::from_str("host"));
+        let host = Player::new(Name::new("host"), TeamColor::Red);
         let host_id = Id::new(&mut rng);
 
         let lobby_id = lobbies.new_lobby(Lobby::init(host_id.clone(), host.clone()));
 
-        let guest = Player::new(Name::from_str("guest"));
+        let guest = Player::new(Name::new("guest"), TeamColor::Blue);
         let guest_id = Id::new(&mut rng);
 
         let lobby = lobbies
