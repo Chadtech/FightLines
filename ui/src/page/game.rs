@@ -182,9 +182,7 @@ pub fn update(
                                         mobility,
                                     };
 
-                                    let draw_result = draw_mode(model);
-
-                                    if let Err((err_title, err_msg)) = draw_result {
+                                    if let Err((err_title, err_msg)) = draw_mode(model) {
                                         global.toast(
                                             Toast::init("error", err_title.as_str())
                                                 .error()
