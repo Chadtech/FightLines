@@ -19,6 +19,8 @@
     ./shared/src/sprites/not_visible.aseprite \
     ./shared/src/sprites/unit_outline.aseprite \
     ./shared/src/sprites/move_option.aseprite \
+    ./shared/src/sprites/arrow_right.aseprite \
+    ./shared/src/sprites/arrow_x.aseprite \
   --sheet ./shared/src/sprites/misc_sheet.png
 
 /Applications/Aseprite.app/Contents/MacOS/aseprite \

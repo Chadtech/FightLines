@@ -4,7 +4,7 @@ use crate::web_sys::HtmlCanvasElement;
 use crate::{assets, global, Row, Style, Toast};
 use seed::app::CmdHandle;
 use seed::prelude::{cmds, el_ref, At, El, ElRef, IndexMap, Node, Orders, St, ToClasses, UpdateEl};
-use seed::{attrs, canvas, style, C};
+use seed::{attrs, canvas, log, style, C};
 use shared::facing_direction::FacingDirection;
 use shared::frame_count::FrameCount;
 use shared::game::Game;
@@ -67,6 +67,7 @@ enum Arrow {
     EndDown,
     EndRight,
     EndUp,
+    X,
 }
 
 #[derive(Clone, Debug)]
@@ -285,27 +286,59 @@ fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Resu
                 .get(&moving_model.unit_id)
                 .ok_or("could not find unit in mouse handling for moving unit".to_string())?;
 
-            match moving_model.arrows.last() {
-                None => {
-                    let mut maybe_new_arrow = None;
+            if moving_model.mobility.contains(&mouse_loc) {
+                let arrow_count = moving_model.arrows.len();
 
-                    if unit.is_west_of(&mouse_loc) {
-                        maybe_new_arrow = Some(Arrow::EndRight);
+                match moving_model.arrows.last() {
+                    None => {
+                        let mut maybe_new_arrow = None;
+
+                        if unit.is_west_of(&mouse_loc) {
+                            maybe_new_arrow = Some(Arrow::EndRight);
+                        }
+
+                        if unit.is_east_of(&mouse_loc) {
+                            maybe_new_arrow = Some(Arrow::EndLeft);
+                        }
+
+                        if let Some(new_arrow) = maybe_new_arrow {
+                            moving_model.arrows = vec![Located {
+                                value: new_arrow,
+                                x: mouse_loc.x.clone(),
+                                y: mouse_loc.y.clone(),
+                            }]
+                        }
                     }
+                    Some(last_arrow) => {
+                        let mut maybe_new_arrow = None;
 
-                    if unit.is_east_of(&mouse_loc) {
-                        maybe_new_arrow = Some(Arrow::EndLeft);
-                    }
+                        if last_arrow.is_west_of(&mouse_loc) {
+                            if moving_model.arrows.len() > 1 {
+                                let second_to_last =
+                                    &moving_model.arrows[moving_model.arrows.len() - 2];
+                                // TODO
+                            } else {
+                                log!("A");
+                                moving_model.arrows[arrow_count - 1] = Located {
+                                    x: last_arrow.x,
+                                    y: last_arrow.y,
+                                    value: Arrow::X,
+                                };
+                                maybe_new_arrow = Some(Arrow::EndRight);
+                            }
+                        }
 
-                    if let Some(new_arrow) = maybe_new_arrow {
-                        moving_model.arrows = vec![Located {
-                            value: new_arrow,
-                            x: mouse_loc.x.clone(),
-                            y: mouse_loc.y.clone(),
-                        }]
+                        if let Some(new_arrow) = maybe_new_arrow {
+                            moving_model.arrows.push(Located {
+                                value: new_arrow,
+                                x: mouse_loc.x.clone(),
+                                y: mouse_loc.y.clone(),
+                            })
+                        }
                     }
                 }
-                Some(_) => {}
+            } else {
+                moving_model.arrows = vec![];
             }
         }
     }
@@ -362,6 +395,33 @@ fn draw_mode(model: &Model) -> Result<(), (String, String)> {
                     (
                         "rendering mobility range".to_string(),
                         "could not draw mobility image on canvas".to_string(),
+                    )
+                })?;
+            }
+
+            for arrow in &moving_model.arrows {
+                let sheet_row = match arrow.value {
+                    Arrow::EndLeft => 64.0,
+                    Arrow::EndDown => 64.0,
+                    Arrow::EndRight => 64.0,
+                    Arrow::EndUp => 64.0,
+                    Arrow::X => 80.0,
+                };
+                ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+                    &model.assets.sheet,
+                    MISC_SPRITE_SHEET_COLUMN,
+                    sheet_row,
+                    tile::PIXEL_WIDTH_FL,
+                    tile::PIXEL_HEIGHT_FL,
+                    arrow.x as f64 * tile::PIXEL_WIDTH_FL,
+                    arrow.y as f64 * tile::PIXEL_HEIGHT_FL,
+                    tile::PIXEL_WIDTH_FL,
+                    tile::PIXEL_HEIGHT_FL,
+                )
+                .map_err(|_| {
+                    (
+                        "rendering mobility range".to_string(),
+                        "could not draw arrow image on canvas".to_string(),
                     )
                 })?;
             }
