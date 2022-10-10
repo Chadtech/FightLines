@@ -53,10 +53,20 @@ pub struct Model {
 
 enum Mode {
     None,
-    MovingUnit {
-        unit_id: UnitId,
-        mobility: HashSet<Located<()>>,
-    },
+    MovingUnit(MovingUnitModel),
+}
+
+struct MovingUnitModel {
+    unit_id: UnitId,
+    mobility: HashSet<Located<()>>,
+    arrows: Vec<Located<Arrow>>,
+}
+
+enum Arrow {
+    EndLeft,
+    EndDown,
+    EndRight,
+    EndUp,
 }
 
 #[derive(Clone, Debug)]
@@ -177,10 +187,11 @@ pub fn update(
 
                             match model.game.get_units_mobility(unit_id) {
                                 Ok(mobility) => {
-                                    model.mode = Mode::MovingUnit {
+                                    model.mode = Mode::MovingUnit(MovingUnitModel {
                                         unit_id: unit_id.clone(),
                                         mobility,
-                                    };
+                                        arrows: Vec::new(),
+                                    });
 
                                     if let Err((err_title, err_msg)) = draw_mode(model) {
                                         global.toast(
@@ -216,6 +227,20 @@ pub fn update(
             {
                 None
             } else {
+                let mouse_loc = Located {
+                    value: (),
+                    x: x as u16,
+                    y: y as u16,
+                };
+
+                if let Err(err_msg) = handle_mouse_move_for_mode(model, mouse_loc) {
+                    global.toast(
+                        Toast::init("error", "mode could not handle mouse move")
+                            .error()
+                            .with_more_info(err_msg.as_str()),
+                    );
+                };
+
                 Some(Point {
                     x: x as u32,
                     y: y as u32,
@@ -250,6 +275,44 @@ pub fn update(
     }
 }
 
+fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Result<(), String> {
+    match &mut model.mode {
+        Mode::None => {}
+        Mode::MovingUnit(moving_model) => {
+            let unit = model
+                .game
+                .units
+                .get(&moving_model.unit_id)
+                .ok_or("could not find unit in mouse handling for moving unit".to_string())?;
+
+            match moving_model.arrows.last() {
+                None => {
+                    let mut maybe_new_arrow = None;
+
+                    if unit.is_west_of(&mouse_loc) {
+                        maybe_new_arrow = Some(Arrow::EndRight);
+                    }
+
+                    if unit.is_east_of(&mouse_loc) {
+                        maybe_new_arrow = Some(Arrow::EndLeft);
+                    }
+
+                    if let Some(new_arrow) = maybe_new_arrow {
+                        moving_model.arrows = vec![Located {
+                            value: new_arrow,
+                            x: mouse_loc.x.clone(),
+                            y: mouse_loc.y.clone(),
+                        }]
+                    }
+                }
+                Some(_) => {}
+            }
+        }
+    }
+
+    Ok(())
+}
+
 fn draw(viewer_id: &Id, model: &Model) -> Result<(), (String, String)> {
     let visibility = model
         .game
@@ -282,8 +345,8 @@ fn draw_mode(model: &Model) -> Result<(), (String, String)> {
 
     match &model.mode {
         Mode::None => {}
-        Mode::MovingUnit { mobility, .. } => {
-            for mobility_space in mobility.into_iter() {
+        Mode::MovingUnit(moving_model) => {
+            for mobility_space in moving_model.mobility.iter() {
                 ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
                     &model.assets.sheet,
                     MISC_SPRITE_SHEET_COLUMN,

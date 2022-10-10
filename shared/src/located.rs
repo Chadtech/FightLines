@@ -9,3 +9,13 @@ pub struct Located<T> {
     pub x: u16,
     pub y: u16,
 }
+
+impl<T> Located<T> {
+    pub fn is_west_of<U>(&self, other: &Located<U>) -> bool {
+        self.x + 1 == other.x
+    }
+
+    pub fn is_east_of<U>(&self, other: &Located<U>) -> bool {
+        self.x - 1 == other.x
+    }
+}
