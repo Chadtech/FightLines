@@ -21,6 +21,10 @@
     ./shared/src/sprites/move_option.aseprite \
     ./shared/src/sprites/arrow_right.aseprite \
     ./shared/src/sprites/arrow_x.aseprite \
+    ./shared/src/sprites/arrow_left.aseprite \
+    ./shared/src/sprites/arrow_up.aseprite \
+    ./shared/src/sprites/arrow_y.aseprite \
+    ./shared/src/sprites/arrow_down.aseprite \
   --sheet ./shared/src/sprites/misc_sheet.png
 
 /Applications/Aseprite.app/Contents/MacOS/aseprite \

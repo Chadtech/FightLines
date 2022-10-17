@@ -68,6 +68,7 @@ enum Arrow {
     EndRight,
     EndUp,
     X,
+    Y,
 }
 
 #[derive(Clone, Debug)]
@@ -301,6 +302,14 @@ fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Resu
                             maybe_new_arrow = Some(Arrow::EndLeft);
                         }
 
+                        if unit.is_north_of(&mouse_loc) {
+                            maybe_new_arrow = Some(Arrow::EndDown);
+                        }
+
+                        if unit.is_south_of(&mouse_loc) {
+                            maybe_new_arrow = Some(Arrow::EndUp);
+                        }
+
                         if let Some(new_arrow) = maybe_new_arrow {
                             moving_model.arrows = vec![Located {
                                 value: new_arrow,
@@ -318,7 +327,6 @@ fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Resu
                                     &moving_model.arrows[moving_model.arrows.len() - 2];
                                 // TODO
                             } else {
-                                log!("A");
                                 moving_model.arrows[arrow_count - 1] = Located {
                                     x: last_arrow.x,
                                     y: last_arrow.y,
@@ -401,11 +409,12 @@ fn draw_mode(model: &Model) -> Result<(), (String, String)> {
 
             for arrow in &moving_model.arrows {
                 let sheet_row = match arrow.value {
-                    Arrow::EndLeft => 64.0,
-                    Arrow::EndDown => 64.0,
+                    Arrow::EndLeft => 96.0,
+                    Arrow::EndDown => 112.0,
                     Arrow::EndRight => 64.0,
-                    Arrow::EndUp => 64.0,
+                    Arrow::EndUp => 144.0,
                     Arrow::X => 80.0,
+                    Arrow::Y => 128.0,
                 };
                 ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
                     &model.assets.sheet,

@@ -86,13 +86,13 @@ impl MapOpt {
             MapOpt::GrassSquare => Militaries {
                 first_player_military: vec![Located::<(FacingDirection, Unit)> {
                     value: (FacingDirection::Right, Unit::Infantry),
-                    x: 1,
-                    y: 1,
+                    x: 2,
+                    y: 2,
                 }],
                 second_player_military: vec![Located::<(FacingDirection, Unit)> {
                     value: (FacingDirection::Left, Unit::Infantry),
-                    x: (map.width as u16) - 2,
-                    y: (map.height as u16) - 2,
+                    x: (map.width as u16) - 3,
+                    y: (map.height as u16) - 3,
                 }],
                 rest_players_miliatries: vec![],
             },
