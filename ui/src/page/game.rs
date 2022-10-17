@@ -288,8 +288,6 @@ fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Resu
                 .ok_or("could not find unit in mouse handling for moving unit".to_string())?;
 
             if moving_model.mobility.contains(&mouse_loc) {
-                let arrow_count = moving_model.arrows.len();
-
                 match moving_model.arrows.last() {
                     None => {
                         let mut maybe_new_arrow = None;
@@ -321,12 +319,29 @@ fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Resu
                     Some(last_arrow) => {
                         let mut maybe_new_arrow = None;
 
+                        let arrow_count = moving_model.arrows.len();
+
                         if last_arrow.is_west_of(&mouse_loc) {
                             if moving_model.arrows.len() > 1 {
-                                let second_to_last =
-                                    &moving_model.arrows[moving_model.arrows.len() - 2];
+                                let second_to_last = &moving_model.arrows[arrow_count - 2];
                                 // TODO
                             } else {
+                                let second_to_last_spot = if moving_model.arrows.len() > 2 {
+                                    let arrow = &moving_model.arrows[arrow_count - 2];
+
+                                    Located {
+                                        x: arrow.x,
+                                        y: arrow.y,
+                                        value: (),
+                                    }
+                                } else {
+                                    Located {
+                                        x: unit.x,
+                                        y: unit.y,
+                                        value: (),
+                                    }
+                                };
+
                                 moving_model.arrows[arrow_count - 1] = Located {
                                     x: last_arrow.x,
                                     y: last_arrow.y,
@@ -776,3 +791,11 @@ fn overlay_view(global: &global::Model, model: &Model) -> Cell<Msg> {
 
 const MISC_SPRITE_SHEET_COLUMN: f64 = 128.0;
 const SPRITE_SHEET_WIDTH: f64 = 9.0;
+
+#[cfg(test)]
+mod test_game_page {
+    #[test]
+    fn draw_arrow() {
+        assert_eq!(true, true)
+    }
+}

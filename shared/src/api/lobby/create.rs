@@ -60,16 +60,20 @@ mod test_create_lobby {
     use crate::lobby::Lobby;
     use crate::name::Name;
     use crate::player::Player;
+    use crate::team_color::TeamColor;
+    use std::str::FromStr;
 
     #[test]
-    fn response_encodes_and_decodes() {
+    fn response_encodes_and_decodes() -> Result<(), String> {
         let lobby_id = Id::from_int_test_only(0);
+
+        let host_name = Name::from_str("host").map_err(|err| err.to_string())?;
 
         let response = Response::init(
             lobby_id,
             Lobby::init(
                 Id::from_int_test_only(1),
-                Player::new(Name::from_str("host")),
+                Player::new(host_name, TeamColor::Red),
             ),
         );
 
@@ -78,5 +82,7 @@ mod test_create_lobby {
         let decoded_response = Response::from_bytes(bytes).unwrap();
 
         assert_eq!(response, decoded_response);
+
+        Ok(())
     }
 }

@@ -1,4 +1,3 @@
-use crate::name::Error::NameCannotBeEmpty;
 use crate::rng::RandGen;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -57,7 +56,7 @@ pub enum Error {
 impl ToString for Error {
     fn to_string(&self) -> String {
         match self {
-            NameCannotBeEmpty => "name cannot be empty".to_string(),
+            Error::NameCannotBeEmpty => "name cannot be empty".to_string(),
         }
     }
 }
