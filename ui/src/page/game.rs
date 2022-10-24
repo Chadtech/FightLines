@@ -1,3 +1,4 @@
+use crate::domain::direction::Direction;
 use crate::view::card::Card;
 use crate::view::cell::Cell;
 use crate::web_sys::HtmlCanvasElement;
@@ -791,6 +792,30 @@ fn overlay_view(global: &global::Model, model: &Model) -> Cell<Msg> {
 
 const MISC_SPRITE_SHEET_COLUMN: f64 = 128.0;
 const SPRITE_SHEET_WIDTH: f64 = 9.0;
+
+fn calc_movement_path(
+    mouse_pos: Located<()>,
+    maybe_existing_path: Option<Vec<Direction>>,
+) -> Vec<Direction> {
+    match maybe_existing_path {
+        None => {
+            let unit_x = unit_origin.x as i32;
+
+            let mut path = vec![];
+            let mut x_dist: i32 = (mouse_pos.x as i32) - (unit_x as i32);
+            let mut y_dist: i32 = (mouse_pos.y as i32) - (unit_origin.y as i32);
+
+            if x_dist > 0 {
+                path.push()
+            }
+
+            path
+        }
+        Some(_) => {
+            vec![]
+        }
+    }
+}
 
 #[cfg(test)]
 mod test_game_page {
