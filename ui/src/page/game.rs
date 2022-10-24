@@ -793,56 +793,91 @@ fn overlay_view(global: &global::Model, model: &Model) -> Cell<Msg> {
 const MISC_SPRITE_SHEET_COLUMN: f64 = 128.0;
 const SPRITE_SHEET_WIDTH: f64 = 9.0;
 
-fn calc_movement_path(mouse_pos: Point<i32>) -> Vec<Direction> {
-    if mouse_pos.x == 0 && mouse_pos.y == 0 {
-        vec![]
-    } else if mouse_pos.y.abs() < mouse_pos.x.abs() {
-        let is_east = mouse_pos.x > 0;
-
-        let next_loc = Point {
-            x: if is_east {
-                mouse_pos.x - 1
+fn calc_movement_path(
+    mouse_pos: Point<i32>,
+    maybe_existing_path: Option<Vec<Direction>>,
+) -> Vec<Direction> {
+    match maybe_existing_path {
+        None => {
+            if mouse_pos.x == 0 && mouse_pos.y == 0 {
+                vec![]
             } else {
-                mouse_pos.x + 1
-            },
-            y: mouse_pos.y,
-        };
+                let (direction, next_loc) = if mouse_pos.y.abs() < mouse_pos.x.abs() {
+                    let is_east = mouse_pos.x > 0;
 
-        let direction = if is_east {
-            Direction::East
-        } else {
-            Direction::West
-        };
+                    let next_loc = Point {
+                        x: if is_east {
+                            mouse_pos.x - 1
+                        } else {
+                            mouse_pos.x + 1
+                        },
+                        y: mouse_pos.y,
+                    };
 
-        let mut base_ret = vec![direction];
+                    let direction = if is_east {
+                        Direction::East
+                    } else {
+                        Direction::West
+                    };
 
-        base_ret.append(&mut calc_movement_path(next_loc));
+                    (direction, next_loc)
+                } else {
+                    let is_south = mouse_pos.y > 0;
 
-        base_ret
-    } else {
-        let is_south = mouse_pos.y > 0;
+                    let next_loc = Point {
+                        x: mouse_pos.x,
+                        y: if is_south {
+                            mouse_pos.y - 1
+                        } else {
+                            mouse_pos.y + 1
+                        },
+                    };
 
-        let next_loc = Point {
-            x: mouse_pos.x,
-            y: if is_south {
-                mouse_pos.y - 1
-            } else {
-                mouse_pos.y + 1
-            },
-        };
+                    let direction = if is_south {
+                        Direction::South
+                    } else {
+                        Direction::North
+                    };
 
-        let direction = if is_south {
-            Direction::South
-        } else {
-            Direction::North
-        };
+                    (direction, next_loc)
+                };
 
-        let mut base_ret = vec![direction];
+                let mut base_ret = vec![direction];
 
-        base_ret.append(&mut calc_movement_path(next_loc));
+                base_ret.append(&mut calc_movement_path(next_loc, None));
 
-        base_ret
+                base_ret
+            }
+        }
+        Some(existing_path) => {
+            let new_origin = path_to_pos(existing_path);
+            calc_movement_path(new_origin, None)
+        }
     }
+}
+
+fn path_to_pos(path: Vec<Direction>) -> Point<i32> {
+    let mut x = 0;
+    let mut y = 0;
+
+    for step in path {
+        match step {
+            Direction::North => {
+                y -= 1;
+            }
+            Direction::South => {
+                y += 1;
+            }
+            Direction::East => {
+                x += 1;
+            }
+            Direction::West => {
+                x -= 1;
+            }
+        }
+    }
+
+    Point { x, y }
 }
 
 #[cfg(test)]
@@ -855,13 +890,13 @@ mod test_movement_arrow {
     #[test]
     fn no_arrow_for_origin() {
         let want: Vec<Direction> = vec![];
-        assert_eq!(want, calc_movement_path(Point { x: 0, y: 0 }));
+        assert_eq!(want, calc_movement_path(Point { x: 0, y: 0 }, None));
     }
 
     #[test]
     fn east_arrow_for_mouse_east() {
         let want: Vec<Direction> = vec![Direction::East];
-        assert_eq!(want, calc_movement_path(Point { x: 1, y: 0 }));
+        assert_eq!(want, calc_movement_path(Point { x: 1, y: 0 }, None));
     }
 
     #[test]
@@ -876,7 +911,7 @@ mod test_movement_arrow {
             Direction::East,
             Direction::East,
         ];
-        assert_eq!(want, calc_movement_path(Point { x: 8, y: 0 }));
+        assert_eq!(want, calc_movement_path(Point { x: 8, y: 0 }, None));
     }
 
     #[test]
@@ -891,7 +926,7 @@ mod test_movement_arrow {
             Direction::West,
             Direction::West,
         ];
-        assert_eq!(want, calc_movement_path(Point { x: -8, y: 0 }));
+        assert_eq!(want, calc_movement_path(Point { x: -8, y: 0 }, None));
     }
 
     #[test]
@@ -906,7 +941,7 @@ mod test_movement_arrow {
             Direction::North,
             Direction::North,
         ];
-        assert_eq!(want, calc_movement_path(Point { x: 0, y: -8 }));
+        assert_eq!(want, calc_movement_path(Point { x: 0, y: -8 }, None));
     }
 
     #[test]
@@ -921,14 +956,14 @@ mod test_movement_arrow {
             Direction::South,
             Direction::South,
         ];
-        assert_eq!(want, calc_movement_path(Point { x: 0, y: 8 }));
+        assert_eq!(want, calc_movement_path(Point { x: 0, y: 8 }, None));
     }
 
     #[test]
     fn arrow_can_go_diagonal() {
         let want: Vec<Direction> = vec![Direction::South, Direction::East];
 
-        assert_eq!(want, calc_movement_path(Point { x: 1, y: 1 }));
+        assert_eq!(want, calc_movement_path(Point { x: 1, y: 1 }, None));
     }
 
     #[test]
@@ -944,6 +979,42 @@ mod test_movement_arrow {
             Direction::East,
         ];
 
-        assert_eq!(want, calc_movement_path(Point { x: 4, y: -4 }));
+        assert_eq!(want, calc_movement_path(Point { x: 4, y: -4 }, None));
+    }
+
+    #[test]
+    fn arrow_can_go_diagonal_irregular() {
+        let want: Vec<Direction> = vec![
+            Direction::West,
+            Direction::West,
+            Direction::North,
+            Direction::West,
+            Direction::North,
+            Direction::West,
+        ];
+
+        assert_eq!(want, calc_movement_path(Point { x: -4, y: -2 }, None));
+    }
+
+    #[test]
+    fn arrow_can_work_off_existing_path() {
+        let want: Vec<Direction> = vec![
+            Direction::South,
+            Direction::South,
+            Direction::South,
+            Direction::West,
+            Direction::West,
+            Direction::West,
+            Direction::South,
+            Direction::West,
+        ];
+
+        assert_eq!(
+            want,
+            calc_movement_path(
+                Point { x: -4, y: 4 },
+                Some(vec![Direction::South, Direction::South, Direction::South])
+            )
+        );
     }
 }
