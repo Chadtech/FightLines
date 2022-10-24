@@ -194,8 +194,7 @@ impl AsMut<[u8]> for RandSeed {
 
 #[cfg(test)]
 mod test_rng {
-    use crate::rng::{RandGen, RandSeed, N};
-    use std::ops::Index;
+    use crate::rng::{RandGen, RandSeed};
 
     #[test]
     fn more_than_255_seeds() {
@@ -224,7 +223,7 @@ mod test_rng {
             while j < seeds_count {
                 let next_seed = seeds[j].clone();
 
-                if (this_seed == next_seed) {
+                if this_seed == next_seed {
                     for (i, seed) in seeds.iter().enumerate() {
                         println!("index {},  {}", i, seed);
                     }
