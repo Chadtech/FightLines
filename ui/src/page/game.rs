@@ -63,6 +63,7 @@ struct MovingUnitModel {
     arrows: Vec<Located<Arrow>>,
 }
 
+#[derive(PartialEq, Debug)]
 enum Arrow {
     EndLeft,
     EndDown,
@@ -70,6 +71,14 @@ enum Arrow {
     EndUp,
     X,
     Y,
+    UpTurnRight,
+    UpTurnLeft,
+    RightTurnUp,
+    RightTurnDown,
+    DownTurnRight,
+    DownTurnLeft,
+    LeftTurnUp,
+    LeftTurnDown,
 }
 
 #[derive(Clone, Debug)]
@@ -431,6 +440,7 @@ fn draw_mode(model: &Model) -> Result<(), (String, String)> {
                     Arrow::EndUp => 144.0,
                     Arrow::X => 80.0,
                     Arrow::Y => 128.0,
+                    _ => todo!("Draw turn arrows"),
                 };
                 ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
                     &model.assets.sheet,
@@ -850,13 +860,22 @@ fn calc_movement_path(
             }
         }
         Some(existing_path) => {
-            let new_origin = path_to_pos(existing_path);
-            calc_movement_path(new_origin, None)
+            let new_origin = path_to_pos(&existing_path);
+            let mut ret = existing_path.clone();
+
+            let new_mouse_pos = Point {
+                x: mouse_pos.x - new_origin.x,
+                y: mouse_pos.y - new_origin.y,
+            };
+
+            ret.append(&mut calc_movement_path(new_mouse_pos, None));
+
+            ret.clone()
         }
     }
 }
 
-fn path_to_pos(path: Vec<Direction>) -> Point<i32> {
+fn path_to_pos(path: &Vec<Direction>) -> Point<i32> {
     let mut x = 0;
     let mut y = 0;
 
@@ -880,27 +899,76 @@ fn path_to_pos(path: Vec<Direction>) -> Point<i32> {
     Point { x, y }
 }
 
+fn path_to_arrows(path: &Vec<Direction>) -> Vec<Arrow> {
+    let mut path_peek = path.into_iter().peekable();
+
+    let mut arrows = vec![];
+
+    while let Some(dir) = path_peek.next() {
+        let maybe_next = path_peek.peek();
+
+        let arrow = match maybe_next {
+            None => match dir {
+                Direction::North => Arrow::EndUp,
+                Direction::South => Arrow::EndDown,
+                Direction::East => Arrow::EndRight,
+                Direction::West => Arrow::EndLeft,
+            },
+            Some(next) => match (dir, next) {
+                (Direction::North, Direction::North) => Arrow::Y,
+                (Direction::North, Direction::East) => Arrow::UpTurnRight,
+                (Direction::North, Direction::South) => {
+                    panic!("Cannot move up and then down")
+                }
+                (Direction::North, Direction::West) => Arrow::UpTurnLeft,
+                (Direction::East, Direction::North) => Arrow::RightTurnUp,
+                (Direction::East, Direction::East) => Arrow::X,
+                (Direction::East, Direction::South) => Arrow::RightTurnDown,
+                (Direction::East, Direction::West) => {
+                    panic!("Cannot move right then left")
+                }
+                (Direction::South, Direction::North) => {
+                    panic!("Cannot move down then up")
+                }
+                (Direction::South, Direction::East) => Arrow::DownTurnRight,
+                (Direction::South, Direction::South) => Arrow::Y,
+                (Direction::South, Direction::West) => Arrow::DownTurnLeft,
+                (Direction::West, Direction::North) => Arrow::LeftTurnUp,
+                (Direction::West, Direction::East) => {
+                    panic!("Cannot move left then right")
+                }
+                (Direction::West, Direction::South) => Arrow::LeftTurnDown,
+                (Direction::West, Direction::West) => Arrow::X,
+            },
+        };
+
+        arrows.push(arrow);
+    }
+
+    arrows
+}
+
 #[cfg(test)]
 mod test_movement_arrow {
     use crate::domain::direction::Direction;
-    use crate::game::calc_movement_path;
-    use pretty_assertions::{assert_eq, assert_ne};
+    use crate::game::{calc_movement_path, path_to_arrows, Arrow};
+    use pretty_assertions::assert_eq;
     use shared::point::Point;
 
     #[test]
-    fn no_arrow_for_origin() {
+    fn no_path_for_origin() {
         let want: Vec<Direction> = vec![];
         assert_eq!(want, calc_movement_path(Point { x: 0, y: 0 }, None));
     }
 
     #[test]
-    fn east_arrow_for_mouse_east() {
+    fn east_path_for_mouse_east() {
         let want: Vec<Direction> = vec![Direction::East];
         assert_eq!(want, calc_movement_path(Point { x: 1, y: 0 }, None));
     }
 
     #[test]
-    fn many_east_arrow_for_mouse_very_east() {
+    fn many_east_path_for_mouse_very_east() {
         let want: Vec<Direction> = vec![
             Direction::East,
             Direction::East,
@@ -915,7 +983,7 @@ mod test_movement_arrow {
     }
 
     #[test]
-    fn many_west_arrow_for_mouse_very_west() {
+    fn many_west_path_for_mouse_very_west() {
         let want: Vec<Direction> = vec![
             Direction::West,
             Direction::West,
@@ -930,7 +998,7 @@ mod test_movement_arrow {
     }
 
     #[test]
-    fn many_north_arrow_for_mouse_very_north() {
+    fn many_north_path_for_mouse_very_north() {
         let want: Vec<Direction> = vec![
             Direction::North,
             Direction::North,
@@ -945,7 +1013,7 @@ mod test_movement_arrow {
     }
 
     #[test]
-    fn many_south_arrow_for_mouse_very_south() {
+    fn many_south_path_for_mouse_very_south() {
         let want: Vec<Direction> = vec![
             Direction::South,
             Direction::South,
@@ -960,14 +1028,14 @@ mod test_movement_arrow {
     }
 
     #[test]
-    fn arrow_can_go_diagonal() {
+    fn path_can_go_diagonal() {
         let want: Vec<Direction> = vec![Direction::South, Direction::East];
 
         assert_eq!(want, calc_movement_path(Point { x: 1, y: 1 }, None));
     }
 
     #[test]
-    fn arrow_can_go_diagonal_far() {
+    fn path_can_go_diagonal_far() {
         let want: Vec<Direction> = vec![
             Direction::North,
             Direction::East,
@@ -983,7 +1051,7 @@ mod test_movement_arrow {
     }
 
     #[test]
-    fn arrow_can_go_diagonal_irregular() {
+    fn path_can_go_diagonal_irregular() {
         let want: Vec<Direction> = vec![
             Direction::West,
             Direction::West,
@@ -997,7 +1065,7 @@ mod test_movement_arrow {
     }
 
     #[test]
-    fn arrow_can_work_off_existing_path() {
+    fn path_can_work_off_existing_path() {
         let want: Vec<Direction> = vec![
             Direction::South,
             Direction::South,
@@ -1015,6 +1083,16 @@ mod test_movement_arrow {
                 Point { x: -4, y: 4 },
                 Some(vec![Direction::South, Direction::South, Direction::South])
             )
+        );
+    }
+
+    #[test]
+    fn east_path_to_arrow() {
+        let want: Vec<Arrow> = vec![Arrow::X, Arrow::X, Arrow::EndRight];
+
+        assert_eq!(
+            want,
+            path_to_arrows(&vec![Direction::East, Direction::East, Direction::East])
         );
     }
 }
