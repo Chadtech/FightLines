@@ -5,7 +5,7 @@ use crate::web_sys::HtmlCanvasElement;
 use crate::{assets, global, Row, Style, Toast};
 use seed::app::CmdHandle;
 use seed::prelude::{cmds, el_ref, At, El, ElRef, IndexMap, Node, Orders, St, ToClasses, UpdateEl};
-use seed::{attrs, canvas, style, C};
+use seed::{attrs, canvas, log, style, C};
 use shared::facing_direction::FacingDirection;
 use shared::frame_count::FrameCount;
 use shared::game::Game;
@@ -60,7 +60,7 @@ enum Mode {
 struct MovingUnitModel {
     unit_id: UnitId,
     mobility: HashSet<Located<()>>,
-    arrows: Vec<Located<Arrow>>,
+    arrows: Vec<(Direction, Arrow)>,
 }
 
 #[derive(PartialEq, Debug)]
@@ -71,10 +71,10 @@ enum Arrow {
     EndUp,
     X,
     Y,
-    RightTurnUp,
-    RightTurnDown,
-    LeftTurnUp,
-    LeftTurnDown,
+    RightUp,
+    RightDown,
+    LeftUp,
+    LeftDown,
 }
 
 #[derive(Clone, Debug)]
@@ -182,7 +182,7 @@ pub fn update(
                 );
             }
         }
-        Msg::MouseDownOnScreen(page_pos) => {}
+        Msg::MouseDownOnScreen(_page_pos) => {}
         Msg::MouseUpOnScreen(page_pos) => {
             let Point { x, y } = click_pos_to_game_pos(page_pos, model);
             if x > 0 && y > 0 {
@@ -287,85 +287,30 @@ fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Resu
     match &mut model.mode {
         Mode::None => {}
         Mode::MovingUnit(moving_model) => {
-            let unit = model
-                .game
-                .units
-                .get(&moving_model.unit_id)
-                .ok_or("could not find unit in mouse handling for moving unit".to_string())?;
-
             if moving_model.mobility.contains(&mouse_loc) {
-                match moving_model.arrows.last() {
-                    None => {
-                        let mut maybe_new_arrow = None;
+                let unit_loc = model
+                    .game
+                    .units
+                    .get(&moving_model.unit_id)
+                    .expect("Could not find unit in moving model");
 
-                        if unit.is_west_of(&mouse_loc) {
-                            maybe_new_arrow = Some(Arrow::EndRight);
-                        }
+                let mouse_point = Point {
+                    x: mouse_loc.x as i32 - unit_loc.x as i32,
+                    y: mouse_loc.y as i32 - unit_loc.y as i32,
+                };
 
-                        if unit.is_east_of(&mouse_loc) {
-                            maybe_new_arrow = Some(Arrow::EndLeft);
-                        }
+                let arrows = calc_arrows(
+                    mouse_point,
+                    Some(
+                        &moving_model
+                            .arrows
+                            .iter()
+                            .map(|(dir, _)| dir.clone())
+                            .collect::<Vec<_>>(),
+                    ),
+                );
 
-                        if unit.is_north_of(&mouse_loc) {
-                            maybe_new_arrow = Some(Arrow::EndDown);
-                        }
-
-                        if unit.is_south_of(&mouse_loc) {
-                            maybe_new_arrow = Some(Arrow::EndUp);
-                        }
-
-                        if let Some(new_arrow) = maybe_new_arrow {
-                            moving_model.arrows = vec![Located {
-                                value: new_arrow,
-                                x: mouse_loc.x.clone(),
-                                y: mouse_loc.y.clone(),
-                            }]
-                        }
-                    }
-                    Some(last_arrow) => {
-                        let mut maybe_new_arrow = None;
-
-                        let arrow_count = moving_model.arrows.len();
-
-                        if last_arrow.is_west_of(&mouse_loc) {
-                            if moving_model.arrows.len() > 1 {
-                                let second_to_last = &moving_model.arrows[arrow_count - 2];
-                                // TODO
-                            } else {
-                                let second_to_last_spot = if moving_model.arrows.len() > 2 {
-                                    let arrow = &moving_model.arrows[arrow_count - 2];
-
-                                    Located {
-                                        x: arrow.x,
-                                        y: arrow.y,
-                                        value: (),
-                                    }
-                                } else {
-                                    Located {
-                                        x: unit.x,
-                                        y: unit.y,
-                                        value: (),
-                                    }
-                                };
-
-                                moving_model.arrows[arrow_count - 1] = Located {
-                                    x: last_arrow.x,
-                                    y: last_arrow.y,
-                                    value: Arrow::X,
-                                };
-                                maybe_new_arrow = Some(Arrow::EndRight);
-                            }
-                        }
-
-                        if let Some(new_arrow) = maybe_new_arrow {
-                            moving_model.arrows.push(Located {
-                                value: new_arrow,
-                                x: mouse_loc.x.clone(),
-                                y: mouse_loc.y.clone(),
-                            })
-                        }
-                    }
-                }
+                moving_model.arrows = arrows;
             } else {
                 moving_model.arrows = vec![];
             }
@@ -428,15 +373,41 @@ fn draw_mode(model: &Model) -> Result<(), (String, String)> {
                 })?;
             }
 
-            for arrow in &moving_model.arrows {
-                let sheet_row = match arrow.value {
+            let unit = model
+                .game
+                .units
+                .get(&moving_model.unit_id)
+                .expect("Could not get unit in moving mode");
+
+            let mut arrow_x = unit.x;
+            let mut arrow_y = unit.y;
+            for (dir, arrow) in &moving_model.arrows {
+                match dir {
+                    Direction::North => {
+                        arrow_y -= 1;
+                    }
+                    Direction::South => {
+                        arrow_y += 1;
+                    }
+                    Direction::East => {
+                        arrow_x += 1;
+                    }
+                    Direction::West => {
+                        arrow_x -= 1;
+                    }
+                }
+
+                let sheet_row = match arrow {
                     Arrow::EndLeft => 96.0,
-                    Arrow::EndDown => 112.0,
+                    Arrow::EndDown => 144.0,
                     Arrow::EndRight => 64.0,
-                    Arrow::EndUp => 144.0,
+                    Arrow::EndUp => 112.0,
                     Arrow::X => 80.0,
                     Arrow::Y => 128.0,
-                    _ => todo!("Draw turn arrows"),
+                    Arrow::RightUp => 160.0,
+                    Arrow::RightDown => 176.0,
+                    Arrow::LeftUp => 192.0,
+                    Arrow::LeftDown => 208.0,
                 };
                 ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
                     &model.assets.sheet,
@@ -444,8 +415,8 @@ fn draw_mode(model: &Model) -> Result<(), (String, String)> {
                     sheet_row,
                     tile::PIXEL_WIDTH_FL,
                     tile::PIXEL_HEIGHT_FL,
-                    arrow.x as f64 * tile::PIXEL_WIDTH_FL,
-                    arrow.y as f64 * tile::PIXEL_HEIGHT_FL,
+                    arrow_x as f64 * tile::PIXEL_WIDTH_FL,
+                    arrow_y as f64 * tile::PIXEL_HEIGHT_FL,
                     tile::PIXEL_WIDTH_FL,
                     tile::PIXEL_HEIGHT_FL,
                 )
@@ -799,9 +770,18 @@ fn overlay_view(global: &global::Model, model: &Model) -> Cell<Msg> {
 const MISC_SPRITE_SHEET_COLUMN: f64 = 128.0;
 const SPRITE_SHEET_WIDTH: f64 = 9.0;
 
+fn calc_arrows(
+    mouse_pos: Point<i32>,
+    maybe_existing_path: Option<&Vec<Direction>>,
+) -> Vec<(Direction, Arrow)> {
+    let directions = calc_movement_path(mouse_pos, maybe_existing_path);
+
+    path_with_arrows(&directions)
+}
+
 fn calc_movement_path(
     mouse_pos: Point<i32>,
-    maybe_existing_path: Option<Vec<Direction>>,
+    maybe_existing_path: Option<&Vec<Direction>>,
 ) -> Vec<Direction> {
     match maybe_existing_path {
         None => {
@@ -895,13 +875,31 @@ fn path_to_pos(path: &Vec<Direction>) -> Point<i32> {
     Point { x, y }
 }
 
-fn path_to_arrows(path: &Vec<Direction>) -> Vec<Arrow> {
+fn path_with_arrows(path: &Vec<Direction>) -> Vec<(Direction, Arrow)> {
     let mut path_peek = path.into_iter().peekable();
+
+    let mut filtered_path = vec![];
+
+    if let Some(first) = path.get(0) {
+        filtered_path.push(first);
+    }
+
+    while let Some(dir) = path_peek.next() {
+        if let Some(next) = path_peek.peek() {
+            if &&dir.opposite() != next {
+                filtered_path.push(next.clone());
+            } else {
+                path_peek.next();
+            }
+        }
+    }
+
+    let mut filtered_path_peek = filtered_path.into_iter().peekable();
 
     let mut arrows = vec![];
 
-    while let Some(dir) = path_peek.next() {
-        let maybe_next = path_peek.peek();
+    while let Some(dir) = filtered_path_peek.next() {
+        let maybe_next = filtered_path_peek.peek();
 
         let arrow = match maybe_next {
             None => match dir {
@@ -912,42 +910,49 @@ fn path_to_arrows(path: &Vec<Direction>) -> Vec<Arrow> {
             },
             Some(next) => match (dir, next) {
                 (Direction::North, Direction::North) => Arrow::Y,
-                (Direction::North, Direction::East) => Arrow::RightTurnUp,
+                (Direction::North, Direction::East) => Arrow::LeftDown,
                 (Direction::North, Direction::South) => {
                     panic!("Cannot move up and then down")
                 }
-                (Direction::North, Direction::West) => Arrow::LeftTurnUp,
-                (Direction::East, Direction::North) => Arrow::RightTurnUp,
+                (Direction::North, Direction::West) => Arrow::RightDown,
+                (Direction::East, Direction::North) => Arrow::RightUp,
                 (Direction::East, Direction::East) => Arrow::X,
-                (Direction::East, Direction::South) => Arrow::RightTurnDown,
+                (Direction::East, Direction::South) => Arrow::RightDown,
                 (Direction::East, Direction::West) => {
                     panic!("Cannot move right then left")
                 }
                 (Direction::South, Direction::North) => {
                     panic!("Cannot move down then up")
                 }
-                (Direction::South, Direction::East) => Arrow::RightTurnDown,
+                (Direction::South, Direction::East) => Arrow::LeftUp,
                 (Direction::South, Direction::South) => Arrow::Y,
-                (Direction::South, Direction::West) => Arrow::LeftTurnDown,
-                (Direction::West, Direction::North) => Arrow::LeftTurnUp,
+                (Direction::South, Direction::West) => Arrow::RightUp,
+                (Direction::West, Direction::North) => Arrow::LeftUp,
                 (Direction::West, Direction::East) => {
                     panic!("Cannot move left then right")
                 }
-                (Direction::West, Direction::South) => Arrow::LeftTurnDown,
+                (Direction::West, Direction::South) => Arrow::LeftDown,
                 (Direction::West, Direction::West) => Arrow::X,
             },
         };
 
-        arrows.push(arrow);
+        arrows.push((dir.clone(), arrow));
     }
 
     arrows
 }
 
+fn path_to_arrows(path: &Vec<Direction>) -> Vec<Arrow> {
+    path_with_arrows(path)
+        .into_iter()
+        .map(|(_, arrow)| arrow)
+        .collect::<Vec<_>>()
+}
+
 #[cfg(test)]
 mod test_movement_arrow {
     use crate::domain::direction::Direction;
-    use crate::game::{calc_movement_path, path_to_arrows, Arrow};
+    use crate::game::{calc_arrows, calc_movement_path, path_to_arrows, Arrow};
     use pretty_assertions::assert_eq;
     use shared::point::Point;
 
@@ -1077,7 +1082,7 @@ mod test_movement_arrow {
             want,
             calc_movement_path(
                 Point { x: -4, y: 4 },
-                Some(vec![Direction::South, Direction::South, Direction::South])
+                Some(&vec![Direction::South, Direction::South, Direction::South])
             )
         );
     }
@@ -1089,6 +1094,68 @@ mod test_movement_arrow {
         assert_eq!(
             want,
             path_to_arrows(&vec![Direction::East, Direction::East, Direction::East])
+        );
+    }
+
+    #[test]
+    fn south_west_path_to_arrow() {
+        let want: Vec<Arrow> = vec![Arrow::RightUp, Arrow::LeftDown, Arrow::EndDown];
+
+        assert_eq!(
+            want,
+            path_to_arrows(&vec![Direction::South, Direction::West, Direction::South])
+        );
+    }
+
+    #[test]
+    fn north_west_path_to_arrow() {
+        let want: Vec<Arrow> = vec![Arrow::RightDown, Arrow::LeftUp, Arrow::EndUp];
+
+        assert_eq!(
+            want,
+            path_to_arrows(&vec![Direction::North, Direction::West, Direction::North])
+        );
+    }
+
+    #[test]
+    fn north_east_path_to_arrow() {
+        let want: Vec<Arrow> = vec![Arrow::LeftDown, Arrow::RightUp, Arrow::EndUp];
+
+        assert_eq!(
+            want,
+            path_to_arrows(&vec![Direction::North, Direction::East, Direction::North])
+        );
+    }
+
+    #[test]
+    fn south_east_path_to_arrow() {
+        let want: Vec<Arrow> = vec![Arrow::LeftUp, Arrow::RightDown, Arrow::EndDown];
+
+        assert_eq!(
+            want,
+            path_to_arrows(&vec![Direction::South, Direction::East, Direction::South])
+        );
+    }
+
+    #[test]
+    fn west_south_path_to_arrow() {
+        let want: Vec<Arrow> = vec![
+            Arrow::LeftDown,
+            Arrow::RightUp,
+            Arrow::LeftDown,
+            Arrow::RightUp,
+            Arrow::EndLeft,
+        ];
+
+        assert_eq!(
+            want,
+            path_to_arrows(&vec![
+                Direction::West,
+                Direction::South,
+                Direction::West,
+                Direction::South,
+                Direction::West
+            ])
         );
     }
 }
