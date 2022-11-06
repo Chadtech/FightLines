@@ -71,12 +71,8 @@ enum Arrow {
     EndUp,
     X,
     Y,
-    UpTurnRight,
-    UpTurnLeft,
     RightTurnUp,
     RightTurnDown,
-    DownTurnRight,
-    DownTurnLeft,
     LeftTurnUp,
     LeftTurnDown,
 }
@@ -916,11 +912,11 @@ fn path_to_arrows(path: &Vec<Direction>) -> Vec<Arrow> {
             },
             Some(next) => match (dir, next) {
                 (Direction::North, Direction::North) => Arrow::Y,
-                (Direction::North, Direction::East) => Arrow::UpTurnRight,
+                (Direction::North, Direction::East) => Arrow::RightTurnUp,
                 (Direction::North, Direction::South) => {
                     panic!("Cannot move up and then down")
                 }
-                (Direction::North, Direction::West) => Arrow::UpTurnLeft,
+                (Direction::North, Direction::West) => Arrow::LeftTurnUp,
                 (Direction::East, Direction::North) => Arrow::RightTurnUp,
                 (Direction::East, Direction::East) => Arrow::X,
                 (Direction::East, Direction::South) => Arrow::RightTurnDown,
@@ -930,9 +926,9 @@ fn path_to_arrows(path: &Vec<Direction>) -> Vec<Arrow> {
                 (Direction::South, Direction::North) => {
                     panic!("Cannot move down then up")
                 }
-                (Direction::South, Direction::East) => Arrow::DownTurnRight,
+                (Direction::South, Direction::East) => Arrow::RightTurnDown,
                 (Direction::South, Direction::South) => Arrow::Y,
-                (Direction::South, Direction::West) => Arrow::DownTurnLeft,
+                (Direction::South, Direction::West) => Arrow::LeftTurnDown,
                 (Direction::West, Direction::North) => Arrow::LeftTurnUp,
                 (Direction::West, Direction::East) => {
                     panic!("Cannot move left then right")
