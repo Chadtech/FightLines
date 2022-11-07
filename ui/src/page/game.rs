@@ -5,7 +5,7 @@ use crate::web_sys::HtmlCanvasElement;
 use crate::{assets, global, Row, Style, Toast};
 use seed::app::CmdHandle;
 use seed::prelude::{cmds, el_ref, At, El, ElRef, IndexMap, Node, Orders, St, ToClasses, UpdateEl};
-use seed::{attrs, canvas, log, style, C};
+use seed::{attrs, canvas, style, C};
 use shared::facing_direction::FacingDirection;
 use shared::frame_count::FrameCount;
 use shared::game::Game;
@@ -241,13 +241,13 @@ pub fn update(
                     y: y as u16,
                 };
 
-                if let Err(err_msg) = handle_mouse_move_for_mode(model, mouse_loc) {
+                if let Err((err_title, err_msg)) = handle_mouse_move_for_mode(model, mouse_loc) {
                     global.toast(
-                        Toast::init("error", "mode could not handle mouse move")
+                        Toast::init("error", err_title.as_str())
                             .error()
                             .with_more_info(err_msg.as_str()),
                     );
-                };
+                }
 
                 Some(Point {
                     x: x as u32,
@@ -283,7 +283,10 @@ pub fn update(
     }
 }
 
-fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Result<(), String> {
+fn handle_mouse_move_for_mode(
+    model: &mut Model,
+    mouse_loc: Located<()>,
+) -> Result<(), (String, String)> {
     match &mut model.mode {
         Mode::None => {}
         Mode::MovingUnit(moving_model) => {
@@ -308,12 +311,15 @@ fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Resu
                             .map(|(dir, _)| dir.clone())
                             .collect::<Vec<_>>(),
                     ),
+                    unit_loc.value.unit.get_mobility_range(),
                 );
 
                 moving_model.arrows = arrows;
             } else {
                 moving_model.arrows = vec![];
             }
+
+            draw_mode(model)?;
         }
     }
 
@@ -329,7 +335,7 @@ fn draw(viewer_id: &Id, model: &Model) -> Result<(), (String, String)> {
     draw_units(visibility, &model)
         .map_err(|err_msg| ("units rendering problem".to_string(), err_msg))?;
 
-    draw_mode(&model)?;
+    // draw_mode(&model)?;
 
     draw_visibility(visibility, &model)
         .map_err(|err_msg| ("visibility rendering problem".to_string(), err_msg))?;
@@ -773,8 +779,9 @@ const SPRITE_SHEET_WIDTH: f64 = 9.0;
 fn calc_arrows(
     mouse_pos: Point<i32>,
     maybe_existing_path: Option<&Vec<Direction>>,
+    range_limit: usize,
 ) -> Vec<(Direction, Arrow)> {
-    let directions = calc_movement_path(mouse_pos, maybe_existing_path);
+    let directions = calc_movement_path(mouse_pos, maybe_existing_path, range_limit);
 
     path_with_arrows(&directions)
 }
@@ -782,6 +789,7 @@ fn calc_arrows(
 fn calc_movement_path(
     mouse_pos: Point<i32>,
     maybe_existing_path: Option<&Vec<Direction>>,
+    range_limit: usize,
 ) -> Vec<Direction> {
     match maybe_existing_path {
         None => {
@@ -830,23 +838,27 @@ fn calc_movement_path(
 
                 let mut base_ret = vec![direction];
 
-                base_ret.append(&mut calc_movement_path(next_loc, None));
+                base_ret.append(&mut calc_movement_path(next_loc, None, range_limit));
 
                 base_ret
             }
         }
         Some(existing_path) => {
-            let new_origin = path_to_pos(&existing_path);
-            let mut ret = existing_path.clone();
+            if existing_path.len() > range_limit {
+                calc_movement_path(mouse_pos, None, range_limit)
+            } else {
+                let new_origin = path_to_pos(&existing_path);
+                let mut ret = existing_path.clone();
 
-            let new_mouse_pos = Point {
-                x: mouse_pos.x - new_origin.x,
-                y: mouse_pos.y - new_origin.y,
-            };
+                let new_mouse_pos = Point {
+                    x: mouse_pos.x - new_origin.x,
+                    y: mouse_pos.y - new_origin.y,
+                };
 
-            ret.append(&mut calc_movement_path(new_mouse_pos, None));
+                ret.append(&mut calc_movement_path(new_mouse_pos, None, range_limit));
 
-            ret.clone()
+                ret.clone()
+            }
         }
     }
 }
@@ -876,22 +888,19 @@ fn path_to_pos(path: &Vec<Direction>) -> Point<i32> {
 }
 
 fn path_with_arrows(path: &Vec<Direction>) -> Vec<(Direction, Arrow)> {
-    let mut path_peek = path.into_iter().peekable();
+    let mut filtered_path = path.into_iter().collect::<Vec<_>>();
 
-    let mut filtered_path = vec![];
-
-    if let Some(first) = path.get(0) {
-        filtered_path.push(first);
-    }
-
-    while let Some(dir) = path_peek.next() {
-        if let Some(next) = path_peek.peek() {
-            if &&dir.opposite() != next {
-                filtered_path.push(next.clone());
-            } else {
-                path_peek.next();
+    let mut index = 0;
+    while index < filtered_path.len() {
+        let dir = path[index.clone()].clone();
+        if let Some(next) = path.get(index.clone() + 1) {
+            if dir == next.opposite() {
+                filtered_path.remove(index.clone() + 1);
+                filtered_path.remove(index.clone());
+                index = 0;
             }
         }
+        index += 1;
     }
 
     let mut filtered_path_peek = filtered_path.into_iter().peekable();
@@ -952,20 +961,20 @@ fn path_to_arrows(path: &Vec<Direction>) -> Vec<Arrow> {
 #[cfg(test)]
 mod test_movement_arrow {
     use crate::domain::direction::Direction;
-    use crate::game::{calc_arrows, calc_movement_path, path_to_arrows, Arrow};
+    use crate::game::{calc_movement_path, path_to_arrows, Arrow};
     use pretty_assertions::assert_eq;
     use shared::point::Point;
 
     #[test]
     fn no_path_for_origin() {
         let want: Vec<Direction> = vec![];
-        assert_eq!(want, calc_movement_path(Point { x: 0, y: 0 }, None));
+        assert_eq!(want, calc_movement_path(Point { x: 0, y: 0 }, None, 16));
     }
 
     #[test]
     fn east_path_for_mouse_east() {
         let want: Vec<Direction> = vec![Direction::East];
-        assert_eq!(want, calc_movement_path(Point { x: 1, y: 0 }, None));
+        assert_eq!(want, calc_movement_path(Point { x: 1, y: 0 }, None, 16));
     }
 
     #[test]
@@ -980,7 +989,7 @@ mod test_movement_arrow {
             Direction::East,
             Direction::East,
         ];
-        assert_eq!(want, calc_movement_path(Point { x: 8, y: 0 }, None));
+        assert_eq!(want, calc_movement_path(Point { x: 8, y: 0 }, None, 16));
     }
 
     #[test]
@@ -995,7 +1004,7 @@ mod test_movement_arrow {
             Direction::West,
             Direction::West,
         ];
-        assert_eq!(want, calc_movement_path(Point { x: -8, y: 0 }, None));
+        assert_eq!(want, calc_movement_path(Point { x: -8, y: 0 }, None, 16));
     }
 
     #[test]
@@ -1010,7 +1019,7 @@ mod test_movement_arrow {
             Direction::North,
             Direction::North,
         ];
-        assert_eq!(want, calc_movement_path(Point { x: 0, y: -8 }, None));
+        assert_eq!(want, calc_movement_path(Point { x: 0, y: -8 }, None, 16));
     }
 
     #[test]
@@ -1025,14 +1034,14 @@ mod test_movement_arrow {
             Direction::South,
             Direction::South,
         ];
-        assert_eq!(want, calc_movement_path(Point { x: 0, y: 8 }, None));
+        assert_eq!(want, calc_movement_path(Point { x: 0, y: 8 }, None, 16));
     }
 
     #[test]
     fn path_can_go_diagonal() {
         let want: Vec<Direction> = vec![Direction::South, Direction::East];
 
-        assert_eq!(want, calc_movement_path(Point { x: 1, y: 1 }, None));
+        assert_eq!(want, calc_movement_path(Point { x: 1, y: 1 }, None, 16));
     }
 
     #[test]
@@ -1048,7 +1057,7 @@ mod test_movement_arrow {
             Direction::East,
         ];
 
-        assert_eq!(want, calc_movement_path(Point { x: 4, y: -4 }, None));
+        assert_eq!(want, calc_movement_path(Point { x: 4, y: -4 }, None, 16));
     }
 
     #[test]
@@ -1062,7 +1071,7 @@ mod test_movement_arrow {
             Direction::West,
         ];
 
-        assert_eq!(want, calc_movement_path(Point { x: -4, y: -2 }, None));
+        assert_eq!(want, calc_movement_path(Point { x: -4, y: -2 }, None, 16));
     }
 
     #[test]
@@ -1082,7 +1091,8 @@ mod test_movement_arrow {
             want,
             calc_movement_path(
                 Point { x: -4, y: 4 },
-                Some(&vec![Direction::South, Direction::South, Direction::South])
+                Some(&vec![Direction::South, Direction::South, Direction::South]),
+                16
             )
         );
     }
@@ -1157,5 +1167,20 @@ mod test_movement_arrow {
                 Direction::West
             ])
         );
+    }
+
+    #[test]
+    fn path_to_arrows_filters_double_backs() {
+        let want: Vec<Arrow> = vec![Arrow::X, Arrow::EndRight];
+
+        assert_eq!(
+            want,
+            path_to_arrows(&vec![
+                Direction::East,
+                Direction::East,
+                Direction::East,
+                Direction::West
+            ])
+        )
     }
 }

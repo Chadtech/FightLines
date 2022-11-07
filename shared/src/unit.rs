@@ -20,3 +20,11 @@ impl UnitId {
 pub enum Unit {
     Infantry,
 }
+
+impl Unit {
+    pub fn get_mobility_range(&self) -> usize {
+        match self {
+            Unit::Infantry => 2,
+        }
+    }
+}

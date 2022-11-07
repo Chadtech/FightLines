@@ -16,3 +16,14 @@ impl Direction {
         }
     }
 }
+
+impl ToString for Direction {
+    fn to_string(&self) -> String {
+        match self {
+            Direction::North => "north".to_string(),
+            Direction::South => "south".to_string(),
+            Direction::East => "east".to_string(),
+            Direction::West => "west".to_string(),
+        }
+    }
+}
