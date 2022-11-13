@@ -49,7 +49,11 @@ pub struct Model {
     frame_count: FrameCount,
     moved_units: HashSet<UnitId>,
     mouse_game_position: Option<Point<u32>>,
-    mode: Mode,
+    stage: Stage,
+}
+
+enum Stage {
+    TakingTurn { mode: Mode },
 }
 
 enum Mode {
@@ -135,7 +139,7 @@ pub fn init(
         frame_count: FrameCount::F1,
         moved_units: HashSet::new(),
         mouse_game_position: None,
-        mode: Mode::None,
+        stage: Stage::TakingTurn { mode: Mode::None },
     };
 
     Ok(model)
@@ -260,11 +264,13 @@ fn handle_click_on_screen_during_turn(
     let x = x as u16;
     let y = y as u16;
 
-    match &model.mode {
-        Mode::None => handle_click_on_screen_when_no_mode(global, model, x, y),
-        Mode::MovingUnit(moving_model) => {
-            handle_click_on_screen_when_move_mode(moving_model, model)
-        }
+    match &model.stage {
+        Stage::TakingTurn { mode } => match mode {
+            Mode::None => handle_click_on_screen_when_no_mode(global, model, x, y),
+            Mode::MovingUnit(moving_model) => {
+                handle_click_on_screen_when_move_mode(moving_model, model)
+            }
+        },
     }
 }
 
@@ -303,11 +309,13 @@ fn handle_click_on_screen_when_no_mode(
 
                 match model.game.get_units_mobility(unit_id) {
                     Ok(mobility) => {
-                        model.mode = Mode::MovingUnit(MovingUnitModel {
-                            unit_id: unit_id.clone(),
-                            mobility,
-                            arrows: Vec::new(),
-                        });
+                        model.stage = Stage::TakingTurn {
+                            mode: Mode::MovingUnit(MovingUnitModel {
+                                unit_id: unit_id.clone(),
+                                mobility,
+                                arrows: Vec::new(),
+                            }),
+                        };
 
                         if let Err((err_title, err_msg)) = draw_mode_from_mouse_event(model) {
                             global.toast(
@@ -336,40 +344,42 @@ fn handle_mouse_move_for_mode(
     model: &mut Model,
     mouse_loc: Located<()>,
 ) -> Result<(), (String, String)> {
-    match &mut model.mode {
-        Mode::None => {}
-        Mode::MovingUnit(moving_model) => {
-            if moving_model.mobility.contains(&mouse_loc) {
-                let unit_loc = model
-                    .game
-                    .units
-                    .get(&moving_model.unit_id)
-                    .expect("Could not find unit in moving model");
+    match &mut model.stage {
+        Stage::TakingTurn { mode } => match mode {
+            Mode::None => {}
+            Mode::MovingUnit(moving_model) => {
+                if moving_model.mobility.contains(&mouse_loc) {
+                    let unit_loc = model
+                        .game
+                        .units
+                        .get(&moving_model.unit_id)
+                        .expect("Could not find unit in moving model");
 
-                let mouse_point = Point {
-                    x: mouse_loc.x as i32 - unit_loc.x as i32,
-                    y: mouse_loc.y as i32 - unit_loc.y as i32,
-                };
+                    let mouse_point = Point {
+                        x: mouse_loc.x as i32 - unit_loc.x as i32,
+                        y: mouse_loc.y as i32 - unit_loc.y as i32,
+                    };
 
-                let arrows = calc_arrows(
-                    mouse_point,
-                    Some(
-                        &moving_model
-                            .arrows
-                            .iter()
-                            .map(|(dir, _)| dir.clone())
-                            .collect::<Vec<_>>(),
-                    ),
-                    unit_loc.value.unit.get_mobility_range(),
-                );
+                    let arrows = calc_arrows(
+                        mouse_point,
+                        Some(
+                            &moving_model
+                                .arrows
+                                .iter()
+                                .map(|(dir, _)| dir.clone())
+                                .collect::<Vec<_>>(),
+                        ),
+                        unit_loc.value.unit.get_mobility_range(),
+                    );
 
-                moving_model.arrows = arrows;
-            } else {
-                moving_model.arrows = vec![];
+                    moving_model.arrows = arrows;
+                } else {
+                    moving_model.arrows = vec![];
+                }
+
+                draw_mode_from_mouse_event(model)?;
             }
-
-            draw_mode_from_mouse_event(model)?;
-        }
+        },
     }
 
     Ok(())
@@ -403,11 +413,12 @@ fn draw_mode_from_mouse_event(model: &Model) -> Result<(), (String, String)> {
     ctx.begin_path();
     ctx.clear_rect(0., 0., width, height);
 
-    match &model.mode {
-        Mode::None => {}
-        Mode::MovingUnit(moving_model) => {
-            for mobility_space in moving_model.mobility.iter() {
-                ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+    match &model.stage {
+        Stage::TakingTurn { mode } => match mode {
+            Mode::None => {}
+            Mode::MovingUnit(moving_model) => {
+                for mobility_space in moving_model.mobility.iter() {
+                    ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
                     &model.assets.sheet,
                     MISC_SPRITE_SHEET_COLUMN,
                     48.0,
@@ -424,45 +435,45 @@ fn draw_mode_from_mouse_event(model: &Model) -> Result<(), (String, String)> {
                         "could not draw mobility image on canvas".to_string(),
                     )
                 })?;
-            }
-
-            let unit = model
-                .game
-                .units
-                .get(&moving_model.unit_id)
-                .expect("Could not get unit in moving mode");
-
-            let mut arrow_x = unit.x;
-            let mut arrow_y = unit.y;
-            for (dir, arrow) in &moving_model.arrows {
-                match dir {
-                    Direction::North => {
-                        arrow_y -= 1;
-                    }
-                    Direction::South => {
-                        arrow_y += 1;
-                    }
-                    Direction::East => {
-                        arrow_x += 1;
-                    }
-                    Direction::West => {
-                        arrow_x -= 1;
-                    }
                 }
 
-                let sheet_row = match arrow {
-                    Arrow::EndLeft => 96.0,
-                    Arrow::EndDown => 144.0,
-                    Arrow::EndRight => 64.0,
-                    Arrow::EndUp => 112.0,
-                    Arrow::X => 80.0,
-                    Arrow::Y => 128.0,
-                    Arrow::RightUp => 160.0,
-                    Arrow::RightDown => 176.0,
-                    Arrow::LeftUp => 192.0,
-                    Arrow::LeftDown => 208.0,
-                };
-                ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+                let unit = model
+                    .game
+                    .units
+                    .get(&moving_model.unit_id)
+                    .expect("Could not get unit in moving mode");
+
+                let mut arrow_x = unit.x;
+                let mut arrow_y = unit.y;
+                for (dir, arrow) in &moving_model.arrows {
+                    match dir {
+                        Direction::North => {
+                            arrow_y -= 1;
+                        }
+                        Direction::South => {
+                            arrow_y += 1;
+                        }
+                        Direction::East => {
+                            arrow_x += 1;
+                        }
+                        Direction::West => {
+                            arrow_x -= 1;
+                        }
+                    }
+
+                    let sheet_row = match arrow {
+                        Arrow::EndLeft => 96.0,
+                        Arrow::EndDown => 144.0,
+                        Arrow::EndRight => 64.0,
+                        Arrow::EndUp => 112.0,
+                        Arrow::X => 80.0,
+                        Arrow::Y => 128.0,
+                        Arrow::RightUp => 160.0,
+                        Arrow::RightDown => 176.0,
+                        Arrow::LeftUp => 192.0,
+                        Arrow::LeftDown => 208.0,
+                    };
+                    ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
                     &model.assets.sheet,
                     MISC_SPRITE_SHEET_COLUMN,
                     sheet_row,
@@ -479,8 +490,9 @@ fn draw_mode_from_mouse_event(model: &Model) -> Result<(), (String, String)> {
                         "could not draw arrow image on canvas".to_string(),
                     )
                 })?;
+                }
             }
-        }
+        },
     }
     Ok(())
 }
