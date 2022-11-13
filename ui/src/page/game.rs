@@ -268,7 +268,7 @@ fn handle_click_on_screen_during_turn(
     }
 }
 
-fn handle_click_on_screen_when_move_mode(moving_model: &MovingUnitModel, model: &mut Model) {
+fn handle_click_on_screen_when_move_mode(moving_model: &MovingUnitModel, mut model: &Model) {
     let unit_loc = model
         .game
         .units
@@ -278,8 +278,8 @@ fn handle_click_on_screen_when_move_mode(moving_model: &MovingUnitModel, model: 
     let pos = path_to_pos(
         &moving_model
             .arrows
-            .into_iter()
-            .map(|(dir, _)| dir)
+            .iter()
+            .map(|(dir, _)| dir.clone())
             .collect::<Vec<_>>(),
     );
 
