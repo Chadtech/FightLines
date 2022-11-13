@@ -164,9 +164,7 @@ pub fn update(
         Msg::RenderedFirstTime => {
             let viewer_id = global.viewer_id();
 
-            let map_draw_result = draw_terrain(&model);
-
-            if let Err(err) = map_draw_result {
+            if let Err(err) = draw_terrain(&model) {
                 global.toast(
                     Toast::init("error", "map rendering problem")
                         .error()
@@ -184,46 +182,11 @@ pub fn update(
         }
         Msg::MouseDownOnScreen(_page_pos) => {}
         Msg::MouseUpOnScreen(page_pos) => {
-            let Point { x, y } = click_pos_to_game_pos(page_pos, model);
-            if x > 0 && y > 0 {
-                let x = x as u16;
-                let y = y as u16;
-                if let Some(units_at_pos) = model.game.get_units_by_location(&Point { x, y }) {
-                    if let Some((first, rest)) = units_at_pos.split_first() {
-                        if rest.is_empty() {
-                            let (unit_id, _) = first;
-
-                            match model.game.get_units_mobility(unit_id) {
-                                Ok(mobility) => {
-                                    model.mode = Mode::MovingUnit(MovingUnitModel {
-                                        unit_id: unit_id.clone(),
-                                        mobility,
-                                        arrows: Vec::new(),
-                                    });
-
-                                    if let Err((err_title, err_msg)) = draw_mode(model) {
-                                        global.toast(
-                                            Toast::init("error", err_title.as_str())
-                                                .error()
-                                                .with_more_info(err_msg.as_str()),
-                                        );
-                                    }
-                                }
-                                Err(err_msg) => {
-                                    global.toast(
-                                        Toast::init(
-                                            "error",
-                                            "could not get mobility range of unit",
-                                        )
-                                        .error()
-                                        .with_more_info(err_msg.as_str()),
-                                    );
-                                }
-                            }
-                        }
-                    }
-                };
-            }
+            handle_click_on_screen_during_turn(
+                global,
+                model,
+                click_pos_to_game_pos(page_pos, model),
+            );
         }
         Msg::MouseMoveOnScreen(page_pos) => {
             let Point { x, y } = click_pos_to_game_pos(page_pos, model);
@@ -283,6 +246,92 @@ pub fn update(
     }
 }
 
+fn handle_click_on_screen_during_turn(
+    global: &mut global::Model,
+    model: &mut Model,
+    mouse_pos: Point<i16>,
+) {
+    let Point { x, y } = mouse_pos;
+
+    if !(x > 0 && y > 0) {
+        return;
+    }
+
+    let x = x as u16;
+    let y = y as u16;
+
+    match &model.mode {
+        Mode::None => handle_click_on_screen_when_no_mode(global, model, x, y),
+        Mode::MovingUnit(moving_model) => {
+            handle_click_on_screen_when_move_mode(moving_model, model)
+        }
+    }
+}
+
+fn handle_click_on_screen_when_move_mode(moving_model: &MovingUnitModel, model: &mut Model) {
+    let unit_loc = model
+        .game
+        .units
+        .get(&moving_model.unit_id)
+        .expect("Could not find unit when moving unit SirttBHL");
+
+    let pos = path_to_pos(
+        &moving_model
+            .arrows
+            .into_iter()
+            .map(|(dir, _)| dir)
+            .collect::<Vec<_>>(),
+    );
+
+    let dest = Located {
+        x: unit_loc.x + (pos.x as u16),
+        y: unit_loc.y + (pos.y as u16),
+        value: (),
+    };
+}
+
+fn handle_click_on_screen_when_no_mode(
+    global: &mut global::Model,
+    model: &mut Model,
+    x: u16,
+    y: u16,
+) {
+    if let Some(units_at_pos) = model.game.get_units_by_location(&Point { x, y }) {
+        if let Some((first, rest)) = units_at_pos.split_first() {
+            if rest.is_empty() {
+                let (unit_id, _) = first;
+
+                match model.game.get_units_mobility(unit_id) {
+                    Ok(mobility) => {
+                        model.mode = Mode::MovingUnit(MovingUnitModel {
+                            unit_id: unit_id.clone(),
+                            mobility,
+                            arrows: Vec::new(),
+                        });
+
+                        if let Err((err_title, err_msg)) = draw_mode_from_mouse_event(model) {
+                            global.toast(
+                                Toast::init("error", err_title.as_str())
+                                    .error()
+                                    .with_more_info(err_msg.as_str()),
+                            );
+                        }
+                    }
+                    Err(err_msg) => {
+                        global.toast(
+                            Toast::init("error", "could not get mobility range of unit")
+                                .error()
+                                .with_more_info(err_msg.as_str()),
+                        );
+                    }
+                }
+            } else {
+                todo!("Clicked on many units")
+            }
+        }
+    };
+}
+
 fn handle_mouse_move_for_mode(
     model: &mut Model,
     mouse_loc: Located<()>,
@@ -319,7 +368,7 @@ fn handle_mouse_move_for_mode(
                 moving_model.arrows = vec![];
             }
 
-            draw_mode(model)?;
+            draw_mode_from_mouse_event(model)?;
         }
     }
 
@@ -335,15 +384,13 @@ fn draw(viewer_id: &Id, model: &Model) -> Result<(), (String, String)> {
     draw_units(visibility, &model)
         .map_err(|err_msg| ("units rendering problem".to_string(), err_msg))?;
 
-    // draw_mode(&model)?;
-
     draw_visibility(visibility, &model)
         .map_err(|err_msg| ("visibility rendering problem".to_string(), err_msg))?;
 
     Ok(())
 }
 
-fn draw_mode(model: &Model) -> Result<(), (String, String)> {
+fn draw_mode_from_mouse_event(model: &Model) -> Result<(), (String, String)> {
     let canvas = model
         .mode_canvas
         .get()
