@@ -14,7 +14,7 @@ use shared::located::Located;
 use shared::point::Point;
 use shared::team_color::TeamColor;
 use shared::tile;
-use shared::unit::UnitId;
+use shared::unit::{Unit, UnitId};
 use std::collections::HashSet;
 
 ///////////////////////////////////////////////////////////////
@@ -625,9 +625,13 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
                     }
                 };
 
-                let sy = match unit_model.color {
-                    TeamColor::Red => 0.0,
-                    TeamColor::Blue => 1.0,
+                let mut sy = match unit_model.unit {
+                    Unit::Infantry => 0.0,
+                    Unit::Tank => 2.0,
+                };
+
+                if unit_model.color == TeamColor::Blue {
+                    sy += 1.0;
                 };
 
                 (sx * tile::PIXEL_WIDTH_FL, sy * tile::PIXEL_WIDTH_FL)

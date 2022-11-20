@@ -19,12 +19,14 @@ impl UnitId {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum Unit {
     Infantry,
+    Tank,
 }
 
 impl Unit {
     pub fn get_mobility_range(&self) -> usize {
         match self {
             Unit::Infantry => 2,
+            Unit::Tank => 8,
         }
     }
 }

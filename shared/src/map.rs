@@ -84,16 +84,30 @@ impl MapOpt {
         let map = self.to_map();
         match self {
             MapOpt::GrassSquare => Militaries {
-                first_player_military: vec![Located::<(FacingDirection, Unit)> {
-                    value: (FacingDirection::Right, Unit::Infantry),
-                    x: 2,
-                    y: 2,
-                }],
-                second_player_military: vec![Located::<(FacingDirection, Unit)> {
-                    value: (FacingDirection::Left, Unit::Infantry),
-                    x: (map.width as u16) - 3,
-                    y: (map.height as u16) - 3,
-                }],
+                first_player_military: vec![
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Right, Unit::Infantry),
+                        x: 2,
+                        y: 2,
+                    },
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Right, Unit::Tank),
+                        x: 3,
+                        y: 4,
+                    },
+                ],
+                second_player_military: vec![
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Left, Unit::Infantry),
+                        x: (map.width as u16) - 3,
+                        y: (map.height as u16) - 3,
+                    },
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Left, Unit::Tank),
+                        x: (map.width as u16) - 4,
+                        y: (map.height as u16) - 5,
+                    },
+                ],
                 rest_players_miliatries: vec![],
             },
         }
