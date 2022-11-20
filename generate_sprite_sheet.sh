@@ -4,6 +4,7 @@
     ./shared/src/sprites/infantry_red.aseprite \
     ./shared/src/sprites/infantry_blue.aseprite \
     ./shared/src/sprites/tank_red.aseprite \
+    ./shared/src/sprites/tank_blue.aseprite \
   --sheet ./shared/src/sprites/units_sheet.png
 
 # Moved Units
