@@ -920,7 +920,23 @@ fn calc_movement_path(
 
                 ret.append(&mut calc_movement_path(new_mouse_pos, None, range_limit));
 
-                ret.clone()
+                let positions = path_to_positions(&ret);
+                let positions_set: HashSet<Point<i32>> = {
+                    let mut set = HashSet::new();
+
+                    for p in &positions {
+                        set.insert(p.clone());
+                    }
+
+                    set
+                };
+
+                // If it the arrow visits the same position twice, then scrap it
+                if positions.len() == positions_set.len() {
+                    ret.clone()
+                } else {
+                    calc_movement_path(mouse_pos, None, range_limit)
+                }
             }
         }
     }
@@ -948,6 +964,37 @@ fn path_to_pos(path: &Vec<Direction>) -> Point<i32> {
     }
 
     Point { x, y }
+}
+
+fn path_to_positions(path: &Vec<Direction>) -> Vec<Point<i32>> {
+    let mut ret = vec![];
+
+    let mut x = 0;
+    let mut y = 0;
+
+    for step in path {
+        match step {
+            Direction::North => {
+                y -= 1;
+            }
+            Direction::South => {
+                y += 1;
+            }
+            Direction::East => {
+                x += 1;
+            }
+            Direction::West => {
+                x -= 1;
+            }
+        }
+
+        ret.push(Point {
+            x: x.clone(),
+            y: y.clone(),
+        });
+    }
+
+    ret
 }
 
 fn path_with_arrows(path: &Vec<Direction>) -> Vec<(Direction, Arrow)> {
@@ -1249,5 +1296,45 @@ mod test_movement_arrow {
                 Direction::West
             ])
         )
+    }
+
+    #[test]
+    fn path_to_arrows_filters_returns() {
+        let want: Vec<Direction> = vec![Direction::East, Direction::East];
+
+        assert_eq!(
+            want,
+            calc_movement_path(
+                Point { x: 2, y: 0 },
+                Some(&vec![
+                    Direction::East,
+                    Direction::East,
+                    Direction::South,
+                    Direction::West,
+                    Direction::North
+                ]),
+                16
+            )
+        );
+    }
+
+    #[test]
+    fn edge_of_range_can_be_approached_from_north() {
+        let want: Vec<Direction> = vec![Direction::East, Direction::South];
+
+        assert_eq!(
+            want,
+            calc_movement_path(Point { x: 1, y: 1 }, Some(&vec![Direction::East]), 2)
+        );
+    }
+
+    #[test]
+    fn edge_of_range_can_be_approached_from_west() {
+        let want: Vec<Direction> = vec![Direction::South, Direction::East];
+
+        assert_eq!(
+            want,
+            calc_movement_path(Point { x: 1, y: 1 }, Some(&vec![Direction::South]), 2)
+        );
     }
 }

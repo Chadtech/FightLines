@@ -248,150 +248,45 @@ impl Game {
                 let unit = &loc_unit.value.unit;
                 let x = loc_unit.x;
                 let y = loc_unit.y;
-                match unit {
-                    Unit::Infantry => {
-                        let mut mobility = HashSet::new();
 
-                        let game_width = self.map.width as u16;
-                        let game_height = self.map.height as u16;
+                let mut index = 0;
+                let unit_range = unit.get_mobility_range() - 1;
 
-                        if x < (game_width - 1) {
-                            mobility.insert(Located {
-                                value: (),
-                                x: x + 1,
-                                y,
-                            });
-                        }
+                let mut mobility_pre_filter: HashSet<Point<i16>> = HashSet::new();
 
-                        if 0 < x {
-                            mobility.insert(Located {
-                                value: (),
-                                x: x - 1,
-                                y,
-                            });
-                        }
+                let x = x as i16;
+                let y = y as i16;
 
-                        if x < (game_width - 2) {
-                            mobility.insert(Located {
-                                value: (),
-                                x: x + 2,
-                                y,
-                            });
-                        }
+                mobility_pre_filter.insert(Point { x: x + 1, y });
+                mobility_pre_filter.insert(Point { x: x - 1, y });
+                mobility_pre_filter.insert(Point { x, y: y + 1 });
+                mobility_pre_filter.insert(Point { x, y: y - 1 });
 
-                        if 1 < x {
-                            mobility.insert(Located {
-                                value: (),
-                                x: x - 2,
-                                y,
-                            });
-                        }
-
-                        if x < (game_width - 1) && y < (game_height - 1) {
-                            mobility.insert(Located {
-                                value: (),
-                                x: x + 1,
-                                y: y + 1,
-                            });
-                        }
-
-                        if 0 < x && y < (game_height - 1) {
-                            mobility.insert(Located {
-                                value: (),
-                                x: x - 1,
-                                y: y + 1,
-                            });
-                        }
-
-                        if 0 < x && 0 < y {
-                            mobility.insert(Located {
-                                value: (),
-                                x: x - 1,
-                                y: y - 1,
-                            });
-                        }
-
-                        if x < (game_width - 1) && 0 < y {
-                            mobility.insert(Located {
-                                value: (),
-                                x: x + 1,
-                                y: y - 1,
-                            });
-                        }
-
-                        if y < (game_height - 1) {
-                            mobility.insert(Located {
-                                value: (),
-                                x,
-                                y: y + 1,
-                            });
-                        }
-
-                        if 0 < y {
-                            mobility.insert(Located {
-                                value: (),
-                                x,
-                                y: y - 1,
-                            });
-                        }
-
-                        if y < (game_height - 2) {
-                            mobility.insert(Located {
-                                value: (),
-                                x,
-                                y: y + 2,
-                            });
-                        }
-
-                        if 1 < y {
-                            mobility.insert(Located {
-                                value: (),
-                                x,
-                                y: y - 2,
-                            });
-                        }
+                while index < unit_range {
+                    let mut new_points = vec![];
+                    for p in mobility_pre_filter.iter() {
+                        new_points.push(Point { x: p.x + 1, y: p.y });
+                        new_points.push(Point { x: p.x - 1, y: p.y });
+                        new_points.push(Point { x: p.x, y: p.y + 1 });
+                        new_points.push(Point { x: p.x, y: p.y - 1 });
                     }
-                    Unit::Tank => {
-                        let mut index = 0;
-                        let unit_range = unit.get_mobility_range();
 
-                        let mut mobility_pre_filter: HashSet<Point<i16>> = HashSet::new();
+                    for p in new_points {
+                        mobility_pre_filter.insert(p);
+                    }
 
-                        let x = x as i16;
-                        let y = y as i16;
+                    index += 1;
+                }
 
-                        mobility_pre_filter.insert(Point { x: x + 1, y });
-                        mobility_pre_filter.insert(Point { x: x - 1, y });
-                        mobility_pre_filter.insert(Point { x, y: y + 1 });
-                        mobility_pre_filter.insert(Point { x, y: y - 1 });
+                for p in mobility_pre_filter {
+                    if p.x >= 0 && p.y >= 0 {
+                        let loc = Located {
+                            x: p.x as u16,
+                            y: p.y as u16,
+                            value: (),
+                        };
 
-                        while index < unit_range {
-                            let mut new_points = vec![];
-                            for p in mobility_pre_filter.iter() {
-                                new_points.push(Point { x: p.x + 1, y: p.y });
-                                new_points.push(Point { x: p.x - 1, y: p.y });
-                                new_points.push(Point { x: p.x, y: p.y + 1 });
-                                new_points.push(Point { x: p.x, y: p.y - 1 });
-                            }
-
-                            for p in new_points {
-                                mobility_pre_filter.insert(p);
-                            }
-
-                            index += 1;
-                        }
-
-                        for p in mobility_pre_filter {
-                            if p.x >= 0 && p.y >= 0 {
-                                let loc = Located {
-                                    x: p.x as u16,
-                                    y: p.y as u16,
-                                    value: (),
-                                };
-
-                                mobility.insert(loc);
-                            }
-                        }
+                        mobility.insert(loc);
                     }
                 }
 
