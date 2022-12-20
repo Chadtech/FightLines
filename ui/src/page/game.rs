@@ -958,8 +958,12 @@ fn path_with_arrows(path: &Vec<Direction>) -> Vec<(Direction, Arrow)> {
         let dir = path[index.clone()].clone();
         if let Some(next) = path.get(index.clone() + 1) {
             if dir == next.opposite() {
-                filtered_path.remove(index.clone() + 1);
+                if (index + 1) < filtered_path.len() {
+                    filtered_path.remove(index.clone() + 1);
+                }
+
                 filtered_path.remove(index.clone());
+
                 index = 0;
             }
         }
