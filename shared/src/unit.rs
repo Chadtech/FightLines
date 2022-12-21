@@ -1,3 +1,5 @@
+pub mod action;
+
 use crate::id::Id;
 use crate::rng::RandGen;
 use serde::{Deserialize, Serialize};

@@ -14,6 +14,7 @@ use shared::located::Located;
 use shared::point::Point;
 use shared::team_color::TeamColor;
 use shared::tile;
+use shared::unit;
 use shared::unit::{Unit, UnitId};
 use std::collections::HashSet;
 
@@ -48,6 +49,7 @@ pub struct Model {
     handle_minimum_framerate_timeout: CmdHandle,
     frame_count: FrameCount,
     moved_units: HashSet<UnitId>,
+    moves: Vec<(UnitId, unit::action::Action)>,
     mouse_game_position: Option<Point<u32>>,
     stage: Stage,
 }
@@ -138,6 +140,7 @@ pub fn init(
         handle_minimum_framerate_timeout: wait_for_timeout(orders),
         frame_count: FrameCount::F1,
         moved_units: HashSet::new(),
+        moves: Vec::new(),
         mouse_game_position: None,
         stage: Stage::TakingTurn { mode: Mode::None },
     };
@@ -154,6 +157,7 @@ fn click_pos_to_game_pos(page_pos: Point<i16>, model: &Model) -> Point<i16> {
 
     Point { x, y }
 }
+
 ///////////////////////////////////////////////////////////////
 // Update
 ///////////////////////////////////////////////////////////////
@@ -264,36 +268,56 @@ fn handle_click_on_screen_during_turn(
     let x = x as u16;
     let y = y as u16;
 
-    match &model.stage {
+    match &mut model.stage {
         Stage::TakingTurn { mode } => match mode {
             Mode::None => handle_click_on_screen_when_no_mode(global, model, x, y),
-            Mode::MovingUnit(moving_model) => {
-                handle_click_on_screen_when_move_mode(moving_model, model)
-            }
+            Mode::MovingUnit(_) => handle_click_on_screen_when_move_mode(global, model),
         },
     }
 }
 
-fn handle_click_on_screen_when_move_mode(moving_model: &MovingUnitModel, mut model: &Model) {
-    let unit_loc = model
-        .game
-        .units
-        .get(&moving_model.unit_id)
-        .expect("Could not find unit when moving unit SirttBHL");
+fn handle_click_on_screen_when_move_mode(global: &mut global::Model, model: &mut Model) {
+    if let Stage::TakingTurn {
+        mode: Mode::MovingUnit(moving_model),
+    } = &model.stage
+    {
+        let unit_loc = model
+            .game
+            .units
+            .get(&moving_model.unit_id)
+            .expect("Could not find unit when moving unit SirttBHL");
 
-    let pos = path_to_pos(
-        &moving_model
-            .arrows
-            .iter()
-            .map(|(dir, _)| dir.clone())
-            .collect::<Vec<_>>(),
-    );
+        let pos = path_to_pos(
+            &moving_model
+                .arrows
+                .iter()
+                .map(|(dir, _)| dir.clone())
+                .collect::<Vec<_>>(),
+        );
 
-    let dest = Located {
-        x: unit_loc.x + (pos.x as u16),
-        y: unit_loc.y + (pos.y as u16),
-        value: (),
-    };
+        let dest = Located {
+            x: unit_loc.x + (pos.x as u16),
+            y: unit_loc.y + (pos.y as u16),
+            value: (),
+        };
+
+        let unit_id = moving_model.unit_id.clone();
+
+        model.moved_units.insert(unit_id.clone());
+        model
+            .moves
+            .push((unit_id, unit::action::Action::MovedTo(dest)));
+
+        model.stage = Stage::TakingTurn { mode: Mode::None };
+
+        if let Err((err_title, err_msg)) = clear_mode_canvas(model) {
+            global.toast(
+                Toast::init("error", err_title.as_str())
+                    .error()
+                    .with_more_info(err_msg.as_str()),
+            );
+        }
+    }
 }
 
 fn handle_click_on_screen_when_no_mode(
@@ -396,6 +420,23 @@ fn draw(viewer_id: &Id, model: &Model) -> Result<(), (String, String)> {
 
     draw_visibility(visibility, &model)
         .map_err(|err_msg| ("visibility rendering problem".to_string(), err_msg))?;
+
+    Ok(())
+}
+
+fn clear_mode_canvas(model: &Model) -> Result<(), (String, String)> {
+    let canvas = model
+        .mode_canvas
+        .get()
+        // TODO turn 'expects' like this into real errors
+        .expect("could not get mode canvas element to clear");
+    let ctx = seed::canvas_context_2d(&canvas);
+
+    let width = model.game_pixel_width as f64;
+    let height = model.game_pixel_height as f64;
+
+    ctx.begin_path();
+    ctx.clear_rect(0., 0., width, height);
 
     Ok(())
 }
@@ -1065,19 +1106,19 @@ fn path_with_arrows(path: &Vec<Direction>) -> Vec<(Direction, Arrow)> {
     arrows
 }
 
-fn path_to_arrows(path: &Vec<Direction>) -> Vec<Arrow> {
-    path_with_arrows(path)
-        .into_iter()
-        .map(|(_, arrow)| arrow)
-        .collect::<Vec<_>>()
-}
-
 #[cfg(test)]
 mod test_movement_arrow {
     use crate::domain::direction::Direction;
-    use crate::game::{calc_movement_path, path_to_arrows, Arrow};
+    use crate::game::{calc_movement_path, path_with_arrows, Arrow};
     use pretty_assertions::assert_eq;
     use shared::point::Point;
+
+    fn path_to_arrows(path: &Vec<Direction>) -> Vec<Arrow> {
+        path_with_arrows(path)
+            .into_iter()
+            .map(|(_, arrow)| arrow)
+            .collect::<Vec<_>>()
+    }
 
     #[test]
     fn no_path_for_origin() {
