@@ -3,7 +3,6 @@ use rand::distributions::uniform::{SampleBorrow, SampleUniform, UniformInt, Unif
 use rand::distributions::{Distribution, Standard};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Types //
@@ -78,8 +77,8 @@ impl Id {
     }
 }
 
-impl fmt::Display for Id {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl ToString for Id {
+    fn to_string(&self) -> String {
         let mut buf = String::new();
 
         for byte in self.bytes {
@@ -88,7 +87,7 @@ impl fmt::Display for Id {
             buf.push_str(hex.as_str());
         }
 
-        write!(f, "{}", buf)
+        buf
     }
 }
 

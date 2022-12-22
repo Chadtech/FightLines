@@ -15,6 +15,23 @@ impl Direction {
             Direction::West => Direction::East,
         }
     }
+
+    pub fn adjust_coord(&self, x: &mut u16, y: &mut u16) {
+        match self {
+            Direction::North => {
+                *y -= 1;
+            }
+            Direction::South => {
+                *y += 1;
+            }
+            Direction::East => {
+                *x += 1;
+            }
+            Direction::West => {
+                *x -= 1;
+            }
+        };
+    }
 }
 
 impl ToString for Direction {

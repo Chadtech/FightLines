@@ -18,6 +18,12 @@ impl UnitId {
         UnitId(id)
     }
 }
+impl ToString for UnitId {
+    fn to_string(&self) -> String {
+        self.0.to_string()
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum Unit {
     Infantry,

@@ -14,9 +14,8 @@ use shared::located::Located;
 use shared::point::Point;
 use shared::team_color::TeamColor;
 use shared::tile;
-use shared::unit;
 use shared::unit::{Unit, UnitId};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 ///////////////////////////////////////////////////////////////
 // Helpers //
@@ -48,10 +47,16 @@ pub struct Model {
     game_pos: Point<i16>,
     handle_minimum_framerate_timeout: CmdHandle,
     frame_count: FrameCount,
-    moved_units: HashSet<UnitId>,
-    moves: Vec<(UnitId, unit::action::Action)>,
+    moved_units: Vec<UnitId>,
+    moves_index: HashMap<UnitId, Action>,
     mouse_game_position: Option<Point<u32>>,
     stage: Stage,
+}
+
+impl Model {
+    fn get_units_move(&self, unit_id: &UnitId) -> Option<&Action> {
+        self.moves_index.get(unit_id)
+    }
 }
 
 enum Stage {
@@ -69,7 +74,15 @@ struct MovingUnitModel {
     arrows: Vec<(Direction, Arrow)>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
+enum Action {
+    TraveledTo {
+        dest: Located<()>,
+        arrows: Vec<(Direction, Arrow)>,
+    },
+}
+
+#[derive(PartialEq, Debug, Clone)]
 enum Arrow {
     EndLeft,
     EndDown,
@@ -139,8 +152,8 @@ pub fn init(
         },
         handle_minimum_framerate_timeout: wait_for_timeout(orders),
         frame_count: FrameCount::F1,
-        moved_units: HashSet::new(),
-        moves: Vec::new(),
+        moved_units: Vec::new(),
+        moves_index: HashMap::new(),
         mouse_game_position: None,
         stage: Stage::TakingTurn { mode: Mode::None },
     };
@@ -271,21 +284,28 @@ fn handle_click_on_screen_during_turn(
     match &mut model.stage {
         Stage::TakingTurn { mode } => match mode {
             Mode::None => handle_click_on_screen_when_no_mode(global, model, x, y),
-            Mode::MovingUnit(_) => handle_click_on_screen_when_move_mode(global, model),
+            Mode::MovingUnit(_) => {
+                if let Err((err_title, err_msg)) = handle_click_on_screen_when_move_mode(model) {
+                    global.toast(
+                        Toast::init("error", err_title.as_str())
+                            .error()
+                            .with_more_info(err_msg.as_str()),
+                    );
+                }
+            }
         },
     }
 }
 
-fn handle_click_on_screen_when_move_mode(global: &mut global::Model, model: &mut Model) {
+fn handle_click_on_screen_when_move_mode(model: &mut Model) -> Result<(), (String, String)> {
     if let Stage::TakingTurn {
         mode: Mode::MovingUnit(moving_model),
     } = &model.stage
     {
-        let unit_loc = model
-            .game
-            .units
-            .get(&moving_model.unit_id)
-            .expect("Could not find unit when moving unit SirttBHL");
+        let unit_loc = model.game.units.get(&moving_model.unit_id).ok_or((
+            "handle move click".to_string(),
+            "Could not find unit when moving unit SirttBHL".to_string(),
+        ))?;
 
         let pos = path_to_pos(
             &moving_model
@@ -303,21 +323,21 @@ fn handle_click_on_screen_when_move_mode(global: &mut global::Model, model: &mut
 
         let unit_id = moving_model.unit_id.clone();
 
-        model.moved_units.insert(unit_id.clone());
-        model
-            .moves
-            .push((unit_id, unit::action::Action::MovedTo(dest)));
+        model.moved_units.push(unit_id.clone());
+        model.moves_index.insert(
+            unit_id,
+            Action::TraveledTo {
+                dest,
+                arrows: moving_model.arrows.clone(),
+            },
+        );
 
         model.stage = Stage::TakingTurn { mode: Mode::None };
 
-        if let Err((err_title, err_msg)) = clear_mode_canvas(model) {
-            global.toast(
-                Toast::init("error", err_title.as_str())
-                    .error()
-                    .with_more_info(err_msg.as_str()),
-            );
-        }
+        clear_mode_canvas(model)?;
     }
+
+    Ok(())
 }
 
 fn handle_click_on_screen_when_no_mode(
@@ -373,11 +393,10 @@ fn handle_mouse_move_for_mode(
             Mode::None => {}
             Mode::MovingUnit(moving_model) => {
                 if moving_model.mobility.contains(&mouse_loc) {
-                    let unit_loc = model
-                        .game
-                        .units
-                        .get(&moving_model.unit_id)
-                        .expect("Could not find unit in moving model");
+                    let unit_loc = model.game.units.get(&moving_model.unit_id).ok_or((
+                        "handle mouse move in move mode".to_string(),
+                        "Could not find unit in moving model".to_string(),
+                    ))?;
 
                     let mouse_point = Point {
                         x: mouse_loc.x as i32 - unit_loc.x as i32,
@@ -425,11 +444,11 @@ fn draw(viewer_id: &Id, model: &Model) -> Result<(), (String, String)> {
 }
 
 fn clear_mode_canvas(model: &Model) -> Result<(), (String, String)> {
-    let canvas = model
-        .mode_canvas
-        .get()
-        // TODO turn 'expects' like this into real errors
-        .expect("could not get mode canvas element to clear");
+    let canvas = model.mode_canvas.get().ok_or((
+        "clear mode canvas".to_string(),
+        "could not get mode canvas element to clear".to_string(),
+    ))?;
+
     let ctx = seed::canvas_context_2d(&canvas);
 
     let width = model.game_pixel_width as f64;
@@ -442,10 +461,11 @@ fn clear_mode_canvas(model: &Model) -> Result<(), (String, String)> {
 }
 
 fn draw_mode_from_mouse_event(model: &Model) -> Result<(), (String, String)> {
-    let canvas = model
-        .mode_canvas
-        .get()
-        .expect("could not get mode canvas element");
+    let canvas = model.mode_canvas.get().ok_or((
+        "draw mode from mouse event".to_string(),
+        "could not get mode canvas element".to_string(),
+    ))?;
+
     let ctx = seed::canvas_context_2d(&canvas);
 
     let width = model.game_pixel_width as f64;
@@ -460,81 +480,78 @@ fn draw_mode_from_mouse_event(model: &Model) -> Result<(), (String, String)> {
             Mode::MovingUnit(moving_model) => {
                 for mobility_space in moving_model.mobility.iter() {
                     ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                    &model.assets.sheet,
-                    MISC_SPRITE_SHEET_COLUMN,
-                    48.0,
-                    tile::PIXEL_WIDTH_FL,
-                    tile::PIXEL_HEIGHT_FL,
-                    mobility_space.x as f64 * tile::PIXEL_WIDTH_FL,
-                    mobility_space.y as f64 * tile::PIXEL_HEIGHT_FL,
-                    tile::PIXEL_WIDTH_FL,
-                    tile::PIXEL_HEIGHT_FL,
-                )
-                .map_err(|_| {
-                    (
-                        "rendering mobility range".to_string(),
-                        "could not draw mobility image on canvas".to_string(),
+                        &model.assets.sheet,
+                        MISC_SPRITE_SHEET_COLUMN,
+                        48.0,
+                        tile::PIXEL_WIDTH_FL,
+                        tile::PIXEL_HEIGHT_FL,
+                        mobility_space.x as f64 * tile::PIXEL_WIDTH_FL,
+                        mobility_space.y as f64 * tile::PIXEL_HEIGHT_FL,
+                        tile::PIXEL_WIDTH_FL,
+                        tile::PIXEL_HEIGHT_FL,
                     )
-                })?;
+                    .map_err(|_| {
+                        (
+                            "rendering mobility range".to_string(),
+                            "could not draw mobility image on canvas".to_string(),
+                        )
+                    })?;
                 }
 
-                let unit = model
-                    .game
-                    .units
-                    .get(&moving_model.unit_id)
-                    .expect("Could not get unit in moving mode");
+                let unit = model.game.units.get(&moving_model.unit_id).ok_or((
+                    "rendering mobility range".to_string(),
+                    "Could not get unit in moving mode".to_string(),
+                ))?;
 
                 let mut arrow_x = unit.x;
                 let mut arrow_y = unit.y;
                 for (dir, arrow) in &moving_model.arrows {
-                    match dir {
-                        Direction::North => {
-                            arrow_y -= 1;
-                        }
-                        Direction::South => {
-                            arrow_y += 1;
-                        }
-                        Direction::East => {
-                            arrow_x += 1;
-                        }
-                        Direction::West => {
-                            arrow_x -= 1;
-                        }
-                    }
-
-                    let sheet_row = match arrow {
-                        Arrow::EndLeft => 96.0,
-                        Arrow::EndDown => 144.0,
-                        Arrow::EndRight => 64.0,
-                        Arrow::EndUp => 112.0,
-                        Arrow::X => 80.0,
-                        Arrow::Y => 128.0,
-                        Arrow::RightUp => 160.0,
-                        Arrow::RightDown => 176.0,
-                        Arrow::LeftUp => 192.0,
-                        Arrow::LeftDown => 208.0,
-                    };
-                    ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                    &model.assets.sheet,
-                    MISC_SPRITE_SHEET_COLUMN,
-                    sheet_row,
-                    tile::PIXEL_WIDTH_FL,
-                    tile::PIXEL_HEIGHT_FL,
-                    arrow_x as f64 * tile::PIXEL_WIDTH_FL,
-                    arrow_y as f64 * tile::PIXEL_HEIGHT_FL,
-                    tile::PIXEL_WIDTH_FL,
-                    tile::PIXEL_HEIGHT_FL,
-                )
-                .map_err(|_| {
-                    (
-                        "rendering mobility range".to_string(),
-                        "could not draw arrow image on canvas".to_string(),
-                    )
-                })?;
+                    draw_arrows(&ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y)
+                        .map_err(|err_msg| ("rendering mobility range".to_string(), err_msg))?;
                 }
             }
         },
     }
+
+    Ok(())
+}
+
+fn draw_arrows(
+    ctx: &web_sys::CanvasRenderingContext2d,
+    model: &Model,
+    arrow: &Arrow,
+    dir: &Direction,
+    arrow_x: &mut u16,
+    arrow_y: &mut u16,
+) -> Result<(), String> {
+    dir.adjust_coord(arrow_x, arrow_y);
+
+    let sheet_row = match arrow {
+        Arrow::EndLeft => 96.0,
+        Arrow::EndDown => 144.0,
+        Arrow::EndRight => 64.0,
+        Arrow::EndUp => 112.0,
+        Arrow::X => 80.0,
+        Arrow::Y => 128.0,
+        Arrow::RightUp => 160.0,
+        Arrow::RightDown => 176.0,
+        Arrow::LeftUp => 192.0,
+        Arrow::LeftDown => 208.0,
+    };
+
+    ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+        &model.assets.sheet,
+        MISC_SPRITE_SHEET_COLUMN,
+        sheet_row,
+        tile::PIXEL_WIDTH_FL,
+        tile::PIXEL_HEIGHT_FL,
+        *arrow_x as f64 * tile::PIXEL_WIDTH_FL,
+        *arrow_y as f64 * tile::PIXEL_HEIGHT_FL,
+        tile::PIXEL_WIDTH_FL,
+        tile::PIXEL_HEIGHT_FL,
+    )
+    .map_err(|_| "could not draw arrow image on canvas".to_string())?;
+
     Ok(())
 }
 
@@ -542,7 +559,7 @@ fn draw_cursor(model: &Model) -> Result<(), String> {
     let canvas = model
         .cursor_canvas
         .get()
-        .expect("could not get cursor canvas element");
+        .ok_or("could not get cursor canvas element".to_string())?;
     let ctx = seed::canvas_context_2d(&canvas);
 
     let width = model.game_pixel_width as f64;
@@ -573,7 +590,7 @@ fn draw_visibility(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(
     let canvas = model
         .visibility_canvas
         .get()
-        .expect("could not get visibility canvas element");
+        .ok_or("could not get visibility canvas element".to_string())?;
     let ctx = seed::canvas_context_2d(&canvas);
 
     let width = model.game_pixel_width as f64;
@@ -625,7 +642,7 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
     let canvas = model
         .units_canvas
         .get()
-        .expect("could not get units canvas element");
+        .ok_or("could not get units canvas element")?;
     let ctx = seed::canvas_context_2d(&canvas);
 
     let width = model.game_pixel_width as f64;
@@ -691,6 +708,19 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
                     tile::PIXEL_HEIGHT_FL,
                 )
                 .map_err(|_| "Could not draw unit outline image on canvas".to_string())?;
+
+                match model.get_units_move(unit_id) {
+                    None => {}
+                    Some(action) => match action {
+                        Action::TraveledTo { arrows, .. } => {
+                            let mut arrow_x = located_unit.x;
+                            let mut arrow_y = located_unit.y;
+                            for (dir, arrow) in arrows {
+                                draw_arrows(&ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y)?;
+                            }
+                        }
+                    },
+                }
             } else {
                 ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
                     sheet,
@@ -715,7 +745,7 @@ fn draw_terrain(model: &Model) -> Result<(), String> {
     let canvas = model
         .map_canvas
         .get()
-        .expect("could not get map canvas element");
+        .ok_or("could not get map canvas element")?;
     let ctx = seed::canvas_context_2d(&canvas);
 
     let width = model.game_pixel_width as f64;
