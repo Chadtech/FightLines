@@ -4,6 +4,7 @@ use crate::view::cell::Cell;
 use crate::web_sys::HtmlCanvasElement;
 use crate::{assets, global, Row, Style, Toast};
 use seed::app::CmdHandle;
+use seed::future::err;
 use seed::prelude::{cmds, el_ref, At, El, ElRef, IndexMap, Node, Orders, St, ToClasses, UpdateEl};
 use seed::{attrs, canvas, style, C};
 use shared::facing_direction::FacingDirection;
@@ -56,6 +57,12 @@ pub struct Model {
 impl Model {
     fn get_units_move(&self, unit_id: &UnitId) -> Option<&Action> {
         self.moves_index.get(unit_id)
+    }
+
+    fn clear_mode(&mut self) -> Result<(), String> {
+        self.stage = Stage::TakingTurn { mode: Mode::None };
+
+        clear_mode_canvas(self)
     }
 }
 
@@ -284,13 +291,30 @@ fn handle_click_on_screen_during_turn(
     match &mut model.stage {
         Stage::TakingTurn { mode } => match mode {
             Mode::None => handle_click_on_screen_when_no_mode(global, model, x, y),
-            Mode::MovingUnit(_) => {
-                if let Err((err_title, err_msg)) = handle_click_on_screen_when_move_mode(model) {
-                    global.toast(
-                        Toast::init("error", err_title.as_str())
-                            .error()
-                            .with_more_info(err_msg.as_str()),
-                    );
+            Mode::MovingUnit(moving_model) => {
+                let mouse_loc = Located {
+                    x: x as u16,
+                    y: y as u16,
+                    value: (),
+                };
+
+                if moving_model.mobility.contains(&mouse_loc) {
+                    if let Err((err_title, err_msg)) = handle_click_on_screen_when_move_mode(model)
+                    {
+                        global.toast(
+                            Toast::init("error", err_title.as_str())
+                                .error()
+                                .with_more_info(err_msg.as_str()),
+                        );
+                    }
+                } else {
+                    if let Err(err_msg) = model.clear_mode() {
+                        global.toast(
+                            Toast::init("error", "clear mode canvas")
+                                .error()
+                                .with_more_info(err_msg.as_str()),
+                        );
+                    };
                 }
             }
         },
@@ -316,8 +340,8 @@ fn handle_click_on_screen_when_move_mode(model: &mut Model) -> Result<(), (Strin
         );
 
         let dest = Located {
-            x: unit_loc.x + (pos.x as u16),
-            y: unit_loc.y + (pos.y as u16),
+            x: (((unit_loc.x as i32) + pos.x) as u16),
+            y: (((unit_loc.y as i32) + pos.y) as u16),
             value: (),
         };
 
@@ -332,9 +356,9 @@ fn handle_click_on_screen_when_move_mode(model: &mut Model) -> Result<(), (Strin
             },
         );
 
-        model.stage = Stage::TakingTurn { mode: Mode::None };
-
-        clear_mode_canvas(model)?;
+        model
+            .clear_mode()
+            .map_err(|msg| ("clear_mode_canvas".to_string(), msg))?;
     }
 
     Ok(())
@@ -443,11 +467,11 @@ fn draw(viewer_id: &Id, model: &Model) -> Result<(), (String, String)> {
     Ok(())
 }
 
-fn clear_mode_canvas(model: &Model) -> Result<(), (String, String)> {
-    let canvas = model.mode_canvas.get().ok_or((
-        "clear mode canvas".to_string(),
-        "could not get mode canvas element to clear".to_string(),
-    ))?;
+fn clear_mode_canvas(model: &Model) -> Result<(), String> {
+    let canvas = model
+        .mode_canvas
+        .get()
+        .ok_or("could not get mode canvas element to clear".to_string())?;
 
     let ctx = seed::canvas_context_2d(&canvas);
 
