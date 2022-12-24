@@ -45,8 +45,8 @@ enum Msg {
     Game(game::Msg),
 
     // Page Loads
-    LoadedLobby(Result<lobby::Flags, String>),
-    LoadedGame(Result<game::Flags, String>),
+    LoadedLobby(Box<Result<lobby::Flags, String>>),
+    LoadedGame(Box<Result<game::Flags, String>>),
     //
     UrlChanged(subs::UrlChanged),
     Global(global::Msg),
@@ -129,12 +129,14 @@ fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders
                                     }
                                 };
 
-                                Msg::LoadedLobby(result)
+                                Msg::LoadedLobby(Box::new(result))
                             }
                         });
                     }
 
-                    Err(_) => {}
+                    Err(_err) => {
+                        todo!("Handle this error somehow")
+                    }
                 }
             };
 
@@ -158,10 +160,7 @@ fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders
 
             match already_loaded_lobby {
                 Some(lobby) => {
-                    let flags = lobby::Flags {
-                        lobby_id: lobby_id,
-                        lobby,
-                    };
+                    let flags = lobby::Flags { lobby_id, lobby };
 
                     match lobby::Model::init(&model.global, flags, &mut orders.proxy(Msg::Lobby)) {
                         Err(error) => match error {
@@ -214,7 +213,7 @@ fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders
                                 }
                             };
 
-                            Msg::LoadedGame(result)
+                            Msg::LoadedGame(Box::new(result))
                         }
                     });
                     Page::Loading
@@ -281,7 +280,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                 );
             }
         }
-        Msg::LoadedLobby(result) => match result {
+        Msg::LoadedLobby(result) => match *result {
             Ok(flags) => {
                 match lobby::Model::init(&model.global, flags, &mut orders.proxy(Msg::Lobby)) {
                     Ok(sub_model) => {
@@ -321,7 +320,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
             }
         }
         Msg::Assets(_) => {}
-        Msg::LoadedGame(result) => match result {
+        Msg::LoadedGame(result) => match *result {
             Ok(flags) => {
                 let new_page = match game::init(&model.global, flags, &mut orders.proxy(Msg::Game))
                 {
@@ -410,7 +409,7 @@ fn view(model: &Model) -> Node<Msg> {
         C!["page-container"],
         style::global_html(),
         page_body.html(),
-        Toast::many_to_html(model.global.first_toast_hidden(), &model.global.toasts())
+        Toast::many_to_html(model.global.first_toast_hidden(), model.global.toasts())
             .map_msg(Msg::Toast),
         assets::view().map_msg(Msg::Assets).html(),
     ]

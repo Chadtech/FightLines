@@ -105,7 +105,7 @@ impl Toast {
             )
     }
 
-    pub fn many_to_html(hide_first: bool, toasts: &Vec<Toast>) -> Node<Msg> {
+    pub fn many_to_html(hide_first: bool, toasts: &[Toast]) -> Node<Msg> {
         let mut element: El<Msg> = El::empty(Tag::Custom(Cow::Borrowed("toasts")));
 
         if let Some((first, rest)) = toasts.split_first() {

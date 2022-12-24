@@ -44,7 +44,7 @@ pub fn fetch_error_to_string(error: FetchError) -> String {
 
             js_value
                 .as_string()
-                .unwrap_or("Json error that could not be unwrapped".to_string())
+                .unwrap_or_else(|| "Json error that could not be unwrapped".to_string())
         }
     }
 }

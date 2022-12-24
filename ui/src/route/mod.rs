@@ -20,11 +20,11 @@ pub enum Route {
 // HELPERS //
 ////////////////////////////////////////////////////////////////
 
-const LOBBY: &'static str = "lobby";
+const LOBBY: &str = "lobby";
 
-const KICKED: &'static str = "kicked";
+const KICKED: &str = "kicked";
 
-const GAME: &'static str = "game";
+const GAME: &str = "game";
 
 ////////////////////////////////////////////////////////////////
 // API //

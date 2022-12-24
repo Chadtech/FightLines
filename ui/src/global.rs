@@ -200,7 +200,7 @@ fn get_viewer_id(rand_gen: &mut RandGen) -> Id {
 
     let new_viewer_id: Id = Id::new(rand_gen);
 
-    viewer_id_result.unwrap_or_else(|_err| new_viewer_id)
+    viewer_id_result.unwrap_or(new_viewer_id)
 }
 
 ///////////////////////////////////////////////////////////////

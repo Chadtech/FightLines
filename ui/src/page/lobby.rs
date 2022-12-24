@@ -44,7 +44,7 @@ struct HostModel {
 pub enum Msg {
     ClickedAddSlot,
     ClickedCloseSlot,
-    UpdatedLobby(Result<lobby_update::Response, String>),
+    UpdatedLobby(Box<Result<lobby_update::Response, String>>),
     UpdatedNameField(String),
     UpdatedGameNameField(String),
     ClickedSaveGameName,
@@ -54,8 +54,8 @@ pub enum Msg {
 
     //
     PollTimeoutExpired,
-    GotLobbyResponse(Result<lobby_get::Response, String>),
-    StartedGame(Result<lobby_start::Response, String>),
+    GotLobbyResponse(Box<Result<lobby_get::Response, String>>),
+    StartedGame(Box<Result<lobby_start::Response, String>>),
 }
 
 #[derive(Clone, Debug)]
@@ -169,11 +169,11 @@ pub fn update(
                 );
             }
         }
-        Msg::UpdatedLobby(result) => match result {
+        Msg::UpdatedLobby(result) => match *result {
             Ok(res) => {
                 let lobby = res.get_lobby();
 
-                handle_updated_lobby(&global, model, &lobby, orders);
+                handle_updated_lobby(global, model, &lobby, orders);
             }
             Err(error) => global.toast(
                 Toast::init("error", "could not load lobby")
@@ -260,17 +260,17 @@ pub fn update(
                         Err(error) => Err(core_ext::http::fetch_error_to_string(error)),
                     };
 
-                    Msg::GotLobbyResponse(result)
+                    Msg::GotLobbyResponse(Box::new(result))
                 }
             });
         }
-        Msg::GotLobbyResponse(result) => match result {
+        Msg::GotLobbyResponse(result) => match *result {
             Ok(res) => {
                 model.load_failure_retries = 0;
 
                 let lobby = res.get_lobby();
 
-                handle_updated_lobby(&global, model, &lobby, orders);
+                handle_updated_lobby(global, model, &lobby, orders);
             }
             Err(error) => {
                 model.load_failure_retries += 1;
@@ -283,7 +283,7 @@ pub fn update(
                 )
             }
         },
-        Msg::StartedGame(result) => match result {
+        Msg::StartedGame(result) => match *result {
             Ok(res) => {
                 model.created_game = Some(res.game);
 
@@ -327,7 +327,7 @@ fn attempt_start_game(
                                 Err(error) => Err(core_ext::http::fetch_error_to_string(error)),
                             };
 
-                            Msg::StartedGame(result)
+                            Msg::StartedGame(Box::new(result))
                         }
                     });
                 }
@@ -352,8 +352,7 @@ fn attempt_start_game(
                     required_player_count,
                     found_player_count: _,
                 } => "could not start game, map requires ${required} players"
-                    .replace("${required}", required_player_count.to_string().as_str())
-                    .to_string(),
+                    .replace("${required}", required_player_count.to_string().as_str()),
             };
 
             global.toast(Toast::init("error", text.as_str()).error());
@@ -386,7 +385,7 @@ fn send_updates(
     orders: &mut impl Orders<Msg>,
 ) {
     let req = lobby_update::Request {
-        lobby_id: lobby_id.clone(),
+        lobby_id,
         updates: upts,
     };
 
@@ -404,7 +403,7 @@ fn send_updates(
                         }
                     };
 
-                    Msg::UpdatedLobby(result)
+                    Msg::UpdatedLobby(Box::new(result))
                 }
             });
         }
@@ -435,7 +434,7 @@ pub fn view(global: &global::Model, model: &Model) -> Vec<Row<Msg>> {
 
     rows.push(center(host_card(viewer_is_host, model)));
 
-    for (guest_id, guest) in guests.into_iter() {
+    for (guest_id, guest) in guests.iter() {
         let guest_row = center(guest_card(
             global.viewer_id(),
             guest_id.clone(),
@@ -549,7 +548,7 @@ pub fn guest_card(
     let guest_is_viewer = viewer_id == guest_id;
 
     let name_row = if guest_is_viewer {
-        name_field(user_name_field, &initial_user_name_field)
+        name_field(user_name_field, initial_user_name_field)
     } else {
         let remove_player_button = if viewer_is_host {
             Button::destructive("kick")
@@ -588,7 +587,7 @@ fn name_field(field: &String, initial_name: &String) -> Row<Msg> {
     Row::from_cells(
         vec![Style::G4],
         vec![
-            TextField::simple(field.as_str(), |event| Msg::UpdatedNameField(event)).cell(),
+            TextField::simple(field.as_str(), Msg::UpdatedNameField).cell(),
             Button::simple("save")
                 .disable(!can_save_name_field(field, initial_name))
                 .on_click(|_| Msg::ClickedSavePlayerName)

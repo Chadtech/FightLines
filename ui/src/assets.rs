@@ -19,13 +19,15 @@ pub enum Msg {}
 // INIT //
 ///////////////////////////////////////////////////////////////
 
-const SHEET_HTML_ID: &'static str = "sheet";
-const SHEET_FLIPPED_HTML_ID: &'static str = "sheet-flipped";
+const SHEET_HTML_ID: &str = "sheet";
+const SHEET_FLIPPED_HTML_ID: &str = "sheet-flipped";
 
 pub fn init() -> Result<Model, String> {
-    let window = web_sys::window().ok_or("Cannot find window".to_string())?;
+    let window = web_sys::window().ok_or_else(|| "Cannot find window".to_string())?;
 
-    let doc = window.document().ok_or("Cannot get document".to_string())?;
+    let doc = window
+        .document()
+        .ok_or_else(|| "Cannot get document".to_string())?;
 
     let sheet = {
         match doc.get_element_by_id(SHEET_HTML_ID) {

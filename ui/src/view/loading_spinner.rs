@@ -16,7 +16,7 @@ impl LoadingSpinner {
     }
 }
 
-const TAG_NAME: &'static str = "spinner";
+const TAG_NAME: &str = "spinner";
 
 const SPINNER_STYLES: [Style; 4] = [Style::BgContent4, Style::Absolute, Style::W7, HEIGHT_STYLE];
 

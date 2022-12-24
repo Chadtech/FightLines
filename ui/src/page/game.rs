@@ -128,8 +128,8 @@ pub fn init(
 ) -> Result<Model, String> {
     let window_size = global.window_size();
 
-    let game_pixel_width = (flags.game.map.width.clone() as u16) * tile::PIXEL_WIDTH;
-    let game_pixel_height = (flags.game.map.height.clone() as u16) * tile::PIXEL_HEIGHT;
+    let game_pixel_width = (flags.game.map.width as u16) * tile::PIXEL_WIDTH;
+    let game_pixel_height = (flags.game.map.height as u16) * tile::PIXEL_HEIGHT;
 
     let mut game_x = window_size.width / 2.0;
     game_x -= (game_pixel_width as f64) / 2.0;
@@ -191,7 +191,7 @@ pub fn update(
         Msg::RenderedFirstTime => {
             let viewer_id = global.viewer_id();
 
-            if let Err(err) = draw_terrain(&model) {
+            if let Err(err) = draw_terrain(model) {
                 global.toast(
                     Toast::init("error", "map rendering problem")
                         .error()
@@ -199,7 +199,7 @@ pub fn update(
                 );
             }
 
-            if let Err((err_title, err_detail)) = draw(&viewer_id, &model) {
+            if let Err((err_title, err_detail)) = draw(&viewer_id, model) {
                 global.toast(
                     Toast::init("error", err_title.as_str())
                         .error()
@@ -245,7 +245,7 @@ pub fn update(
                 })
             };
 
-            let draw_result = draw_cursor(&model);
+            let draw_result = draw_cursor(model);
 
             if let Err(err_msg) = draw_result {
                 global.toast(
@@ -260,7 +260,7 @@ pub fn update(
 
             let viewer_id = global.viewer_id();
 
-            if let Err((err_title, err_detail)) = draw(&viewer_id, &model) {
+            if let Err((err_title, err_detail)) = draw(&viewer_id, model) {
                 global.toast(
                     Toast::init("error", err_title.as_str())
                         .error()
@@ -306,14 +306,12 @@ fn handle_click_on_screen_during_turn(
                                 .with_more_info(err_msg.as_str()),
                         );
                     }
-                } else {
-                    if let Err(err_msg) = model.clear_mode() {
-                        global.toast(
-                            Toast::init("error", "clear mode canvas")
-                                .error()
-                                .with_more_info(err_msg.as_str()),
-                        );
-                    };
+                } else if let Err(err_msg) = model.clear_mode() {
+                    global.toast(
+                        Toast::init("error", "clear mode canvas")
+                            .error()
+                            .with_more_info(err_msg.as_str()),
+                    );
                 }
             }
         },
@@ -457,10 +455,10 @@ fn draw(viewer_id: &Id, model: &Model) -> Result<(), (String, String)> {
         .get_players_visibility(viewer_id)
         .map_err(|err_msg| ("visibility rendering problem".to_string(), err_msg))?;
 
-    draw_units(visibility, &model)
+    draw_units(visibility, model)
         .map_err(|err_msg| ("units rendering problem".to_string(), err_msg))?;
 
-    draw_visibility(visibility, &model)
+    draw_visibility(visibility, model)
         .map_err(|err_msg| ("visibility rendering problem".to_string(), err_msg))?;
 
     Ok(())
@@ -470,7 +468,7 @@ fn clear_mode_canvas(model: &Model) -> Result<(), String> {
     let canvas = model
         .mode_canvas
         .get()
-        .ok_or("could not get mode canvas element to clear".to_string())?;
+        .ok_or_else(|| "could not get mode canvas element to clear".to_string())?;
 
     let ctx = seed::canvas_context_2d(&canvas);
 
@@ -587,7 +585,7 @@ fn draw_cursor(model: &Model) -> Result<(), String> {
     let canvas = model
         .cursor_canvas
         .get()
-        .ok_or("could not get cursor canvas element".to_string())?;
+        .ok_or_else(|| "could not get cursor canvas element".to_string())?;
     let ctx = seed::canvas_context_2d(&canvas);
 
     let width = model.game_pixel_width as f64;
@@ -618,7 +616,7 @@ fn draw_visibility(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(
     let canvas = model
         .visibility_canvas
         .get()
-        .ok_or("could not get visibility canvas element".to_string())?;
+        .ok_or_else(|| "could not get visibility canvas element".to_string())?;
     let ctx = seed::canvas_context_2d(&canvas);
 
     let width = model.game_pixel_width as f64;
@@ -883,7 +881,7 @@ fn game_canvas(model: &Model, r: &ElRef<HtmlCanvasElement>) -> Node<Msg> {
             St::Left => px_i16(model.game_pos.x).as_str(),
             St::Top => px_i16(model.game_pos.y).as_str()
         },
-        el_ref(&r)
+        el_ref(r)
     ]
 }
 
@@ -1030,7 +1028,7 @@ fn calc_movement_path(
             if existing_path.len() > range_limit {
                 calc_movement_path(mouse_pos, None, range_limit)
             } else {
-                let new_origin = path_to_pos(&existing_path);
+                let new_origin = path_to_pos(existing_path);
                 let mut ret = existing_path.clone();
 
                 let new_mouse_pos = Point {
@@ -1108,28 +1106,25 @@ fn path_to_positions(path: &Vec<Direction>) -> Vec<Point<i32>> {
             }
         }
 
-        ret.push(Point {
-            x: x.clone(),
-            y: y.clone(),
-        });
+        ret.push(Point { x, y });
     }
 
     ret
 }
 
-fn path_with_arrows(path: &Vec<Direction>) -> Vec<(Direction, Arrow)> {
-    let mut filtered_path = path.into_iter().collect::<Vec<_>>();
+fn path_with_arrows(path: &[Direction]) -> Vec<(Direction, Arrow)> {
+    let mut filtered_path = path.iter().collect::<Vec<_>>();
 
     let mut index = 0;
     while index < filtered_path.len() {
-        let dir = path[index.clone()].clone();
-        if let Some(next) = path.get(index.clone() + 1) {
+        let dir = path[index].clone();
+        if let Some(next) = path.get(index + 1) {
             if dir == next.opposite() {
                 if (index + 1) < filtered_path.len() {
-                    filtered_path.remove(index.clone() + 1);
+                    filtered_path.remove(index + 1);
                 }
 
-                filtered_path.remove(index.clone());
+                filtered_path.remove(index);
 
                 index = 0;
             }

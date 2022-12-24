@@ -1,6 +1,5 @@
 use crate::route;
 use crate::style::Style;
-use crate::view::button::Click::NoClick;
 use crate::view::cell::Cell;
 use crate::view::text::text;
 use seed::dom_entity_names::Tag;
@@ -16,7 +15,7 @@ use web_sys::MouseEvent;
 
 pub struct Button<Msg: 'static> {
     label: String,
-    on_click: Click<Msg>,
+    on_click: Option<Click<Msg>>,
     active: bool,
     variant: Variant,
     full_width: bool,
@@ -30,7 +29,6 @@ enum Variant {
 }
 
 enum Click<Msg> {
-    NoClick,
     Handler(Rc<dyn Fn(MouseEvent) -> Msg>),
     Route(route::Route),
 }
@@ -68,7 +66,7 @@ impl<Msg: 'static> Button<Msg> {
     fn from_variant(label: &str, variant: Variant) -> Button<Msg> {
         Button {
             label: label.to_string(),
-            on_click: NoClick,
+            on_click: None,
             active: false,
             variant,
             full_width: false,
@@ -105,11 +103,11 @@ impl<Msg: 'static> Button<Msg> {
         mut self,
         msg: impl FnOnce(MouseEvent) -> Msg + Clone + 'static,
     ) -> Button<Msg> {
-        self.on_click = Click::Handler(Rc::new(move |event| msg.clone()(event)));
+        self.on_click = Some(Click::Handler(Rc::new(move |event| msg.clone()(event))));
         self
     }
     pub fn route(mut self, route: route::Route) -> Button<Msg> {
-        self.on_click = Click::Route(route);
+        self.on_click = Some(Click::Route(route));
         self
     }
     pub fn cell(self) -> Cell<Msg> {
@@ -117,7 +115,7 @@ impl<Msg: 'static> Button<Msg> {
     }
     pub fn html(self) -> Node<Msg> {
         let tag = match self.on_click {
-            Click::Route(_) => "a",
+            Some(Click::Route(_)) => "a",
             _ => "button",
         };
 
@@ -145,14 +143,15 @@ impl<Msg: 'static> Button<Msg> {
 
         element.children.push(text(self.label.as_str()));
 
-        match self.on_click {
-            Click::Handler(on_click) => {
-                element.add_event_handler(mouse_ev(Ev::Click, move |event| on_click(event)));
+        if let Some(on_click) = self.on_click {
+            match on_click {
+                Click::Handler(on_click_fn) => {
+                    element.add_event_handler(mouse_ev(Ev::Click, move |event| on_click_fn(event)));
+                }
+                Click::Route(route) => {
+                    element.add_attr(Cow::Borrowed("href"), route.to_string());
+                }
             }
-            Click::Route(route) => {
-                element.add_attr(Cow::Borrowed("href"), route.to_string());
-            }
-            NoClick => {}
         }
 
         Node::Element(element)
