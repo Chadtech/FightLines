@@ -12,6 +12,8 @@
   --batch \
     ./shared/src/sprites/infantry_red_moved.aseprite \
     ./shared/src/sprites/infantry_blue_moved.aseprite \
+    ./shared/src/sprites/tank_red_moved.aseprite \
+    ./shared/src/sprites/tank_blue_moved.aseprite \
   --sheet ./shared/src/sprites/unit_moved_sheet.png
 
 # Misc

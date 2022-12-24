@@ -4,7 +4,6 @@ use crate::view::cell::Cell;
 use crate::web_sys::HtmlCanvasElement;
 use crate::{assets, global, Row, Style, Toast};
 use seed::app::CmdHandle;
-use seed::future::err;
 use seed::prelude::{cmds, el_ref, At, El, ElRef, IndexMap, Node, Orders, St, ToClasses, UpdateEl};
 use seed::{attrs, canvas, style, C};
 use shared::facing_direction::FacingDirection;
@@ -698,8 +697,10 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
                 FacingDirection::Right => &model.assets.sheet,
             };
 
+            let has_moved = model.moved_units.contains(unit_id);
+
             let (sx, sy) = {
-                let sx = {
+                let mut sx = {
                     let sprite_sheet_x = match model.frame_count {
                         FrameCount::F1 => 0.0,
                         FrameCount::F2 => 1.0,
@@ -711,6 +712,17 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
                         FacingDirection::Right => sprite_sheet_x,
                     }
                 };
+
+                if has_moved {
+                    match unit_model.facing {
+                        FacingDirection::Left => {
+                            sx -= 4.0;
+                        }
+                        FacingDirection::Right => {
+                            sx += 4.0;
+                        }
+                    }
+                }
 
                 let mut sy = match unit_model.unit {
                     Unit::Infantry => 0.0,
@@ -724,10 +736,10 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
                 (sx * tile::PIXEL_WIDTH_FL, sy * tile::PIXEL_WIDTH_FL)
             };
 
-            if model.moved_units.contains(unit_id) {
+            if has_moved {
                 ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                    &model.assets.sheet,
-                    sx + 64.0,
+                    sheet,
+                    sx,
                     sy,
                     tile::PIXEL_WIDTH_FL,
                     tile::PIXEL_HEIGHT_FL,
