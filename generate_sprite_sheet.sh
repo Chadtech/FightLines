@@ -31,6 +31,16 @@
     ./shared/src/sprites/arrow_right_turn_down.aseprite \
     ./shared/src/sprites/arrow_left_turn_up.aseprite \
     ./shared/src/sprites/arrow_left_turn_down.aseprite \
+    ./shared/src/sprites/arrow_right_moved.aseprite \
+    ./shared/src/sprites/arrow_x_moved.aseprite \
+    ./shared/src/sprites/arrow_left_moved.aseprite \
+    ./shared/src/sprites/arrow_up_moved.aseprite \
+    ./shared/src/sprites/arrow_y_moved.aseprite \
+    ./shared/src/sprites/arrow_down_moved.aseprite \
+    ./shared/src/sprites/arrow_right_turn_up_moved.aseprite \
+    ./shared/src/sprites/arrow_right_turn_down_moved.aseprite \
+    ./shared/src/sprites/arrow_left_turn_up_moved.aseprite \
+    ./shared/src/sprites/arrow_left_turn_down_moved.aseprite \
   --sheet ./shared/src/sprites/misc_sheet.png
 
 /Applications/Aseprite.app/Contents/MacOS/aseprite \

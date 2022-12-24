@@ -506,7 +506,7 @@ fn draw_mode_from_mouse_event(model: &Model) -> Result<(), (String, String)> {
                 let mut arrow_x = unit.x;
                 let mut arrow_y = unit.y;
                 for (dir, arrow) in &moving_model.arrows {
-                    draw_arrows(&ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y)
+                    draw_arrows(&ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y, false)
                         .map_err(|err_msg| ("rendering mobility range".to_string(), err_msg))?;
                 }
             }
@@ -523,10 +523,11 @@ fn draw_arrows(
     dir: &Direction,
     arrow_x: &mut u16,
     arrow_y: &mut u16,
+    moved: bool,
 ) -> Result<(), String> {
     dir.adjust_coord(arrow_x, arrow_y);
 
-    let sheet_row = match arrow {
+    let mut sheet_row = match arrow {
         Arrow::EndLeft => 96.0,
         Arrow::EndDown => 144.0,
         Arrow::EndRight => 64.0,
@@ -538,6 +539,10 @@ fn draw_arrows(
         Arrow::LeftUp => 192.0,
         Arrow::LeftDown => 208.0,
     };
+
+    if moved {
+        sheet_row += 160.0;
+    }
 
     ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
         &model.assets.sheet,
@@ -716,7 +721,15 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
                             let mut arrow_x = located_unit.x;
                             let mut arrow_y = located_unit.y;
                             for (dir, arrow) in arrows {
-                                draw_arrows(&ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y)?;
+                                draw_arrows(
+                                    &ctx,
+                                    model,
+                                    arrow,
+                                    dir,
+                                    &mut arrow_x,
+                                    &mut arrow_y,
+                                    true,
+                                )?;
                             }
                         }
                     },
