@@ -39,14 +39,14 @@ pub async fn handle(
 
     let games = data.games.lock().unwrap();
 
-    let mut game: Game = match games.get_game(game_id.clone()) {
+    let mut game: Game = match games.get_game(game_id) {
         Some(game) => game,
         None => {
             return HttpResponse::NotFound().body("game does not exist");
         }
     };
 
-    if let Err(err) = game.set_turn(player_id.clone(), req.moves) {
+    if let Err(err) = game.set_turn(player_id, req.moves) {
         return HttpResponse::BadRequest().body(err);
     };
 

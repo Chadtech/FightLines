@@ -113,7 +113,7 @@ pub enum FromLobbyError {
 
 impl Game {
     pub fn set_turn(&mut self, player_id: Id, moves: Vec<Action>) -> Result<(), String> {
-        return if player_id == self.host_id {
+        if player_id == self.host_id {
             match self.hosts_turn {
                 Turn::Waiting => {
                     self.hosts_turn = Turn::Turn { moves };
@@ -152,7 +152,7 @@ impl Game {
                 "Game does not have guest {}",
                 player_id.to_string()
             ))
-        };
+        }
     }
     pub fn from_lobby(lobby: Lobby, rng: &mut RandGen) -> Result<Game, FromLobbyError> {
         let num_players = lobby.num_players();
