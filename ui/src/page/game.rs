@@ -1,21 +1,23 @@
-use crate::domain::direction::Direction;
 use crate::view::button::Button;
 use crate::view::card::Card;
 use crate::view::cell::Cell;
 use crate::web_sys::HtmlCanvasElement;
-use crate::{assets, global, Row, Style, Toast};
+use crate::{api, assets, core_ext, global, Row, Style, Toast};
 use seed::app::CmdHandle;
 use seed::prelude::{cmds, el_ref, At, El, ElRef, IndexMap, Node, Orders, St, ToClasses, UpdateEl};
-use seed::{attrs, canvas, log, style, C};
+use seed::{attrs, canvas, style, C};
+use shared::api::endpoint::Endpoint;
+use shared::api::game::submit_turn;
+use shared::direction::Direction;
 use shared::facing_direction::FacingDirection;
 use shared::frame_count::FrameCount;
-use shared::game::Game;
+use shared::game::{Game, GameId};
 use shared::id::Id;
 use shared::located::Located;
 use shared::point::Point;
 use shared::team_color::TeamColor;
-use shared::tile;
 use shared::unit::{Unit, UnitId};
+use shared::{game, tile};
 use std::collections::{HashMap, HashSet};
 
 ///////////////////////////////////////////////////////////////
@@ -36,7 +38,7 @@ const MIN_RENDER_TIME: u32 = 256;
 
 pub struct Model {
     game: Game,
-    game_id: Id,
+    game_id: GameId,
     map_canvas: ElRef<HtmlCanvasElement>,
     units_canvas: ElRef<HtmlCanvasElement>,
     visibility_canvas: ElRef<HtmlCanvasElement>,
@@ -102,7 +104,7 @@ struct MovingUnitModel {
 #[derive(PartialEq, Debug, Clone)]
 enum Action {
     TraveledTo {
-        dest: Located<()>,
+        path: Vec<Located<Direction>>,
         arrows: Vec<(Direction, Arrow)>,
     },
 }
@@ -131,6 +133,7 @@ pub enum Msg {
     ClickedSubmitTurn,
     ClickedSubmitTurnConfirm,
     ClickedCancelSubmitTurn,
+    GotTurnSubmitResponse(Box<Result<submit_turn::Response, String>>),
 }
 
 ///////////////////////////////////////////////////////////////
@@ -140,7 +143,7 @@ pub enum Msg {
 #[derive(Clone)]
 pub struct Flags {
     pub game: Game,
-    pub game_id: Id,
+    pub game_id: GameId,
 }
 
 pub fn init(
@@ -293,22 +296,59 @@ pub fn update(
         }
         Msg::ClickedSubmitTurn => {
             if model.all_units_moved(global.viewer_id()) {
-                submit_turn(model);
+                submit_turn(global, model, orders);
             } else {
                 model.dialog = Some(Dialog::ConfirmTurnSubmit)
             }
         }
         Msg::ClickedSubmitTurnConfirm => {
-            submit_turn(model);
+            submit_turn(global, model, orders);
         }
         Msg::ClickedCancelSubmitTurn => {
             model.dialog = None;
         }
+        Msg::GotTurnSubmitResponse(_) => {}
     }
 }
 
-fn submit_turn(model: &mut Model) {
+fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl Orders<Msg>) {
     model.dialog = None;
+
+    let req_moves: Vec<game::Action> = model
+        .moves_index
+        .iter()
+        .map(|(unit_id, action)| match action {
+            Action::TraveledTo { path, .. } => game::Action::Traveled {
+                unit_id: unit_id.clone(),
+                path: path.clone(),
+            },
+        })
+        .collect();
+
+    let req: submit_turn::Request = submit_turn::Request::init(req_moves);
+
+    let url = Endpoint::submit_turn(model.game_id.clone(), global.viewer_id());
+
+    match req.to_bytes() {
+        Ok(bytes) => orders.skip().perform_cmd({
+            async {
+                let result = match api::post(url, bytes).await {
+                    Ok(res_bytes) => {
+                        submit_turn::Response::from_bytes(res_bytes).map_err(|err| err.to_string())
+                    }
+                    Err(error) => {
+                        let fetch_error = core_ext::http::fetch_error_to_string(error);
+                        Err(fetch_error)
+                    }
+                };
+
+                Msg::GotTurnSubmitResponse(Box::new(result))
+            }
+        }),
+        Err(_err) => {
+            todo!("Handle this error")
+        }
+    };
 }
 
 fn handle_click_on_screen_during_turn(
@@ -366,19 +406,20 @@ fn handle_click_on_screen_when_move_mode(model: &mut Model) -> Result<(), (Strin
             "Could not find unit when moving unit SirttBHL".to_string(),
         ))?;
 
-        let pos = path_to_pos(
-            &moving_model
-                .arrows
-                .iter()
-                .map(|(dir, _)| dir.clone())
-                .collect::<Vec<_>>(),
-        );
+        let mut path: Vec<Located<Direction>> = Vec::new();
 
-        let dest = Located {
-            x: (((unit_loc.x as i32) + pos.x) as u16),
-            y: (((unit_loc.y as i32) + pos.y) as u16),
-            value: (),
-        };
+        let mut pos_x: u16 = unit_loc.x;
+        let mut pos_y: u16 = unit_loc.y;
+
+        for (dir, _) in &moving_model.arrows {
+            path.push(Located {
+                x: pos_x,
+                y: pos_y,
+                value: dir.clone(),
+            });
+
+            dir.adjust_coord(&mut pos_x, &mut pos_y);
+        }
 
         let unit_id = moving_model.unit_id.clone();
 
@@ -386,7 +427,7 @@ fn handle_click_on_screen_when_move_mode(model: &mut Model) -> Result<(), (Strin
         model.moves_index.insert(
             unit_id,
             Action::TraveledTo {
-                dest,
+                path,
                 arrows: moving_model.arrows.clone(),
             },
         );
@@ -997,7 +1038,7 @@ fn dialog_view(model: &Model) -> Cell<Msg> {
                         Style::BgBackDrop,
                     ],
                     vec![Cell::group(
-                        vec![Style::Absolute, Style::AbsoluteCenter],
+                        vec![Style::AbsoluteCenter],
                         vec![Card::cell_from_rows(
                             vec![Style::G4, Style::FlexCol],
                             vec![
@@ -1289,9 +1330,9 @@ fn path_with_arrows(path: &[Direction]) -> Vec<(Direction, Arrow)> {
 
 #[cfg(test)]
 mod test_movement_arrow {
-    use crate::domain::direction::Direction;
     use crate::game::{calc_movement_path, path_with_arrows, Arrow};
     use pretty_assertions::assert_eq;
+    use shared::direction::Direction;
     use shared::point::Point;
 
     fn path_to_arrows(path: &Vec<Direction>) -> Vec<Arrow> {

@@ -1,12 +1,42 @@
 use crate::id::Id;
 use crate::name::Name;
 use crate::player::Player;
+use crate::rng::RandGen;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Types //
 ////////////////////////////////////////////////////////////////////////////////
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Debug)]
+pub struct LobbyId(Id);
+
+impl ToString for LobbyId {
+    fn to_string(&self) -> String {
+        self.0.to_string()
+    }
+}
+
+impl LobbyId {
+    // When a lobby becomes a game, we reuse the id, so a lobby
+    // id needs to transform into a game id
+    // - Chad Dec 25 2022 (merry christmas!)
+    pub fn ambiguate(&self) -> Id {
+        self.0.clone()
+    }
+
+    pub fn from_int_test_only(n: u8) -> LobbyId {
+        LobbyId(Id::from_int_test_only(n))
+    }
+
+    pub fn from_string(s: String) -> Option<LobbyId> {
+        Id::from_string(s).map(LobbyId)
+    }
+
+    pub fn new(rng: &mut RandGen) -> LobbyId {
+        LobbyId(Id::new(rng))
+    }
+}
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct Lobby {

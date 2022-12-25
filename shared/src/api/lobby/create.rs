@@ -1,5 +1,5 @@
 use crate::id::Id;
-use crate::lobby::Lobby;
+use crate::lobby::{Lobby, LobbyId};
 use crate::name::Name;
 use serde::{Deserialize, Serialize};
 
@@ -35,12 +35,12 @@ impl Request {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Response {
-    pub lobby_id: Id,
+    pub lobby_id: LobbyId,
     pub lobby: Lobby,
 }
 
 impl Response {
-    pub fn init(lobby_id: Id, lobby: Lobby) -> Response {
+    pub fn init(lobby_id: LobbyId, lobby: Lobby) -> Response {
         Response { lobby_id, lobby }
     }
 
@@ -57,7 +57,7 @@ impl Response {
 mod test_create_lobby {
     use crate::api::lobby::create::Response;
     use crate::id::Id;
-    use crate::lobby::Lobby;
+    use crate::lobby::{Lobby, LobbyId};
     use crate::name::Name;
     use crate::player::Player;
     use crate::team_color::TeamColor;
@@ -65,7 +65,7 @@ mod test_create_lobby {
 
     #[test]
     fn response_encodes_and_decodes() -> Result<(), String> {
-        let lobby_id = Id::from_int_test_only(0);
+        let lobby_id = LobbyId::from_int_test_only(0);
 
         let host_name = Name::from_str("host").map_err(|err| err.to_string())?;
 

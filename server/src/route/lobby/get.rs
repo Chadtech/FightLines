@@ -2,10 +2,10 @@ use actix_web::{web, HttpResponse};
 
 use crate::model::Model;
 use shared::api::lobby::get::Response;
-use shared::id::Id;
+use shared::lobby::LobbyId;
 
 pub async fn handle(data: web::Data<Model>, url_id: web::Path<(String,)>) -> HttpResponse {
-    match Id::from_string(url_id.into_inner().0) {
+    match LobbyId::from_string(url_id.into_inner().0) {
         Some(lobby_id) => {
             let lobbies = data.lobbies.lock().unwrap();
 

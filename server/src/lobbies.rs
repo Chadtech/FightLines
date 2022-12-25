@@ -1,5 +1,4 @@
-use shared::id::Id;
-use shared::lobby::Lobby;
+use shared::lobby::{Lobby, LobbyId};
 use shared::rng::{RandGen, RandSeed};
 use std::collections::HashMap;
 
@@ -8,7 +7,7 @@ use std::collections::HashMap;
 ////////////////////////////////////////////////////////////////////////////////
 
 pub struct Lobbies {
-    lobbies: HashMap<Id, Lobby>,
+    lobbies: HashMap<LobbyId, Lobby>,
     random_seed: RandSeed,
 }
 
@@ -24,18 +23,18 @@ impl Lobbies {
         }
     }
 
-    pub fn get_lobby(&self, id: Id) -> Option<Lobby> {
+    pub fn get_lobby(&self, id: LobbyId) -> Option<Lobby> {
         self.lobbies.get(&id).cloned()
     }
 
-    pub fn upsert(&mut self, id: Id, lobby: Lobby) {
+    pub fn upsert(&mut self, id: LobbyId, lobby: Lobby) {
         self.lobbies.insert(id, lobby);
     }
 
-    pub fn new_lobby(&mut self, lobby: Lobby) -> Id {
+    pub fn new_lobby(&mut self, lobby: Lobby) -> LobbyId {
         let mut rand_gen = RandGen::from_seed(self.random_seed.clone());
 
-        let new_id: Id = Id::new(&mut rand_gen);
+        let new_id: LobbyId = LobbyId::new(&mut rand_gen);
 
         self.upsert(new_id.clone(), lobby);
 

@@ -81,6 +81,10 @@ async fn main() -> Result<(), String> {
                             .route(
                                 Endpoint::template_get_game().to_string().as_str(),
                                 web::get().to(game::get::handle),
+                            )
+                            .route(
+                                Endpoint::template_submit_turn().to_string().as_str(),
+                                web::post().to(game::submit_turn::handle),
                             ),
                     )
                     .default_service(web::get().to(frontend))

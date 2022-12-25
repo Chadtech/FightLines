@@ -1,6 +1,5 @@
 use shared::game;
-use shared::game::Game;
-use shared::id::Id;
+use shared::game::{Game, GameId};
 use shared::lobby::Lobby;
 use shared::rng::{RandGen, RandSeed};
 use std::collections::HashMap;
@@ -10,7 +9,7 @@ use std::collections::HashMap;
 ////////////////////////////////////////////////////////////////////////////////
 
 pub struct Games {
-    games: HashMap<Id, Game>,
+    games: HashMap<GameId, Game>,
     random_seed: RandSeed,
 }
 
@@ -26,11 +25,11 @@ impl Games {
         }
     }
 
-    pub fn get_game(&self, id: Id) -> Option<Game> {
+    pub fn get_game(&self, id: GameId) -> Option<Game> {
         self.games.get(&id).cloned()
     }
 
-    pub fn upsert(&mut self, id: Id, game: Game) {
+    pub fn upsert(&mut self, id: GameId, game: Game) {
         self.games.insert(id, game);
     }
 

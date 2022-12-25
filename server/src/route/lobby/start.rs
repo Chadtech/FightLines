@@ -2,7 +2,7 @@ use actix_web::{web, HttpResponse};
 
 use crate::model::Model;
 use shared::api::lobby::start::{Request, Response};
-use shared::game::FromLobbyError;
+use shared::game::{FromLobbyError, GameId};
 
 pub async fn handle(body: String, data: web::Data<Model>) -> HttpResponse {
     match hex::decode(body) {
@@ -23,7 +23,7 @@ async fn from_req(req: Request, data: web::Data<Model>) -> HttpResponse {
 
         Some(lobby) => match games.new_game_from_lobby(lobby.clone()) {
             Ok(game) => {
-                games.upsert(req.lobby_id.clone(), game.clone());
+                games.upsert(GameId::from_lobby_id(req.lobby_id.clone()), game.clone());
 
                 lobby.started();
                 lobbies.upsert(req.lobby_id, lobby.clone());

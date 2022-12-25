@@ -1,5 +1,6 @@
 use seed::Url;
-use shared::id::Id;
+use shared::game::GameId;
+use shared::lobby::LobbyId;
 
 pub mod component_library;
 
@@ -11,9 +12,9 @@ pub mod component_library;
 pub enum Route {
     Title,
     ComponentLibrary(component_library::Route),
-    Lobby(Id),
+    Lobby(LobbyId),
     Kicked,
-    Game(Id),
+    Game(GameId),
 }
 
 ////////////////////////////////////////////////////////////////
@@ -75,14 +76,14 @@ impl Route {
                 if first == LOBBY {
                     return path
                         .next()
-                        .and_then(|id| Id::from_string(id.clone()))
+                        .and_then(|id| LobbyId::from_string(id.clone()))
                         .map(Route::Lobby);
                 }
 
                 if first == GAME {
                     return path
                         .next()
-                        .and_then(|id| Id::from_string(id.clone()))
+                        .and_then(|id| GameId::from_string(id.clone()))
                         .map(Route::Game);
                 }
 

@@ -271,7 +271,7 @@ pub fn open_toast_view(global: &Model) -> Option<Cell<Msg>> {
             .with_header(header)
             .with_body_styles(vec![Style::G4])
             .cell(
-                vec![Style::Absolute, Style::AbsoluteCenter],
+                vec![Style::AbsoluteCenter],
                 vec![
                     Row::from_cells(vec![], vec![text_cell]),
                     Row::from_cells(

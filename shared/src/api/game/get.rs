@@ -1,5 +1,4 @@
-use crate::game::Game;
-use crate::id::Id;
+use crate::game::{Game, GameId};
 use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////
@@ -8,16 +7,16 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Response {
-    game_id: Id,
+    game_id: GameId,
     game: Game,
 }
 
 impl Response {
-    pub fn init(game_id: Id, game: Game) -> Response {
+    pub fn init(game_id: GameId, game: Game) -> Response {
         Response { game_id, game }
     }
 
-    pub fn get_game_id(&self) -> Id {
+    pub fn get_game_id(&self) -> GameId {
         self.game_id.clone()
     }
 

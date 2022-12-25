@@ -1,5 +1,4 @@
-use crate::id::Id;
-use crate::lobby::{Lobby, Update};
+use crate::lobby::{Lobby, LobbyId, Update};
 use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////
@@ -8,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct Request {
-    pub lobby_id: Id,
+    pub lobby_id: LobbyId,
     pub updates: Vec<Update>,
 }
 
@@ -27,16 +26,16 @@ impl Request {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Response {
-    lobby_id: Id,
+    lobby_id: LobbyId,
     lobby: Lobby,
 }
 
 impl Response {
-    pub fn init(lobby_id: Id, lobby: Lobby) -> Response {
+    pub fn init(lobby_id: LobbyId, lobby: Lobby) -> Response {
         Response { lobby_id, lobby }
     }
 
-    pub fn get_lobby_id(&self) -> Id {
+    pub fn get_lobby_id(&self) -> LobbyId {
         self.lobby_id.clone()
     }
 

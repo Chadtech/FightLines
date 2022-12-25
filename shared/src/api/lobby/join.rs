@@ -1,5 +1,5 @@
 use crate::id::Id;
-use crate::lobby::Lobby;
+use crate::lobby::{Lobby, LobbyId};
 use crate::name::Name;
 use serde::{Deserialize, Serialize};
 
@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 pub struct Request {
     pub guest_id: Id,
     pub guest_name: Name,
-    pub lobby_id: Id,
+    pub lobby_id: LobbyId,
 }
 
 impl Request {
@@ -29,12 +29,12 @@ impl Request {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Response {
-    pub lobby_id: Id,
+    pub lobby_id: LobbyId,
     pub lobby: Lobby,
 }
 
 impl Response {
-    pub fn init(lobby_id: Id, lobby: Lobby) -> Response {
+    pub fn init(lobby_id: LobbyId, lobby: Lobby) -> Response {
         Response { lobby_id, lobby }
     }
 

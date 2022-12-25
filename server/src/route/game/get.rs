@@ -2,10 +2,10 @@ use actix_web::{web, HttpResponse};
 
 use crate::model::Model;
 use shared::api::game::get::Response;
-use shared::id::Id;
+use shared::game::GameId;
 
 pub async fn handle(data: web::Data<Model>, url_id: web::Path<(String,)>) -> HttpResponse {
-    match Id::from_string(url_id.into_inner().0) {
+    match GameId::from_string(url_id.into_inner().0) {
         Some(game_id) => {
             let games = data.games.lock().unwrap();
 

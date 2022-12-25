@@ -1,4 +1,6 @@
+use crate::game::GameId;
 use crate::id::Id;
+use crate::lobby::LobbyId;
 use crate::sprite::Sprite;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -8,12 +10,13 @@ use crate::sprite::Sprite;
 #[derive(Clone)]
 pub enum Endpoint {
     CreateLobby,
-    GetLobby(Param<Id>),
-    JoinLobby(Param<Id>),
+    GetLobby(Param<LobbyId>),
+    JoinLobby(Param<LobbyId>),
     UpdateLobby,
     StartGame,
-    GetGame(Param<Id>),
+    GetGame(Param<GameId>),
     SpriteAsset(Sprite),
+    SubmitTurn(Param<GameId>, Param<Id>),
 }
 
 #[derive(Clone)]
@@ -83,10 +86,18 @@ impl Endpoint {
             Endpoint::SpriteAsset(sprite) => {
                 vec![sprite.to_file_name()]
             }
+            Endpoint::SubmitTurn(game_id, player_id) => {
+                vec![
+                    "game".to_string(),
+                    "submit-turn".to_string(),
+                    game_id.to_string(),
+                    player_id.to_string(),
+                ]
+            }
         }
     }
 
-    pub fn make_get_game(id: Id) -> Endpoint {
+    pub fn make_get_game(id: GameId) -> Endpoint {
         Endpoint::GetGame(Param::Value(id))
     }
 
@@ -94,16 +105,27 @@ impl Endpoint {
         Endpoint::GetGame(Param::Template("id".to_string()))
     }
 
+    pub fn template_submit_turn() -> Endpoint {
+        Endpoint::SubmitTurn(
+            Param::Template("game_id".to_string()),
+            Param::Template("player_id".to_string()),
+        )
+    }
+
     pub fn update_lobby() -> Endpoint {
         Endpoint::UpdateLobby
     }
 
-    pub fn join_lobby(lobby_id: Id) -> Endpoint {
+    pub fn join_lobby(lobby_id: LobbyId) -> Endpoint {
         Endpoint::JoinLobby(Param::Value(lobby_id))
     }
 
-    pub fn make_get_lobby(id: Id) -> Endpoint {
+    pub fn make_get_lobby(id: LobbyId) -> Endpoint {
         Endpoint::GetLobby(Param::Value(id))
+    }
+
+    pub fn submit_turn(game_id: GameId, player_id: Id) -> Endpoint {
+        Endpoint::SubmitTurn(Param::Value(game_id), Param::Value(player_id))
     }
 
     pub fn template_get_lobby() -> Endpoint {

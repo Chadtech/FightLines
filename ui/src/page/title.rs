@@ -10,8 +10,7 @@ use crate::{api, core_ext, global};
 use seed::prelude::Orders;
 use shared::api::endpoint::Endpoint;
 use shared::api::lobby::create;
-use shared::id::Id;
-use shared::lobby::Lobby;
+use shared::lobby::{Lobby, LobbyId};
 
 ///////////////////////////////////////////////////////////////
 // Types
@@ -25,7 +24,7 @@ enum Status {
     Ready,
     WaitingForNewGame,
     CouldNotMakeNewGame(NewGameError),
-    NewGameLobbyCreated { lobby_id: Id, lobby: Lobby },
+    NewGameLobbyCreated(LobbyId, Lobby),
 }
 
 enum NewGameError {
@@ -52,9 +51,9 @@ impl Model {
         }
     }
 
-    pub fn just_created_lobby(&self) -> Option<(&Id, &Lobby)> {
+    pub fn just_created_lobby(&self) -> Option<(&LobbyId, &Lobby)> {
         match &self.status {
-            Status::NewGameLobbyCreated { lobby_id, lobby } => Some((lobby_id, lobby)),
+            Status::NewGameLobbyCreated(lobby_id, lobby) => Some((lobby_id, lobby)),
             _ => None,
         }
     }
@@ -97,10 +96,7 @@ pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut 
             Ok(res) => {
                 let lobby_id = res.lobby_id;
 
-                model.status = Status::NewGameLobbyCreated {
-                    lobby_id: lobby_id.clone(),
-                    lobby: res.lobby,
-                };
+                model.status = Status::NewGameLobbyCreated(lobby_id.clone(), res.lobby);
 
                 go_to_route(orders, Route::Lobby(lobby_id));
             }
@@ -112,7 +108,7 @@ pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut 
             go_to_route(orders, Route::Title);
         }
         Msg::ClickedGoToNewGame => {
-            if let Status::NewGameLobbyCreated { lobby_id, lobby: _ } = &mut model.status {
+            if let Status::NewGameLobbyCreated(lobby_id, _) = &mut model.status {
                 go_to_route(orders, Route::Lobby(lobby_id.clone()));
             }
         }
@@ -128,10 +124,7 @@ pub fn view(model: &Model) -> Vec<Row<Msg>> {
         Status::Ready => ready_view(),
         Status::WaitingForNewGame => waiting_for_new_game_view(),
         Status::CouldNotMakeNewGame(error) => new_game_error_view(error),
-        Status::NewGameLobbyCreated {
-            lobby_id: _,
-            lobby: _,
-        } => new_game_view(),
+        Status::NewGameLobbyCreated(_, _) => new_game_view(),
     }
 }
 

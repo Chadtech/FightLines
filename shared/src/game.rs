@@ -1,7 +1,8 @@
+use crate::direction::Direction;
 use crate::facing_direction::FacingDirection;
 use crate::game::FromLobbyError::CouldNotFindInitialMapMilitary;
 use crate::id::Id;
-use crate::lobby::Lobby;
+use crate::lobby::{Lobby, LobbyId};
 use crate::located::Located;
 use crate::map::{Map, MapOpt};
 use crate::owner::Owned;
@@ -16,6 +17,25 @@ use std::collections::{HashMap, HashSet};
 ////////////////////////////////////////////////////////////////////////////////
 // Types //
 ////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Debug)]
+pub struct GameId(Id);
+
+impl ToString for GameId {
+    fn to_string(&self) -> String {
+        self.0.to_string()
+    }
+}
+
+impl GameId {
+    pub fn from_lobby_id(lobby_id: LobbyId) -> GameId {
+        GameId(lobby_id.ambiguate())
+    }
+
+    pub fn from_string(s: String) -> Option<GameId> {
+        Id::from_string(s).map(GameId)
+    }
+}
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct Game {
@@ -41,7 +61,7 @@ pub struct Game {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum Turn {
     Waiting,
-    Turn { moves: Vec<Move> },
+    Turn { moves: Vec<Action> },
 }
 
 impl Turn {
@@ -54,8 +74,11 @@ impl Turn {
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub enum Move {
-    Travel { unit_id: UnitId, dest: Located<()> },
+pub enum Action {
+    Traveled {
+        unit_id: UnitId,
+        path: Vec<Located<Direction>>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -89,6 +112,48 @@ pub enum FromLobbyError {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl Game {
+    pub fn set_turn(&mut self, player_id: Id, moves: Vec<Action>) -> Result<(), String> {
+        return if player_id == self.host_id {
+            match self.hosts_turn {
+                Turn::Waiting => {
+                    self.hosts_turn = Turn::Turn { moves };
+
+                    Ok(())
+                }
+                Turn::Turn { .. } => Err("Host has already moved this turn".to_string()),
+            }
+        } else if player_id == self.first_guest_id {
+            match self.first_guests_turn {
+                Turn::Waiting => {
+                    self.first_guests_turn = Turn::Turn { moves };
+
+                    Ok(())
+                }
+                Turn::Turn { .. } => Err("first guest has already moved this turn".to_string()),
+            }
+        } else {
+            for (index, (guest_id, guest)) in self.remaining_guests.iter().enumerate() {
+                if &player_id == guest_id {
+                    return match guest.turn {
+                        Turn::Waiting => {
+                            self.remaining_guests[index].1.turn = Turn::Turn { moves };
+
+                            Ok(())
+                        }
+                        Turn::Turn { .. } => Err(format!(
+                            "guest number {} has already moved this turn",
+                            (index + 2)
+                        )),
+                    };
+                }
+            }
+
+            Err(format!(
+                "Game does not have guest {}",
+                player_id.to_string()
+            ))
+        };
+    }
     pub fn from_lobby(lobby: Lobby, rng: &mut RandGen) -> Result<Game, FromLobbyError> {
         let num_players = lobby.num_players();
         let guests: Vec<(Id, Player)> = lobby.guests.into_iter().collect();

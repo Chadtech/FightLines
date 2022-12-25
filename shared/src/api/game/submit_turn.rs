@@ -1,4 +1,4 @@
-use crate::id::Id;
+use crate::game;
 use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////
@@ -7,12 +7,12 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct Request {
-    player_id: Id,
+    pub moves: Vec<game::Action>,
 }
 
 impl Request {
-    pub fn init(player_id: Id) -> Request {
-        Request { player_id }
+    pub fn init(moves: Vec<game::Action>) -> Request {
+        Request { moves }
     }
 
     pub fn to_bytes(&self) -> bincode::Result<Vec<u8>> {

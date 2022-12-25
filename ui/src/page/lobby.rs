@@ -12,10 +12,10 @@ use shared::api::endpoint::Endpoint;
 use shared::api::lobby::get as lobby_get;
 use shared::api::lobby::start as lobby_start;
 use shared::api::lobby::update as lobby_update;
-use shared::game::{FromLobbyError, Game};
+use shared::game::{FromLobbyError, Game, GameId};
 use shared::id::Id;
 use shared::lobby;
-use shared::lobby::{Lobby, MAX_GUESTS};
+use shared::lobby::{Lobby, LobbyId, MAX_GUESTS};
 use shared::name::{Error, Name};
 use shared::player::Player;
 use std::str::FromStr;
@@ -25,7 +25,7 @@ use std::str::FromStr;
 ///////////////////////////////////////////////////////////////
 
 pub struct Model {
-    lobby_id: Id,
+    lobby_id: LobbyId,
     lobby: Lobby,
     name_field: String,
     initial_name_field: String,
@@ -60,7 +60,7 @@ pub enum Msg {
 
 #[derive(Clone, Debug)]
 pub struct Flags {
-    pub lobby_id: Id,
+    pub lobby_id: LobbyId,
     pub lobby: Lobby,
 }
 
@@ -127,10 +127,10 @@ impl Model {
         self.host_model.is_some()
     }
 
-    pub fn started_game(&self) -> Option<(Id, &Game)> {
+    pub fn started_game(&self) -> Option<(GameId, &Game)> {
         self.created_game
             .as_ref()
-            .map(|game| (self.lobby_id.clone(), game))
+            .map(|game| (GameId::from_lobby_id(self.lobby_id.clone()), game))
     }
 }
 
@@ -290,7 +290,10 @@ pub fn update(
                 // Games use the same id as the lobby they were
                 // created from. Should that ever change, this code
                 // should change too.
-                go_to_route(orders, Route::Game(model.lobby_id.clone()));
+                go_to_route(
+                    orders,
+                    Route::Game(GameId::from_lobby_id(model.lobby_id.clone())),
+                );
             }
             Err(error) => global.toast(
                 Toast::init("error", "could not load new game")
@@ -373,14 +376,17 @@ fn handle_updated_lobby(
         model.lobby = lobby.clone();
 
         if lobby.game_started {
-            go_to_route(orders, Route::Game(model.lobby_id.clone()))
+            go_to_route(
+                orders,
+                Route::Game(GameId::from_lobby_id(model.lobby_id.clone())),
+            )
         }
     }
 }
 
 fn send_updates(
     global: &mut global::Model,
-    lobby_id: Id,
+    lobby_id: LobbyId,
     upts: Vec<lobby::Update>,
     orders: &mut impl Orders<Msg>,
 ) {

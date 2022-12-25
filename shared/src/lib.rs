@@ -1,4 +1,5 @@
 pub mod api;
+pub mod direction;
 pub mod facing_direction;
 pub mod frame_count;
 pub mod game;
