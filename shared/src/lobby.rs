@@ -100,10 +100,8 @@ impl Lobby {
         let players = self.clone().players();
 
         if self.num_players() < MAX_PLAYERS {
-            let player_ids: Vec<Id> = players.into_iter().map(|(id, _)| id).collect();
-
-            if !player_ids.contains(&guest_id) {
-                self.guests.insert(guest_id.clone(), guest);
+            if !players.into_iter().map(|(id, _)| id).any(|x| x == guest_id) {
+                self.guests.insert(guest_id, guest);
             }
 
             Ok(self)

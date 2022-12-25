@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 // Response //
 ////////////////////////////////////////////////////////////////
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Response {
     lobby_id: Id,
     lobby: Lobby,

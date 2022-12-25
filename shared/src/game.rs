@@ -132,7 +132,7 @@ impl Game {
                 let mut remaining_guests_with_militaries: Vec<(UnitId, Located<UnitModel>)> =
                     vec![];
 
-                for (index, (guest_id, guest)) in rest.into_iter().enumerate() {
+                for (index, (guest_id, guest)) in rest.iter().enumerate() {
                     let initial_military = initial_militaries
                         .rest_players_miliatries
                         .get(index)
@@ -154,7 +154,7 @@ impl Game {
 
                 let first_guest_units = id_units(
                     initial_militaries.second_player_military,
-                    &first_guest_id,
+                    first_guest_id,
                     &first_guest.color,
                 );
 
@@ -174,11 +174,11 @@ impl Game {
                 let host_id = lobby.host_id.clone();
 
                 let remaining_guests: Vec<(Id, Guest)> = rest
-                    .into_iter()
+                    .iter()
                     .map(|(guest_id, guest_player)| {
                         let guest = Guest {
                             player: guest_player.clone(),
-                            visibility: calculate_player_visibility(&guest_id, &map, &unit_hashmap),
+                            visibility: calculate_player_visibility(guest_id, &map, &unit_hashmap),
                             turn: Turn::Waiting,
                         };
 
@@ -195,7 +195,7 @@ impl Game {
                     first_guest: first_guest.clone(),
                     first_guest_id: first_guest_id.clone(),
                     first_guest_visibility: calculate_player_visibility(
-                        &first_guest_id,
+                        first_guest_id,
                         &map,
                         &unit_hashmap,
                     ),
@@ -323,7 +323,7 @@ fn index_units_by_location(
 ) -> HashMap<Point<u16>, Vec<(UnitId, UnitModel)>> {
     let mut ret = HashMap::new();
 
-    for (unit_id, loc_unit) in units.into_iter() {
+    for (unit_id, loc_unit) in units.iter() {
         let key = Point {
             x: loc_unit.x,
             y: loc_unit.y,
@@ -333,7 +333,7 @@ fn index_units_by_location(
 
         let val = || (unit_id.clone(), unit.clone());
 
-        let entry = ret.entry(key).or_insert_with(|| vec![]);
+        let entry = ret.entry(key).or_insert_with(Vec::new);
 
         entry.push(val());
     }

@@ -25,7 +25,7 @@ impl Lobbies {
     }
 
     pub fn get_lobby(&self, id: Id) -> Option<Lobby> {
-        self.lobbies.get(&id).map(|lobby| lobby.clone())
+        self.lobbies.get(&id).cloned()
     }
 
     pub fn upsert(&mut self, id: Id, lobby: Lobby) {

@@ -26,9 +26,6 @@ impl Setting {
         Setting::Prod(ProdModel)
     }
     pub fn is_dev(&self) -> bool {
-        match self {
-            Setting::Dev(_) => true,
-            _ => false,
-        }
+        matches!(self, Setting::Dev(_))
     }
 }

@@ -27,12 +27,7 @@ impl Sprite {
         }
     }
     pub fn to_file_name(&self) -> String {
-        let mut file = self
-            .to_pieces()
-            .into_iter()
-            .map(|p| p.to_string())
-            .collect::<Vec<_>>()
-            .join("_");
+        let mut file = self.to_pieces().into_iter().collect::<Vec<_>>().join("_");
 
         file.push_str(".png");
 
@@ -42,9 +37,7 @@ impl Sprite {
         match self {
             Sprite::GrassTile => "grass tile".to_string(),
             Sprite::Infantry { frame, dir } => {
-                vec!["infantry", frame.to_str(), dir.to_human_readable_label()]
-                    .join(" ")
-                    .to_string()
+                vec!["infantry", frame.to_str(), dir.to_human_readable_label()].join(" ")
             }
         }
     }

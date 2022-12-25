@@ -26,7 +26,7 @@ async fn from_req(req: Request, data: web::Data<Model>) -> HttpResponse {
                 games.upsert(req.lobby_id.clone(), game.clone());
 
                 lobby.started();
-                lobbies.upsert(req.lobby_id.clone(), lobby.clone());
+                lobbies.upsert(req.lobby_id, lobby.clone());
 
                 response_to_http(Response::init(game))
             }

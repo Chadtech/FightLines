@@ -27,7 +27,7 @@ impl Games {
     }
 
     pub fn get_game(&self, id: Id) -> Option<Game> {
-        self.games.get(&id).map(|game| game.clone())
+        self.games.get(&id).cloned()
     }
 
     pub fn upsert(&mut self, id: Id, game: Game) {

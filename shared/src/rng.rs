@@ -97,9 +97,7 @@ impl UniformSampler for UniformRandSeed {
             self.0.sample(rng),
         ];
 
-        let next = RandSeed { bytes };
-
-        next
+        RandSeed { bytes }
     }
 }
 impl SampleUniform for RandSeed {
@@ -162,7 +160,7 @@ impl RandGen {
     {
         let (bytes, next_seed) = self.next();
 
-        let mut rng = Pcg64::from_seed(bytes.clone());
+        let mut rng = Pcg64::from_seed(bytes);
 
         let uniform = Uniform::new(low, high);
         let val: T = uniform.sample(&mut rng);

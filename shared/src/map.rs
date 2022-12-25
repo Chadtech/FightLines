@@ -38,7 +38,7 @@ impl Map {
                 let feature = self
                     .features
                     .get(&Spot { x, y })
-                    .map(|tile| tile.clone())
+                    .cloned()
                     .unwrap_or_else(|| self.base_tile.clone());
 
                 let loc_tile = Located::<Tile> {

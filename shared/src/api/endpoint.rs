@@ -61,7 +61,7 @@ impl ToString for Endpoint {
 // Api //
 ////////////////////////////////////////////////////////////////////////////////
 
-pub const ROOT: &'static str = "/api";
+pub const ROOT: &str = "/api";
 
 impl Endpoint {
     fn to_pieces(&self) -> Vec<String> {

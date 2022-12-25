@@ -42,9 +42,7 @@ impl Id {
             rng.gen::<u8>(0, 255),
         ];
 
-        let new_id = Id { bytes: id_bytes };
-
-        new_id
+        Id { bytes: id_bytes }
     }
 
     pub fn from_string(s: String) -> Option<Id> {
@@ -54,7 +52,7 @@ impl Id {
                     let mut new_id = Id::empty();
 
                     for (i, byte) in bytes.iter().enumerate() {
-                        new_id.bytes[i] = byte.clone();
+                        new_id.bytes[i] = *byte;
                     }
 
                     Some(new_id)

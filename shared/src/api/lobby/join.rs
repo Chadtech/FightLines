@@ -27,7 +27,7 @@ impl Request {
 // Response //
 ////////////////////////////////////////////////////////////////
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Response {
     pub lobby_id: Id,
     pub lobby: Lobby,
