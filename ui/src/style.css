@@ -15,6 +15,8 @@ body {
     --bg-3: #142909;
     --bg-4: #30371A;
 
+    --backdrop-color: #03090780;
+
     --content-5: #E0D6CA;
     --content-4: #B0A69A;
     --content-3: #807672;
@@ -288,6 +290,11 @@ a.button {
     background-color: var(--bg-0);
 }
 
+.backdrop {
+    background-color: var(--backdrop-color);
+
+}
+
 .bg-background-1 {
     background-color: var(--bg-1);
 }
@@ -312,8 +319,17 @@ canvas {
     left: 0px;
 }
 
-.left-0-pct {
+
+.left-4 {
+    left: var(--s-4);
+}
+
+.left-50-pct {
     left: 50%;
+}
+
+.top-50-pct {
+    top: 50%;
 }
 
 .right-0 {

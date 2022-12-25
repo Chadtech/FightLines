@@ -11,7 +11,7 @@ pub async fn handle(data: web::Data<Model>, url_id: web::Path<(String,)>) -> Htt
 
             match games.get_game(game_id.clone()) {
                 None => HttpResponse::NotFound().body("game does not exist"),
-                Some(lobby) => match Response::init(game_id, lobby).to_bytes() {
+                Some(game) => match Response::init(game_id, game).to_bytes() {
                     Ok(response_bytes) => HttpResponse::Ok()
                         .header("Content-Type", "application/octet-stream")
                         .body(response_bytes),

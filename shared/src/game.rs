@@ -33,6 +33,7 @@ pub struct Game {
     pub remaining_guests: Vec<(Id, Guest)>,
     pub units: HashMap<UnitId, Located<UnitModel>>,
     pub units_by_location_index: HashMap<Point<u16>, Vec<(UnitId, UnitModel)>>,
+    pub units_by_player_index: HashMap<Id, Vec<(UnitId, UnitModel)>>,
     pub map: Map,
     pub turn_number: u32,
 }
@@ -202,6 +203,7 @@ impl Game {
                     first_guests_turn: Turn::Waiting,
                     remaining_guests,
                     units_by_location_index: index_units_by_location(&unit_hashmap),
+                    units_by_player_index: index_units_by_player(&unit_hashmap),
                     units: unit_hashmap,
                     map,
                     turn_number: 0,
@@ -316,6 +318,26 @@ impl Game {
     pub fn get_units_by_location(&self, key: &Point<u16>) -> Option<&Vec<(UnitId, UnitModel)>> {
         self.units_by_location_index.get(key)
     }
+}
+
+fn index_units_by_player(
+    units: &HashMap<UnitId, Located<UnitModel>>,
+) -> HashMap<Id, Vec<(UnitId, UnitModel)>> {
+    let mut ret = HashMap::new();
+
+    for (unit_id, loc_unit) in units.iter() {
+        let key = loc_unit.value.owner.clone();
+
+        let unit = &loc_unit.value;
+
+        let val = || (unit_id.clone(), unit.clone());
+
+        let entry = ret.entry(key).or_insert_with(Vec::new);
+
+        entry.push(val());
+    }
+
+    ret
 }
 
 fn index_units_by_location(

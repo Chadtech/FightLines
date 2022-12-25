@@ -88,6 +88,13 @@ impl<Msg: 'static> Button<Msg> {
     pub fn destructive(label: &str) -> Button<Msg> {
         Button::from_variant(label, Variant::Destructive)
     }
+    pub fn set_primary(mut self, p: bool) -> Button<Msg> {
+        if p {
+            self.variant = Variant::Primary
+        };
+
+        self
+    }
     pub fn disable(mut self, d: bool) -> Button<Msg> {
         if d {
             self.variant = Variant::Disabled

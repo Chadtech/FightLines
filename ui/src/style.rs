@@ -1,4 +1,3 @@
-use crate::style::Style::Batch;
 use crate::view::text::text;
 use seed::dom_entity_names::Tag;
 use seed::prelude::{El, Node};
@@ -42,6 +41,7 @@ pub enum Style {
     BgBackground1,
     BgImportant1,
     BgProblem1,
+    BgBackDrop,
     H4,
     H5,
     H8,
@@ -57,9 +57,11 @@ pub enum Style {
     Screen,
     AbsoluteCenter,
     Left0,
+    Left4,
     Left50Pct,
     Right0,
     Top0,
+    Top50Pct,
     Bottom0,
     Bottom4,
     CursorPointer,
@@ -68,7 +70,7 @@ pub enum Style {
 
 impl Style {
     pub fn none() -> Style {
-        Batch(vec![])
+        Style::Batch(vec![])
     }
 
     pub fn css_classes(self) -> Vec<&'static str> {
@@ -125,15 +127,18 @@ impl Style {
             Style::Screen => vec!["screen"],
             Style::AbsoluteCenter => vec!["absolute-center"],
             Style::Left0 => vec!["left-0"],
-            Style::Left50Pct => vec!["left-0-pct"],
+            Style::Left4 => vec!["left-4"],
+            Style::Left50Pct => vec!["left-50-pct"],
             Style::Right0 => vec!["right-0"],
             Style::Top0 => vec!["top-0"],
+            Style::Top50Pct => vec!["top-50-pct"],
             Style::Bottom0 => vec!["bottom-0"],
             Style::Bottom4 => vec!["bottom-4"],
             Style::W512px => vec!["w-512px"],
             Style::H512px => vec!["h-512px"],
             Style::CursorPointer => vec!["cursor-pointer"],
             Style::CursorNone => vec!["cursor-none"],
+            Style::BgBackDrop => vec!["backdrop"],
         }
     }
 }

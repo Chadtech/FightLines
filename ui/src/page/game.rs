@@ -1,11 +1,12 @@
 use crate::domain::direction::Direction;
+use crate::view::button::Button;
 use crate::view::card::Card;
 use crate::view::cell::Cell;
 use crate::web_sys::HtmlCanvasElement;
 use crate::{assets, global, Row, Style, Toast};
 use seed::app::CmdHandle;
 use seed::prelude::{cmds, el_ref, At, El, ElRef, IndexMap, Node, Orders, St, ToClasses, UpdateEl};
-use seed::{attrs, canvas, style, C};
+use seed::{attrs, canvas, log, style, C};
 use shared::facing_direction::FacingDirection;
 use shared::frame_count::FrameCount;
 use shared::game::Game;
@@ -51,6 +52,11 @@ pub struct Model {
     moves_index: HashMap<UnitId, Action>,
     mouse_game_position: Option<Point<u32>>,
     stage: Stage,
+    dialog: Option<Dialog>,
+}
+
+enum Dialog {
+    ConfirmTurnSubmit,
 }
 
 impl Model {
@@ -62,6 +68,19 @@ impl Model {
         self.stage = Stage::TakingTurn { mode: Mode::None };
 
         clear_mode_canvas(self)
+    }
+
+    fn all_units_moved(&self, player_id: Id) -> bool {
+        let total_moved_units = self.moved_units.len();
+
+        let total_units = self
+            .game
+            .units_by_player_index
+            .get(&player_id)
+            .unwrap_or(&vec![])
+            .len();
+
+        total_moved_units == total_units
     }
 }
 
@@ -109,6 +128,9 @@ pub enum Msg {
     MouseUpOnScreen(Point<i16>),
     MouseMoveOnScreen(Point<i16>),
     MinimumRenderTimeExpired,
+    ClickedSubmitTurn,
+    ClickedSubmitTurnConfirm,
+    ClickedCancelSubmitTurn,
 }
 
 ///////////////////////////////////////////////////////////////
@@ -131,11 +153,9 @@ pub fn init(
     let game_pixel_width = (flags.game.map.width as u16) * tile::PIXEL_WIDTH;
     let game_pixel_height = (flags.game.map.height as u16) * tile::PIXEL_HEIGHT;
 
-    let mut game_x = window_size.width / 2.0;
-    game_x -= (game_pixel_width as f64) / 2.0;
+    let game_x = (window_size.width / 2.0) - (game_pixel_width as f64);
 
-    let mut game_y = window_size.height / 2.0;
-    game_y -= (game_pixel_height as f64) / 2.0;
+    let game_y = (window_size.height / 2.0) - (game_pixel_height as f64);
 
     orders.after_next_render(|_| Msg::RenderedFirstTime);
 
@@ -162,6 +182,7 @@ pub fn init(
         moves_index: HashMap::new(),
         mouse_game_position: None,
         stage: Stage::TakingTurn { mode: Mode::None },
+        dialog: None,
     };
 
     Ok(model)
@@ -270,7 +291,24 @@ pub fn update(
 
             model.handle_minimum_framerate_timeout = wait_for_timeout(orders);
         }
+        Msg::ClickedSubmitTurn => {
+            if model.all_units_moved(global.viewer_id()) {
+                submit_turn(model);
+            } else {
+                model.dialog = Some(Dialog::ConfirmTurnSubmit)
+            }
+        }
+        Msg::ClickedSubmitTurnConfirm => {
+            submit_turn(model);
+        }
+        Msg::ClickedCancelSubmitTurn => {
+            model.dialog = None;
+        }
     }
+}
+
+fn submit_turn(model: &mut Model) {
+    model.dialog = None;
 }
 
 fn handle_click_on_screen_during_turn(
@@ -842,6 +880,8 @@ pub fn view(global: &global::Model, model: &Model) -> Cell<Msg> {
             cursor_canvas_cell(model),
             click_screen(model),
             overlay_view(global, model),
+            primary_options_view(global, model),
+            dialog_view(model),
         ],
     )
 }
@@ -937,8 +977,75 @@ fn click_screen(model: &Model) -> Cell<Msg> {
     })
 }
 
+fn dialog_view(model: &Model) -> Cell<Msg> {
+    match &model.dialog {
+        None => Cell::none(),
+        Some(dialog) => match dialog {
+            Dialog::ConfirmTurnSubmit => {
+                let message = "You have not moved all your units, are you sure you would like to submit your turn?";
+
+                let card_content =
+                    Row::from_cells(vec![Style::W9], vec![Cell::from_str(vec![], message)]);
+
+                Cell::group(
+                    vec![
+                        Style::Absolute,
+                        Style::Left0,
+                        Style::Top0,
+                        Style::Right0,
+                        Style::Bottom0,
+                        Style::BgBackDrop,
+                    ],
+                    vec![Cell::group(
+                        vec![Style::Absolute, Style::AbsoluteCenter],
+                        vec![Card::cell_from_rows(
+                            vec![Style::G4, Style::FlexCol],
+                            vec![
+                                card_content,
+                                Row::from_cells(
+                                    vec![Style::G4, Style::FlexRow],
+                                    vec![
+                                        Button::primary("submit")
+                                            .on_click(|_| Msg::ClickedSubmitTurnConfirm)
+                                            .cell(),
+                                        Button::simple("cancel")
+                                            .on_click(|_| Msg::ClickedCancelSubmitTurn)
+                                            .cell(),
+                                    ],
+                                ),
+                            ],
+                        )],
+                    )],
+                )
+            }
+        },
+    }
+}
+
+fn primary_options_view(global: &global::Model, model: &Model) -> Cell<Msg> {
+    if model.dialog.is_none() {
+        let submit_move_button = {
+            let label = "submit turn";
+
+            Button::simple(label)
+                .set_primary(model.all_units_moved(global.viewer_id()))
+                .on_click(|_| Msg::ClickedSubmitTurn)
+        };
+
+        Cell::group(
+            vec![Style::Absolute, Style::Bottom4, Style::Left4],
+            vec![Card::cell_from_rows(
+                vec![],
+                vec![Row::from_cells(vec![], vec![submit_move_button.cell()])],
+            )],
+        )
+    } else {
+        Cell::none()
+    }
+}
+
 fn overlay_view(global: &global::Model, model: &Model) -> Cell<Msg> {
-    if model.game.waiting_on_player(&global.viewer_id()) {
+    if model.game.waiting_on_player(&global.viewer_id()) || model.dialog.is_some() {
         Cell::none()
     } else {
         Cell::group(
