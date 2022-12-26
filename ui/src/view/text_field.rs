@@ -11,7 +11,6 @@ use std::rc::Rc;
 #[derive(Clone)]
 pub struct TextField<Msg: 'static> {
     value: String,
-    placeholder: Option<String>,
     on_input: Rc<dyn Fn(String) -> Msg>,
 }
 
@@ -26,7 +25,6 @@ impl<Msg: 'static> TextField<Msg> {
     ) -> TextField<Msg> {
         TextField {
             value: value.to_string(),
-            placeholder: None,
             on_input: Rc::new(move |event| on_input.clone()(event)),
         }
     }
@@ -42,22 +40,10 @@ impl<Msg: 'static> TextField<Msg> {
         element.add_attr(Cow::Borrowed("value"), self.value);
         element.add_attr(Cow::Borrowed("spellcheck"), "false");
 
-        match self.placeholder {
-            None => {}
-            Some(placeholder_text) => {
-                element.add_attr(Cow::Borrowed("placeholder"), placeholder_text);
-            }
-        }
-
         Node::Element(element)
     }
 
     pub fn cell(self) -> Cell<Msg> {
         Cell::from_html(vec![], vec![self.html()])
-    }
-
-    pub fn placeholder(mut self, placeholder_text: &str) -> TextField<Msg> {
-        self.placeholder = Some(placeholder_text.to_string());
-        self
     }
 }

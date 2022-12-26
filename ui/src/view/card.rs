@@ -9,7 +9,6 @@ pub struct Card {
 
 enum Variant {
     Normal,
-    Disabled,
     Primary,
     Problem,
 }
@@ -50,10 +49,6 @@ impl Card {
         self.with_variant(Variant::Problem, p)
     }
 
-    pub fn disable(self, d: bool) -> Card {
-        self.with_variant(Variant::Disabled, d)
-    }
-
     pub fn primary(self, p: bool) -> Card {
         self.with_variant(Variant::Primary, p)
     }
@@ -77,7 +72,6 @@ impl Card {
 
         let bg_color = match self.variant {
             Variant::Normal => Style::BgContent1,
-            Variant::Disabled => Style::BgContent0,
             Variant::Primary => Style::BgImportant1,
             Variant::Problem => Style::BgProblem1,
         };

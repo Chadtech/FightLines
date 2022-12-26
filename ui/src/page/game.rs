@@ -97,10 +97,7 @@ impl Model {
     }
 
     fn is_waiting_stage(&self) -> bool {
-        match self.stage {
-            Stage::Waiting => true,
-            _ => false,
-        }
+        matches!(self.stage, Stage::Waiting)
     }
 }
 

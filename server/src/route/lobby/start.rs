@@ -46,7 +46,7 @@ pub async fn handle(body: String, data: web::Data<Model>) -> HttpResponse {
         }
     };
 
-    games.upsert(GameId::from_lobby_id(req.lobby_id.clone()), game.clone());
+    games.upsert(GameId::from_lobby_id(req.lobby_id), game.clone());
 
     lobby.started();
 
