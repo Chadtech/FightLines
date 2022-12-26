@@ -40,7 +40,7 @@ pub struct Response {
 }
 
 impl Response {
-    pub fn init(lobby_id: LobbyId, lobby: Lobby) -> Response {
+    pub fn new(lobby_id: LobbyId, lobby: Lobby) -> Response {
         Response { lobby_id, lobby }
     }
 
@@ -71,7 +71,7 @@ mod test_create_lobby {
 
         let response = Response::init(
             lobby_id,
-            Lobby::init(
+            Lobby::init2(
                 Id::from_int_test_only(1),
                 Player::new(host_name, TeamColor::Red),
             ),

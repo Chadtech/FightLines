@@ -2,51 +2,60 @@ use actix_web::{web, HttpResponse};
 
 use crate::model::Model;
 use shared::api::lobby::start::{Request, Response};
-use shared::game::{FromLobbyError, GameId};
+use shared::game::{FromLobbyError, Game, GameId};
+use shared::lobby::Lobby;
 
 pub async fn handle(body: String, data: web::Data<Model>) -> HttpResponse {
-    match hex::decode(body) {
-        Ok(bytes) => match Request::from_bytes(bytes) {
-            Ok(request) => from_req(request, data).await,
-            Err(error) => HttpResponse::BadRequest().body(error.to_string()),
-        },
-        Err(error) => HttpResponse::BadRequest().body(error.to_string()),
-    }
-}
+    let bytes = match hex::decode(body) {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            return HttpResponse::BadRequest().body(error.to_string());
+        }
+    };
 
-async fn from_req(req: Request, data: web::Data<Model>) -> HttpResponse {
+    let req: Request = match Request::from_bytes(bytes) {
+        Ok(request) => request,
+        Err(error) => {
+            return HttpResponse::BadRequest().body(error.to_string());
+        }
+    };
+
     let mut lobbies = data.lobbies.lock().unwrap();
     let mut games = data.games.lock().unwrap();
 
-    match &mut lobbies.get_lobby(req.lobby_id.clone()) {
-        None => HttpResponse::NotFound().body("Lobby not found"),
+    let lobby: &mut Lobby = match lobbies.get_mut_lobby(req.lobby_id.clone()) {
+        Some(lobby) => lobby,
+        None => {
+            return HttpResponse::NotFound().body("Lobby not found");
+        }
+    };
 
-        Some(lobby) => match games.new_game_from_lobby(lobby.clone()) {
-            Ok(game) => {
-                games.upsert(GameId::from_lobby_id(req.lobby_id.clone()), game.clone());
-
-                lobby.started();
-                lobbies.upsert(req.lobby_id, lobby.clone());
-
-                response_to_http(Response::init(game))
-            }
-            Err(error) => match error {
+    let game: Game = match games.new_game_from_lobby(lobby.clone()) {
+        Ok(game) => game,
+        Err(error) => {
+            let res = match error {
                 FromLobbyError::NotEnoughPlayers => {
                     HttpResponse::Conflict().body("Lobby does not have enough players")
                 }
                 FromLobbyError::CouldNotFindInitialMapMilitary { .. } => HttpResponse::Conflict().body(
                     "Map selected requires a different number of players than the number of players in the lobby"
                 ),
-            },
-        },
-    }
-}
+            };
 
-fn response_to_http(res: Response) -> HttpResponse {
+            return res;
+        }
+    };
+
+    games.upsert(GameId::from_lobby_id(req.lobby_id.clone()), game.clone());
+
+    lobby.started();
+
+    let res: Response = Response::new(game);
+
     match res.to_bytes() {
-        Ok(response_bytes) => HttpResponse::Ok()
+        Ok(res_bytes) => HttpResponse::Ok()
             .header("Content-Type", "application/octet-stream")
-            .body(response_bytes),
+            .body(res_bytes),
         Err(error) => HttpResponse::InternalServerError().body(error.to_string()),
     }
 }

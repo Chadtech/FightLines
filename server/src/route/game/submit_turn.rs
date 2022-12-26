@@ -37,9 +37,9 @@ pub async fn handle(
         }
     };
 
-    let games = data.games.lock().unwrap();
+    let mut games = data.games.lock().unwrap();
 
-    let mut game: Game = match games.get_game(game_id) {
+    let game: &mut Game = match games.get_mut_game(game_id) {
         Some(game) => game,
         None => {
             return HttpResponse::NotFound().body("game does not exist");
@@ -50,7 +50,7 @@ pub async fn handle(
         return HttpResponse::BadRequest().body(err);
     };
 
-    match Response::init().to_bytes() {
+    match Response::init(game.clone()).to_bytes() {
         Ok(res_bytes) => HttpResponse::Ok()
             .header("Content-Type", "application/octet-stream")
             .body(res_bytes),

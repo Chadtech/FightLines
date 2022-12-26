@@ -7,24 +7,28 @@ use shared::player::Player;
 use shared::team_color::TeamColor;
 
 pub async fn handle(body: String, data: web::Data<Model>) -> HttpResponse {
-    match hex::decode(body) {
-        Ok(bytes) => match Request::from_bytes(bytes) {
-            Ok(request) => from_req(request, data).await,
-            Err(error) => HttpResponse::BadRequest().body(error.to_string()),
-        },
-        Err(error) => HttpResponse::BadRequest().body(error.to_string()),
-    }
-}
+    let bytes = match hex::decode(body) {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            return HttpResponse::BadRequest().body(error.to_string());
+        }
+    };
 
-async fn from_req(request: Request, data: web::Data<Model>) -> HttpResponse {
-    let host = Player::new(request.host_name.clone(), TeamColor::Red);
-    let new_lobby = Lobby::init(request.host_id(), host);
+    let req: Request = match Request::from_bytes(bytes) {
+        Ok(req) => req,
+        Err(error) => {
+            return HttpResponse::BadRequest().body(error.to_string());
+        }
+    };
+
+    let host = Player::new(req.host_name.clone(), TeamColor::Red);
+    let new_lobby = Lobby::new(req.host_id(), host);
 
     let mut lobbies = data.lobbies.lock().unwrap();
 
     let lobby_id = lobbies.new_lobby(new_lobby.clone());
 
-    match Response::init(lobby_id, new_lobby).to_bytes() {
+    match Response::new(lobby_id, new_lobby).to_bytes() {
         Ok(response_bytes) => HttpResponse::Ok()
             .header("Content-Type", "application/octet-stream")
             .body(response_bytes),

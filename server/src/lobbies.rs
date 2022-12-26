@@ -23,8 +23,12 @@ impl Lobbies {
         }
     }
 
-    pub fn get_lobby(&self, id: LobbyId) -> Option<Lobby> {
-        self.lobbies.get(&id).cloned()
+    pub fn get_lobby(&self, id: LobbyId) -> Option<&Lobby> {
+        self.lobbies.get(&id)
+    }
+
+    pub fn get_mut_lobby(&mut self, id: LobbyId) -> Option<&mut Lobby> {
+        self.lobbies.get_mut(&id)
     }
 
     pub fn upsert(&mut self, id: LobbyId, lobby: Lobby) {

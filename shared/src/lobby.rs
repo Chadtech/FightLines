@@ -87,7 +87,7 @@ pub const MAX_GUESTS: u8 = 3;
 pub const MIN_GUESTS: u8 = 1;
 
 impl Lobby {
-    pub fn init(host_id: Id, host: Player) -> Lobby {
+    pub fn new(host_id: Id, host: Player) -> Lobby {
         Lobby {
             host,
             host_id,
@@ -126,7 +126,7 @@ impl Lobby {
         players
     }
 
-    pub fn add_guest(&mut self, guest_id: Id, guest: Player) -> Result<&mut Lobby, AddError> {
+    pub fn add_guest(&mut self, guest_id: Id, guest: Player) -> Result<(), AddError> {
         let players = self.clone().players();
 
         if self.num_players() < MAX_PLAYERS {
@@ -134,13 +134,13 @@ impl Lobby {
                 self.guests.insert(guest_id, guest);
             }
 
-            Ok(self)
+            Ok(())
         } else {
             Err(AddError::LobbyIsFull)
         }
     }
 
-    pub fn many_updates(&mut self, upts: Vec<Update>) -> Result<&mut Lobby, UpdateError> {
+    pub fn many_updates(&mut self, upts: Vec<Update>) -> Result<(), UpdateError> {
         let mut err: Option<UpdateError> = None;
 
         for upt in upts {
@@ -154,7 +154,7 @@ impl Lobby {
 
         match err {
             Some(err) => Err(err),
-            None => Ok(self),
+            None => Ok(()),
         }
     }
 
@@ -162,27 +162,24 @@ impl Lobby {
         self.game_started = true;
     }
 
-    pub fn update(&mut self, upt: Update) -> Result<&mut Lobby, UpdateError> {
+    pub fn update(&mut self, upt: Update) -> Result<(), UpdateError> {
         match upt {
             Update::AddSlot => {
                 if self.num_players_limit < MAX_PLAYERS {
                     self.num_players_limit += 1;
-                    Ok(self)
                 } else {
-                    Err(UpdateError::AtMaximumSlots)
+                    return Err(UpdateError::AtMaximumSlots);
                 }
             }
             Update::CloseSlot => {
                 if MIN_PLAYERS < self.num_players_limit {
                     self.num_players_limit -= 1;
-                    Ok(self)
                 } else {
-                    Err(UpdateError::NoOpenSlotToClose)
+                    return Err(UpdateError::NoOpenSlotToClose);
                 }
             }
             Update::ChangeName(new_name) => {
                 self.name = new_name;
-                Ok(self)
             }
             Update::ChangePlayerName {
                 player_id,
@@ -190,14 +187,11 @@ impl Lobby {
             } => {
                 if self.host_id == player_id {
                     self.host.name = new_name;
-                    Ok(self)
                 } else {
                     match self.guests.get_mut(&player_id) {
-                        None => Err(UpdateError::CannotFindPlayer),
+                        None => return Err(UpdateError::CannotFindPlayer),
                         Some(guest) => {
                             guest.name = new_name;
-
-                            Ok(self)
                         }
                     }
                 }
@@ -205,9 +199,9 @@ impl Lobby {
             Update::KickGuest { guest_id } => {
                 self.guests.remove(&guest_id);
                 self.kicked_guests.insert(guest_id);
-
-                Ok(self)
             }
         }
+
+        Ok(())
     }
 }

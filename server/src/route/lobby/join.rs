@@ -2,49 +2,49 @@ use actix_web::{web, HttpResponse};
 
 use crate::model::Model;
 use shared::api::lobby::join::{Request, Response};
-use shared::lobby::AddError;
+use shared::lobby::{AddError, Lobby};
 use shared::player::Player;
 use shared::team_color::TeamColor;
 
 pub async fn handle(body: String, data: web::Data<Model>) -> HttpResponse {
-    match hex::decode(body) {
-        Ok(bytes) => match Request::from_bytes(bytes) {
-            Ok(request) => from_req(request, data).await,
-            Err(error) => HttpResponse::BadRequest().body(error.to_string()),
-        },
-        Err(error) => HttpResponse::BadRequest().body(error.to_string()),
-    }
-}
+    let body_bytes = match hex::decode(body) {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            return HttpResponse::BadRequest().body(error.to_string());
+        }
+    };
 
-async fn from_req(req: Request, data: web::Data<Model>) -> HttpResponse {
+    let req: Request = match Request::from_bytes(body_bytes) {
+        Ok(req) => req,
+        Err(error) => {
+            return HttpResponse::BadRequest().body(error.to_string());
+        }
+    };
+
     let guest = Player::new(req.guest_name, TeamColor::Blue);
 
     let mut lobbies = data.lobbies.lock().unwrap();
 
-    match &mut lobbies.get_lobby(req.lobby_id.clone()) {
-        None => HttpResponse::NotFound().body("Lobby not found"),
-        Some(lobby) => {
-            let lobby_result = lobby.add_guest(req.guest_id, guest);
+    let lobby: &mut Lobby = match lobbies.get_mut_lobby(req.lobby_id.clone()) {
+        None => {
+            return HttpResponse::NotFound().body("Lobby not found");
+        }
+        Some(lobby) => lobby,
+    };
 
-            match lobby_result.map(|l| l.clone()) {
-                Ok(lobby) => {
-                    lobbies.upsert(req.lobby_id.clone(), lobby.clone());
-
-                    response_to_http(Response::init(req.lobby_id, lobby))
-                }
-                Err(err) => match err {
-                    AddError::LobbyIsFull => HttpResponse::Conflict().body("Lobby is full"),
-                },
+    if let Err(err) = lobby.add_guest(req.guest_id, guest) {
+        match err {
+            AddError::LobbyIsFull => {
+                return HttpResponse::Conflict().body("Lobby is full");
             }
         }
-    }
-}
+    };
+    let res: Response = Response::new(req.lobby_id, lobby.clone());
 
-fn response_to_http(res: Response) -> HttpResponse {
     match res.to_bytes() {
-        Ok(response_bytes) => HttpResponse::Ok()
+        Ok(res_bytes) => HttpResponse::Ok()
             .header("Content-Type", "application/octet-stream")
-            .body(response_bytes),
+            .body(res_bytes),
         Err(error) => HttpResponse::InternalServerError().body(error.to_string()),
     }
 }

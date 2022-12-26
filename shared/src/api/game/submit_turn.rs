@@ -1,4 +1,5 @@
 use crate::game;
+use crate::game::Game;
 use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////
@@ -28,11 +29,13 @@ impl Request {
 ////////////////////////////////////////////////////////////////
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct Response {}
+pub struct Response {
+    pub game: Game,
+}
 
 impl Response {
-    pub fn init() -> Response {
-        Response {}
+    pub fn init(game: Game) -> Response {
+        Response { game }
     }
 
     pub fn to_bytes(&self) -> bincode::Result<Vec<u8>> {

@@ -24,9 +24,12 @@ impl Games {
             random_seed,
         }
     }
+    pub fn get_game(&self, id: GameId) -> Option<&Game> {
+        self.games.get(&id)
+    }
 
-    pub fn get_game(&self, id: GameId) -> Option<Game> {
-        self.games.get(&id).cloned()
+    pub fn get_mut_game(&mut self, id: GameId) -> Option<&mut Game> {
+        self.games.get_mut(&id)
     }
 
     pub fn upsert(&mut self, id: GameId, game: Game) {

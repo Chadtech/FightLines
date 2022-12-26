@@ -55,6 +55,13 @@ pub struct Model {
     mouse_game_position: Option<Point<u32>>,
     stage: Stage,
     dialog: Option<Dialog>,
+    status: Status,
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub enum Status {
+    Ready,
+    Waiting,
 }
 
 enum Dialog {
@@ -84,17 +91,32 @@ impl Model {
 
         total_moved_units == total_units
     }
+
+    fn is_ready(&self) -> bool {
+        self.status == Status::Ready
+    }
+
+    fn is_waiting_stage(&self) -> bool {
+        match self.stage {
+            Stage::Waiting => true,
+            _ => false,
+        }
+    }
 }
 
+#[derive(Debug)]
 enum Stage {
     TakingTurn { mode: Mode },
+    Waiting,
 }
 
+#[derive(Debug)]
 enum Mode {
     None,
     MovingUnit(MovingUnitModel),
 }
 
+#[derive(Debug)]
 struct MovingUnitModel {
     unit_id: UnitId,
     mobility: HashSet<Located<()>>,
@@ -164,6 +186,12 @@ pub fn init(
 
     let assets = assets::init()?;
 
+    let stage = if flags.game.waiting_on_player(&global.viewer_id()) {
+        Stage::TakingTurn { mode: Mode::None }
+    } else {
+        Stage::Waiting
+    };
+
     let model = Model {
         game: flags.game.clone(),
         game_id: flags.game_id,
@@ -184,8 +212,9 @@ pub fn init(
         moved_units: Vec::new(),
         moves_index: HashMap::new(),
         mouse_game_position: None,
-        stage: Stage::TakingTurn { mode: Mode::None },
+        stage,
         dialog: None,
+        status: Status::Ready,
     };
 
     Ok(model)
@@ -307,7 +336,20 @@ pub fn update(
         Msg::ClickedCancelSubmitTurn => {
             model.dialog = None;
         }
-        Msg::GotTurnSubmitResponse(_) => {}
+        Msg::GotTurnSubmitResponse(result) => match *result {
+            Ok(res) => {
+                model.game = res.game;
+                model.stage = Stage::Waiting;
+                model.status = Status::Ready;
+            }
+            Err(err) => {
+                global.toast(
+                    Toast::init("error", "failed to submit turn")
+                        .error()
+                        .with_more_info(err),
+                );
+            }
+        },
     }
 }
 
@@ -330,21 +372,24 @@ fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl 
     let url = Endpoint::submit_turn(model.game_id.clone(), global.viewer_id());
 
     match req.to_bytes() {
-        Ok(bytes) => orders.skip().perform_cmd({
-            async {
-                let result = match api::post(url, bytes).await {
-                    Ok(res_bytes) => {
-                        submit_turn::Response::from_bytes(res_bytes).map_err(|err| err.to_string())
-                    }
-                    Err(error) => {
-                        let fetch_error = core_ext::http::fetch_error_to_string(error);
-                        Err(fetch_error)
-                    }
-                };
+        Ok(bytes) => {
+            model.status = Status::Waiting;
 
-                Msg::GotTurnSubmitResponse(Box::new(result))
-            }
-        }),
+            orders.skip().perform_cmd({
+                async {
+                    let result = match api::post(url, bytes).await {
+                        Ok(res_bytes) => submit_turn::Response::from_bytes(res_bytes)
+                            .map_err(|err| err.to_string()),
+                        Err(error) => {
+                            let fetch_error = core_ext::http::fetch_error_to_string(error);
+                            Err(fetch_error)
+                        }
+                    };
+
+                    Msg::GotTurnSubmitResponse(Box::new(result))
+                }
+            })
+        }
         Err(_err) => {
             todo!("Handle this error")
         }
@@ -393,6 +438,7 @@ fn handle_click_on_screen_during_turn(
                 }
             }
         },
+        Stage::Waiting => {}
     }
 }
 
@@ -523,6 +569,7 @@ fn handle_mouse_move_for_mode(
                 draw_mode_from_mouse_event(model)?;
             }
         },
+        Stage::Waiting => {}
     }
 
     Ok(())
@@ -611,6 +658,7 @@ fn draw_mode_from_mouse_event(model: &Model) -> Result<(), (String, String)> {
                 }
             }
         },
+        Stage::Waiting => {}
     }
 
     Ok(())
@@ -920,7 +968,7 @@ pub fn view(global: &global::Model, model: &Model) -> Cell<Msg> {
             mode_canvas_cell(model),
             cursor_canvas_cell(model),
             click_screen(model),
-            overlay_view(global, model),
+            overlay_view(model),
             primary_options_view(global, model),
             dialog_view(model),
         ],
@@ -1070,6 +1118,7 @@ fn primary_options_view(global: &global::Model, model: &Model) -> Cell<Msg> {
 
             Button::simple(label)
                 .set_primary(model.all_units_moved(global.viewer_id()))
+                .disable(!model.is_ready() || model.is_waiting_stage())
                 .on_click(|_| Msg::ClickedSubmitTurn)
         };
 
@@ -1085,8 +1134,8 @@ fn primary_options_view(global: &global::Model, model: &Model) -> Cell<Msg> {
     }
 }
 
-fn overlay_view(global: &global::Model, model: &Model) -> Cell<Msg> {
-    if model.game.waiting_on_player(&global.viewer_id()) || model.dialog.is_some() {
+fn overlay_view(model: &Model) -> Cell<Msg> {
+    if !model.is_waiting_stage() || model.dialog.is_some() {
         Cell::none()
     } else {
         Cell::group(

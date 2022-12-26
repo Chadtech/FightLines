@@ -34,7 +34,7 @@ pub struct Response {
 }
 
 impl Response {
-    pub fn init(lobby_id: LobbyId, lobby: Lobby) -> Response {
+    pub fn new(lobby_id: LobbyId, lobby: Lobby) -> Response {
         Response { lobby_id, lobby }
     }
 

@@ -63,7 +63,7 @@ impl Toast {
         self
     }
 
-    pub fn with_more_info(mut self, more_info: &str) -> Toast {
+    pub fn with_more_info(mut self, more_info: impl ToString) -> Toast {
         self.more_info = Some(more_info.to_string());
         self
     }
