@@ -50,6 +50,10 @@ pub async fn handle(
         return HttpResponse::BadRequest().body(err);
     };
 
+    if let Err(err) = game.advance_turn() {
+        return HttpResponse::BadRequest().body(err);
+    };
+
     match Response::new(game.clone()).to_bytes() {
         Ok(res_bytes) => HttpResponse::Ok()
             .header("Content-Type", "application/octet-stream")

@@ -115,6 +115,10 @@ pub enum FromLobbyError {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl Game {
+    pub fn advance_turn(&mut self) -> Result<(), String> {
+        // TODO!
+        Ok(())
+    }
     pub fn get_turn(&self, player_id: Id) -> Result<Turn, String> {
         if player_id == self.host_id {
             return Ok(self.hosts_turn.clone());
