@@ -1,3 +1,4 @@
+use crate::arrow::Arrow;
 use crate::direction::Direction;
 use crate::facing_direction::FacingDirection;
 use crate::game::FromLobbyError::CouldNotFindInitialMapMilitary;
@@ -51,6 +52,7 @@ pub struct Game {
     pub first_guests_turn: Turn,
     // remaining guests
     pub remaining_guests: Vec<(Id, Guest)>,
+    //
     pub units: HashMap<UnitId, Located<UnitModel>>,
     pub units_by_location_index: HashMap<Point<u16>, Vec<(UnitId, UnitModel)>>,
     pub units_by_player_index: HashMap<Id, Vec<(UnitId, UnitModel)>>,
@@ -78,6 +80,7 @@ pub enum Action {
     Traveled {
         unit_id: UnitId,
         path: Vec<Located<Direction>>,
+        arrows: Vec<(Direction, Arrow)>,
     },
 }
 
@@ -112,6 +115,22 @@ pub enum FromLobbyError {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl Game {
+    pub fn get_turn(&self, player_id: Id) -> Result<Turn, String> {
+        if player_id == self.host_id {
+            return Ok(self.hosts_turn.clone());
+        } else if player_id == self.first_guest_id {
+            return Ok(self.first_guests_turn.clone());
+        } else {
+            for (guest_id, guest) in self.remaining_guests.iter() {
+                if guest_id == &player_id {
+                    return Ok(guest.turn.clone());
+                }
+            }
+        }
+
+        Err("Could not find player when getting turn".to_string())
+    }
+
     pub fn set_turn(&mut self, player_id: Id, moves: Vec<Action>) -> Result<(), String> {
         if player_id == self.host_id {
             match self.hosts_turn {

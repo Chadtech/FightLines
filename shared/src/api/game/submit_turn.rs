@@ -34,7 +34,7 @@ pub struct Response {
 }
 
 impl Response {
-    pub fn init(game: Game) -> Response {
+    pub fn new(game: Game) -> Response {
         Response { game }
     }
 

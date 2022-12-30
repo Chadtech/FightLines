@@ -8,10 +8,11 @@ use seed::prelude::{cmds, el_ref, At, El, ElRef, IndexMap, Node, Orders, St, ToC
 use seed::{attrs, canvas, style, C};
 use shared::api::endpoint::Endpoint;
 use shared::api::game::submit_turn;
+use shared::arrow::Arrow;
 use shared::direction::Direction;
 use shared::facing_direction::FacingDirection;
 use shared::frame_count::FrameCount;
-use shared::game::{Game, GameId};
+use shared::game::{Game, GameId, Turn};
 use shared::id::Id;
 use shared::located::Located;
 use shared::point::Point;
@@ -128,20 +129,6 @@ enum Action {
     },
 }
 
-#[derive(PartialEq, Debug, Clone)]
-enum Arrow {
-    EndLeft,
-    EndDown,
-    EndRight,
-    EndUp,
-    X,
-    Y,
-    RightUp,
-    RightDown,
-    LeftUp,
-    LeftDown,
-}
-
 #[derive(Clone, Debug)]
 pub enum Msg {
     RenderedFirstTime,
@@ -183,14 +170,54 @@ pub fn init(
 
     let assets = assets::init()?;
 
-    let stage = if flags.game.waiting_on_player(&global.viewer_id()) {
+    let game = flags.game;
+
+    let stage = if game.waiting_on_player(&global.viewer_id()) {
         Stage::TakingTurn { mode: Mode::None }
     } else {
         Stage::Waiting
     };
 
+    let moves_index = match game.get_turn(global.viewer_id()) {
+        Ok(turn) => match turn {
+            Turn::Waiting => HashMap::new(),
+            Turn::Turn { moves } => {
+                let mut moves_ret = HashMap::new();
+
+                for m in moves {
+                    match m {
+                        game::Action::Traveled {
+                            unit_id,
+                            path,
+                            arrows,
+                        } => {
+                            moves_ret.insert(
+                                unit_id.clone(),
+                                Action::TraveledTo {
+                                    path: path.clone(),
+                                    arrows: arrows.clone(),
+                                },
+                            );
+                        }
+                    }
+                }
+
+                moves_ret
+            }
+        },
+        Err(error) => {
+            todo!("Handle error")
+        }
+    };
+
+    let moved_units = moves_index
+        .keys()
+        .into_iter()
+        .map(|unit_id| unit_id.clone())
+        .collect::<Vec<UnitId>>();
+
     let model = Model {
-        game: flags.game.clone(),
+        game,
         game_id: flags.game_id,
         map_canvas: ElRef::<HtmlCanvasElement>::default(),
         units_canvas: ElRef::<HtmlCanvasElement>::default(),
@@ -206,8 +233,8 @@ pub fn init(
         },
         handle_minimum_framerate_timeout: wait_for_timeout(orders),
         frame_count: FrameCount::F1,
-        moved_units: Vec::new(),
-        moves_index: HashMap::new(),
+        moved_units,
+        moves_index,
         mouse_game_position: None,
         stage,
         dialog: None,
@@ -357,9 +384,10 @@ fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl 
         .moves_index
         .iter()
         .map(|(unit_id, action)| match action {
-            Action::TraveledTo { path, .. } => game::Action::Traveled {
+            Action::TraveledTo { path, arrows } => game::Action::Traveled {
                 unit_id: unit_id.clone(),
                 path: path.clone(),
+                arrows: arrows.clone(),
             },
         })
         .collect();

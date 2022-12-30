@@ -50,7 +50,7 @@ pub async fn handle(
         return HttpResponse::BadRequest().body(err);
     };
 
-    match Response::init(game.clone()).to_bytes() {
+    match Response::new(game.clone()).to_bytes() {
         Ok(res_bytes) => HttpResponse::Ok()
             .header("Content-Type", "application/octet-stream")
             .body(res_bytes),
