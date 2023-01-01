@@ -153,7 +153,7 @@ pub struct Flags {
 }
 
 pub fn init(
-    global: &global::Model,
+    global: &mut global::Model,
     flags: Flags,
     orders: &mut impl Orders<Msg>,
 ) -> Result<Model, String> {
@@ -206,7 +206,13 @@ pub fn init(
             }
         },
         Err(error) => {
-            todo!("Handle error")
+            global.toast(
+                Toast::init("error", "could not get turn")
+                    .error()
+                    .with_more_info(error.as_str()),
+            );
+
+            HashMap::new()
         }
     };
 

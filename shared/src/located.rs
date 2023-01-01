@@ -26,4 +26,8 @@ impl<T> Located<T> {
     pub fn is_south_of<U>(&self, other: &Located<U>) -> bool {
         self.x == other.x && self.y + 1 == other.y
     }
+
+    pub fn is_same_pos_as<U>(&self, other: &Located<U>) -> bool {
+        self.x == other.x && self.y == other.y
+    }
 }

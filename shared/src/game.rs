@@ -9,7 +9,7 @@ use crate::map::{Map, MapOpt};
 use crate::owner::Owned;
 use crate::player::Player;
 use crate::point::Point;
-use crate::rng::RandGen;
+use crate::rng::{RandGen, RandSeed};
 use crate::team_color::TeamColor;
 use crate::unit::{Unit, UnitId};
 use serde::{Deserialize, Serialize};
@@ -115,7 +115,42 @@ pub enum FromLobbyError {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl Game {
-    pub fn advance_turn(&mut self) -> Result<(), String> {
+    pub fn all_players_turns(&self) -> Result<Vec<(Id, Vec<Action>)>, String> {
+        let mut player_moves: Vec<(Id, Vec<Action>)> = Vec::new();
+
+        match &self.hosts_turn {
+            Turn::Waiting => {
+                return Err("waiting on the host to submit their turn".to_string());
+            }
+            Turn::Turn { moves } => {
+                player_moves.push((self.host_id.clone(), moves.clone()));
+            }
+        }
+
+        match &self.first_guests_turn {
+            Turn::Waiting => {
+                return Err("waiting on the first guest to submit their turn".to_string());
+            }
+            Turn::Turn { moves } => {
+                player_moves.push((self.first_guest_id.clone(), moves.clone()));
+            }
+        }
+
+        for (n, (guest_id, guest)) in self.remaining_guests.iter().enumerate() {
+            match &guest.turn {
+                Turn::Waiting => {
+                    return Err(format!("wiating on guest {} to submit their turn", n + 2));
+                }
+                Turn::Turn { moves } => player_moves.push((guest_id.clone(), moves.clone())),
+            }
+        }
+
+        Ok(player_moves)
+    }
+    pub fn advance_turn(&mut self, seed: RandSeed) -> Result<(), String> {
+        let mut rand_gen = RandGen::from_seed(seed);
+
+        let player_moves: Vec<(Id, Vec<Action>)> = self.all_players_turns()?;
         // TODO!
         Ok(())
     }
