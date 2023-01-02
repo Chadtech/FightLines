@@ -219,7 +219,7 @@ pub fn init(
     let moved_units = moves_index
         .keys()
         .into_iter()
-        .map(|unit_id| unit_id.clone())
+        .cloned()
         .collect::<Vec<UnitId>>();
 
     let model = Model {

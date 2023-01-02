@@ -84,6 +84,13 @@ pub enum Action {
     },
 }
 
+pub enum Outcome {
+    Traveled {
+        unit_id: UnitId,
+        path: Vec<Located<Direction>>,
+    },
+}
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct UnitModel {
     pub unit: Unit,
@@ -139,7 +146,7 @@ impl Game {
         for (n, (guest_id, guest)) in self.remaining_guests.iter().enumerate() {
             match &guest.turn {
                 Turn::Waiting => {
-                    return Err(format!("wiating on guest {} to submit their turn", n + 2));
+                    return Err(format!("waiting on guest {} to submit their turn", n + 2));
                 }
                 Turn::Turn { moves } => player_moves.push((guest_id.clone(), moves.clone())),
             }
@@ -147,12 +154,60 @@ impl Game {
 
         Ok(player_moves)
     }
-    pub fn advance_turn(&mut self, seed: RandSeed) -> Result<(), String> {
-        let mut rand_gen = RandGen::from_seed(seed);
+    pub fn advance_turn(&mut self, seed: RandSeed) -> Result<Option<Vec<Outcome>>, String> {
+        let mut rng = RandGen::from_seed(seed);
 
-        let player_moves: Vec<(Id, Vec<Action>)> = self.all_players_turns()?;
-        // TODO!
-        Ok(())
+        let mut player_moves: Vec<(Id, Vec<Action>)> = match &mut self.all_players_turns() {
+            Ok(moves) => {
+                let mut src_moves = moves.clone();
+                let mut ret_moves = Vec::new();
+
+                while !src_moves.is_empty() {
+                    let index = rng.gen::<usize>(0, src_moves.len() - 1);
+
+                    let players_moves = src_moves[index].clone();
+
+                    ret_moves.push(players_moves);
+
+                    src_moves.remove(index);
+                }
+
+                ret_moves
+            }
+            Err(_) => {
+                return Ok(None);
+            }
+        };
+
+        let mut outcomes = Vec::new();
+
+        let mut player_index = 0;
+        let mut cont = true;
+
+        while cont {
+            if let Some((_player_id, actions)) = player_moves.get_mut(player_index) {
+                if let Some(first) = actions.first() {
+                    match first {
+                        Action::Traveled { unit_id, path, .. } => {
+                            outcomes.push(Outcome::Traveled {
+                                unit_id: unit_id.clone(),
+                                path: path.clone(),
+                            });
+                        }
+                    }
+
+                    actions.remove(0);
+                }
+            }
+
+            player_index = (player_index + 1) % player_moves.len();
+
+            cont = !player_moves.iter().all(|(_, m)| m.is_empty());
+        }
+
+        self.turn_number += 1;
+
+        Ok(Some(outcomes))
     }
     pub fn get_turn(&self, player_id: Id) -> Result<Turn, String> {
         if player_id == self.host_id {
@@ -440,6 +495,10 @@ impl Game {
 
     pub fn get_units_by_location(&self, key: &Point<u16>) -> Option<&Vec<(UnitId, UnitModel)>> {
         self.units_by_location_index.get(key)
+    }
+
+    pub fn num_players(&self) -> usize {
+        2 + self.remaining_guests.len()
     }
 }
 

@@ -28,8 +28,20 @@ impl Games {
         self.games.get(&id)
     }
 
-    pub fn get_mut_game(&mut self, id: GameId) -> Option<&mut Game> {
-        self.games.get_mut(&id)
+    pub fn get_mut_game_and_seed(&mut self, id: GameId) -> Option<(&mut Game, RandSeed)> {
+        match self.games.get_mut(&id) {
+            None => None,
+            Some(game) => {
+                let mut rng = RandGen::from_seed(self.random_seed.clone());
+
+                let new_seed_0: RandSeed = RandSeed::next(&mut rng);
+                let new_seed_1: RandSeed = RandSeed::next(&mut rng);
+
+                self.random_seed = new_seed_1;
+
+                Some((game, new_seed_0))
+            }
+        }
     }
 
     pub fn upsert(&mut self, id: GameId, game: Game) {

@@ -3,6 +3,7 @@ use actix_web::{web, HttpResponse};
 use shared::api::game::submit_turn::{Request, Response};
 use shared::game::{Game, GameId};
 use shared::id::Id;
+use shared::rng::RandSeed;
 
 pub async fn handle(
     body: String,
@@ -39,7 +40,7 @@ pub async fn handle(
 
     let mut games = data.games.lock().unwrap();
 
-    let game: &mut Game = match games.get_mut_game(game_id) {
+    let (game, rand_seed): (&mut Game, RandSeed) = match games.get_mut_game_and_seed(game_id) {
         Some(game) => game,
         None => {
             return HttpResponse::NotFound().body("game does not exist");
@@ -50,7 +51,7 @@ pub async fn handle(
         return HttpResponse::BadRequest().body(err);
     };
 
-    if let Err(err) = game.advance_turn() {
+    if let Err(err) = game.advance_turn(rand_seed) {
         return HttpResponse::BadRequest().body(err);
     };
 
