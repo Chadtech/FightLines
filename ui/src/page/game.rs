@@ -140,6 +140,7 @@ pub enum Msg {
     ClickedSubmitTurnConfirm,
     ClickedCancelSubmitTurn,
     GotTurnSubmitResponse(Box<Result<submit_turn::Response, String>>),
+    GotGame(Box<Result<shared::api::game::get::Response, String>>),
 }
 
 ///////////////////////////////////////////////////////////////
@@ -368,9 +369,10 @@ pub fn update(
         }
         Msg::GotTurnSubmitResponse(result) => match *result {
             Ok(res) => {
-                model.game = res.game;
                 model.stage = Stage::Waiting;
                 model.status = Status::Ready;
+
+                refetch_game(model, res.game, orders);
             }
             Err(err) => {
                 global.toast(
@@ -380,7 +382,46 @@ pub fn update(
                 );
             }
         },
+        Msg::GotGame(result) => match *result {
+            Ok(res) => {
+                refetch_game(model, res.get_game(), orders);
+            }
+            Err(err) => {
+                global.toast(
+                    Toast::init("error", "failed to fetch game")
+                        .error()
+                        .with_more_info(err),
+                );
+            }
+        },
     }
+}
+
+fn refetch_game(model: &mut Model, fetched_game: Game, orders: &mut impl Orders<Msg>) {
+    if model.game.turn_number == fetched_game.turn_number {
+        let url = Endpoint::make_get_game(model.game_id.clone());
+
+        orders.skip().perform_cmd({
+            async {
+                let result = match api::get(url).await {
+                    Ok(res_bytes) => shared::api::game::get::Response::from_bytes(res_bytes)
+                        .map_err(|err| err.to_string()),
+                    Err(error) => {
+                        let fetch_error = core_ext::http::fetch_error_to_string(error);
+                        Err(fetch_error)
+                    }
+                };
+
+                Msg::GotGame(Box::new(result))
+            }
+        });
+
+        model.status = Status::Waiting;
+    } else {
+        model.stage = Stage::TakingTurn { mode: Mode::None };
+    }
+
+    model.game = fetched_game;
 }
 
 fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl Orders<Msg>) {

@@ -58,6 +58,7 @@ pub struct Game {
     pub units_by_player_index: HashMap<Id, Vec<(UnitId, UnitModel)>>,
     pub map: Map,
     pub turn_number: u32,
+    pub prev_outcomes: Vec<Outcome>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -84,6 +85,7 @@ pub enum Action {
     },
 }
 
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum Outcome {
     Traveled {
         unit_id: UnitId,
@@ -154,16 +156,20 @@ impl Game {
 
         Ok(player_moves)
     }
-    pub fn advance_turn(&mut self, seed: RandSeed) -> Result<Option<Vec<Outcome>>, String> {
+    pub fn advance_turn(&mut self, seed: RandSeed) -> Result<bool, String> {
         let mut rng = RandGen::from_seed(seed);
-
         let mut player_moves: Vec<(Id, Vec<Action>)> = match &mut self.all_players_turns() {
             Ok(moves) => {
                 let mut src_moves = moves.clone();
                 let mut ret_moves = Vec::new();
 
                 while !src_moves.is_empty() {
-                    let index = rng.gen::<usize>(0, src_moves.len() - 1);
+                    let max_index = src_moves.len() - 1;
+                    let index = if max_index == 0 {
+                        0
+                    } else {
+                        rng.gen::<usize>(0, max_index)
+                    };
 
                     let players_moves = src_moves[index].clone();
 
@@ -175,7 +181,7 @@ impl Game {
                 ret_moves
             }
             Err(_) => {
-                return Ok(None);
+                return Ok(false);
             }
         };
 
@@ -206,9 +212,38 @@ impl Game {
         }
 
         self.turn_number += 1;
+        self.consume_outcomes(outcomes.clone());
+        self.prev_outcomes = outcomes.clone();
+        self.units_by_location_index = index_units_by_location(&self.units);
+        self.units_by_player_index = index_units_by_player(&self.units);
+        self.host_visibility = calculate_player_visibility(&self.host_id, &self.map, &self.units);
+        self.first_guest_visibility =
+            calculate_player_visibility(&self.first_guest_id, &self.map, &self.units);
+        self.hosts_turn = Turn::Waiting;
+        self.first_guests_turn = Turn::Waiting;
 
-        Ok(Some(outcomes))
+        for (guest_id, guest) in &mut self.remaining_guests {
+            guest.visibility = calculate_player_visibility(guest_id, &self.map, &self.units);
+            guest.turn = Turn::Waiting;
+        }
+
+        Ok(true)
     }
+    pub fn consume_outcomes(&mut self, outcomes: Vec<Outcome>) {
+        for outcome in outcomes {
+            match outcome {
+                Outcome::Traveled { unit_id, path } => {
+                    if let Some(loc_dir) = path.last() {
+                        if let Some(loc_unit) = self.units.get_mut(&unit_id) {
+                            loc_unit.x = loc_dir.x;
+                            loc_unit.y = loc_dir.y;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     pub fn get_turn(&self, player_id: Id) -> Result<Turn, String> {
         if player_id == self.host_id {
             return Ok(self.hosts_turn.clone());
@@ -370,7 +405,6 @@ impl Game {
                     host_id: host_id.clone(),
                     host_visibility: calculate_player_visibility(&host_id, &map, &unit_hashmap),
                     hosts_turn: Turn::Waiting,
-
                     first_guest: first_guest.clone(),
                     first_guest_id: first_guest_id.clone(),
                     first_guest_visibility: calculate_player_visibility(
@@ -385,6 +419,7 @@ impl Game {
                     units: unit_hashmap,
                     map,
                     turn_number: 0,
+                    prev_outcomes: Vec::new(),
                 };
 
                 Ok(game)
