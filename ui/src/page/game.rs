@@ -5,7 +5,7 @@ use crate::web_sys::HtmlCanvasElement;
 use crate::{api, assets, core_ext, global, Row, Style, Toast};
 use seed::app::CmdHandle;
 use seed::prelude::{cmds, el_ref, At, El, ElRef, IndexMap, Node, Orders, St, ToClasses, UpdateEl};
-use seed::{attrs, canvas, style, C};
+use seed::{attrs, canvas, log, style, C};
 use shared::api::endpoint::Endpoint;
 use shared::api::game::submit_turn;
 use shared::arrow::Arrow;
@@ -25,10 +25,14 @@ use std::collections::{HashMap, HashSet};
 // Helpers //
 ///////////////////////////////////////////////////////////////
 
-fn wait_for_timeout(orders: &mut impl Orders<Msg>) -> CmdHandle {
+fn wait_for_render_timeout(orders: &mut impl Orders<Msg>) -> CmdHandle {
     orders.perform_cmd_with_handle(cmds::timeout(MIN_RENDER_TIME, || {
         Msg::MinimumRenderTimeExpired
     }))
+}
+
+fn wait_for_game_reload_timeout(orders: &mut impl Orders<Msg>) -> CmdHandle {
+    orders.perform_cmd_with_handle(cmds::timeout(4096, || Msg::GameReloadTimeExpired))
 }
 
 const MIN_RENDER_TIME: u32 = 256;
@@ -50,6 +54,7 @@ pub struct Model {
     game_pixel_height: u16,
     game_pos: Point<i16>,
     handle_minimum_framerate_timeout: CmdHandle,
+    handle_game_reload_timeout: Option<CmdHandle>,
     frame_count: FrameCount,
     moved_units: Vec<UnitId>,
     moves_index: HashMap<UnitId, Action>,
@@ -141,6 +146,7 @@ pub enum Msg {
     ClickedCancelSubmitTurn,
     GotTurnSubmitResponse(Box<Result<submit_turn::Response, String>>),
     GotGame(Box<Result<shared::api::game::get::Response, String>>),
+    GameReloadTimeExpired,
 }
 
 ///////////////////////////////////////////////////////////////
@@ -238,7 +244,8 @@ pub fn init(
             x: game_x as i16,
             y: game_y as i16,
         },
-        handle_minimum_framerate_timeout: wait_for_timeout(orders),
+        handle_minimum_framerate_timeout: wait_for_render_timeout(orders),
+        handle_game_reload_timeout: None,
         frame_count: FrameCount::F1,
         moved_units,
         moves_index,
@@ -293,11 +300,13 @@ pub fn update(
         }
         Msg::MouseDownOnScreen(_page_pos) => {}
         Msg::MouseUpOnScreen(page_pos) => {
-            handle_click_on_screen_during_turn(
-                global,
-                model,
-                click_pos_to_game_pos(page_pos, model),
-            );
+            if let Stage::TakingTurn { .. } = model.stage {
+                handle_click_on_screen_during_turn(
+                    global,
+                    model,
+                    click_pos_to_game_pos(page_pos, model),
+                );
+            }
         }
         Msg::MouseMoveOnScreen(page_pos) => {
             let Point { x, y } = click_pos_to_game_pos(page_pos, model);
@@ -352,7 +361,7 @@ pub fn update(
                 );
             }
 
-            model.handle_minimum_framerate_timeout = wait_for_timeout(orders);
+            model.handle_minimum_framerate_timeout = wait_for_render_timeout(orders);
         }
         Msg::ClickedSubmitTurn => {
             if model.all_units_moved(global.viewer_id()) {
@@ -394,31 +403,37 @@ pub fn update(
                 );
             }
         },
+        Msg::GameReloadTimeExpired => {
+            let url = Endpoint::make_get_game(model.game_id.clone());
+
+            model.status = Status::Waiting;
+
+            orders.skip().perform_cmd({
+                async {
+                    let result = match api::get(url).await {
+                        Ok(res_bytes) => shared::api::game::get::Response::from_bytes(res_bytes)
+                            .map_err(|err| err.to_string()),
+                        Err(error) => {
+                            let fetch_error = core_ext::http::fetch_error_to_string(error);
+                            Err(fetch_error)
+                        }
+                    };
+
+                    Msg::GotGame(Box::new(result))
+                }
+            });
+        }
     }
 }
 
 fn refetch_game(model: &mut Model, fetched_game: Game, orders: &mut impl Orders<Msg>) {
     if model.game.turn_number == fetched_game.turn_number {
-        let url = Endpoint::make_get_game(model.game_id.clone());
-
-        orders.skip().perform_cmd({
-            async {
-                let result = match api::get(url).await {
-                    Ok(res_bytes) => shared::api::game::get::Response::from_bytes(res_bytes)
-                        .map_err(|err| err.to_string()),
-                    Err(error) => {
-                        let fetch_error = core_ext::http::fetch_error_to_string(error);
-                        Err(fetch_error)
-                    }
-                };
-
-                Msg::GotGame(Box::new(result))
-            }
-        });
-
-        model.status = Status::Waiting;
+        model.handle_game_reload_timeout = Some(wait_for_game_reload_timeout(orders));
     } else {
         model.stage = Stage::TakingTurn { mode: Mode::None };
+        model.status = Status::Ready;
+        model.moved_units = Vec::new();
+        model.moves_index = HashMap::new();
     }
 
     model.game = fetched_game;
@@ -431,11 +446,14 @@ fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl 
         .moves_index
         .iter()
         .map(|(unit_id, action)| match action {
-            Action::TraveledTo { path, arrows } => game::Action::Traveled {
-                unit_id: unit_id.clone(),
-                path: path.clone(),
-                arrows: arrows.clone(),
-            },
+            Action::TraveledTo { path, arrows } => {
+                log!(path);
+                game::Action::Traveled {
+                    unit_id: unit_id.clone(),
+                    path: path.clone(),
+                    arrows: arrows.clone(),
+                }
+            }
         })
         .collect();
 
@@ -529,14 +547,22 @@ fn handle_click_on_screen_when_move_mode(model: &mut Model) -> Result<(), (Strin
         let mut pos_x: u16 = unit_loc.x;
         let mut pos_y: u16 = unit_loc.y;
 
-        for (dir, _) in &moving_model.arrows {
+        if let Some((dir, _)) = &moving_model.arrows.first() {
             path.push(Located {
                 x: pos_x,
                 y: pos_y,
                 value: dir.clone(),
             });
+        }
 
+        for (dir, _) in &moving_model.arrows {
             dir.adjust_coord(&mut pos_x, &mut pos_y);
+
+            path.push(Located {
+                x: pos_x,
+                y: pos_y,
+                value: dir.clone(),
+            });
         }
 
         let unit_id = moving_model.unit_id.clone();

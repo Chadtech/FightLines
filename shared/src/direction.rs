@@ -25,7 +25,9 @@ impl Direction {
     pub fn adjust_coord(&self, x: &mut u16, y: &mut u16) {
         match self {
             Direction::North => {
-                *y -= 1;
+                if *y > 0 {
+                    *y -= 1;
+                }
             }
             Direction::South => {
                 *y += 1;
@@ -34,7 +36,9 @@ impl Direction {
                 *x += 1;
             }
             Direction::West => {
-                *x -= 1;
+                if *x > 0 {
+                    *x -= 1;
+                }
             }
         };
     }
