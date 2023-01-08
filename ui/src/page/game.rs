@@ -446,14 +446,11 @@ fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl 
         .moves_index
         .iter()
         .map(|(unit_id, action)| match action {
-            Action::TraveledTo { path, arrows } => {
-                log!(path);
-                game::Action::Traveled {
-                    unit_id: unit_id.clone(),
-                    path: path.clone(),
-                    arrows: arrows.clone(),
-                }
-            }
+            Action::TraveledTo { path, arrows } => game::Action::Traveled {
+                unit_id: unit_id.clone(),
+                path: path.clone(),
+                arrows: arrows.clone(),
+            },
         })
         .collect();
 
@@ -493,7 +490,7 @@ fn handle_click_on_screen_during_turn(
 ) {
     let Point { x, y } = mouse_pos;
 
-    if !(x > 0 && y > 0) {
+    if !(x >= 0 && y >= 0) {
         return;
     }
 

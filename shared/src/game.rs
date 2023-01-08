@@ -589,11 +589,13 @@ fn calculate_player_visibility(
 
     for loc_unit in units.values() {
         if &loc_unit.value.owner == player_id {
-            visible_spots.insert(Located {
-                value: (),
-                x: loc_unit.x - 1,
-                y: loc_unit.y,
-            });
+            if loc_unit.x > 0 {
+                visible_spots.insert(Located {
+                    value: (),
+                    x: loc_unit.x - 1,
+                    y: loc_unit.y,
+                });
+            }
 
             visible_spots.insert(Located {
                 value: (),
@@ -601,11 +603,13 @@ fn calculate_player_visibility(
                 y: loc_unit.y,
             });
 
-            visible_spots.insert(Located {
-                value: (),
-                x: loc_unit.x,
-                y: loc_unit.y - 1,
-            });
+            if loc_unit.y > 0 {
+                visible_spots.insert(Located {
+                    value: (),
+                    x: loc_unit.x,
+                    y: loc_unit.y - 1,
+                });
+            }
 
             visible_spots.insert(Located {
                 value: (),
