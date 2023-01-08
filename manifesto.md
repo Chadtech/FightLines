@@ -27,7 +27,7 @@ Ground combat is also unique in that it relies on logistics units like trucks to
 
 ### Ground logistics units
 - **Trucks** can be loaded up with ground attack units or supplies, whereafter they can relocate their cargo quickly and efficiently
-- **Semi-Truck** is just like a truck, except it can carry more cargo, and it is disadvantaged in that it can only travel on roads.
+- **Semi-Truck** is just like a truck, except it can carry more cargo, but it can travel on roads.
 
 
 ## Air Units
@@ -38,11 +38,11 @@ Air units can move very fast and far and are not impeded by terrain. They cannot
 
 ### Air logistics units
 - **Recon Planes** cannot attack or move cargo, but they have good visibility and so are useful for spotting enemy forces. They are cheap to make and operate.
-- **Transport Helicopters** behave much like trucks. Helicopters can also land anywhere, which means they are not necessarily consuming lots of fuel simply due to being away from an airfield.
+- **Transport Helicopters** behave much like trucks. Helicopters can also land anywhere, which means they are not constrained to operating out of airfields.
 - **Cargo Planes** can carry large amounts of ground units and supplies and have an enormous range, but can only load cargo at airfields (they can however drop cargo or infantry anywhere via parachutes).
 
 ## Naval Units
-Navals units are fairly large and expensive. It is cost-effective to fight them with air units due to air units being cheaper.
+Naval units are fairly large and expensive. It is cost-effective to fight them with air units due to air units being cheaper.
 
 Naval units also have a rock-paper-scissors dynamic between Torpedo Boats, Destroyers, and Battleships. It is therefore advantageous to group naval units into large flotillas that move together, so that the strengths of different ships compliment each other.
 
