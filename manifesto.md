@@ -6,9 +6,56 @@ FightLines is a turn based strategy war game about moving and resupplying troops
 
 # Gameplay
 In FightLines..
-1. ..there is a "rock paper scissors" dynamic between defense, movement, and offense. A defending unit will have a huge advantage against an attacking one. A defending unit can be destroyed by moving around it, and either cutting it off from it's supplies or attacking it from behind. Units that are simply moving around will be greatly vulnerable to an attacking unit.
+1. ..for ground units, there is a "rock paper scissors" dynamic between defense, movement, and offense. A defending unit will have a huge advantage against an attacking one. A defending unit can be destroyed by moving around it, and either cutting it off from it's supplies or attacking it from behind. Units that are simply moving around will be greatly vulnerable to an attacking unit.
 2. ..it is expensive to simply move troops into combat on their own. It is optimal to move them via trucks and boats. Troops far away from home will perish if they are not resupplied, which may occur if the vehicles resupplying them are destroyed en route.
 3. ..you and your enemy have towns and factories, but neither of you can capture them from each other. They can only be destroyed, whereafter the no one will never benefit them again. Infrastructure and resources can't be taken, only denied from the enemy.
+
+# Units
+
+## Ground Units
+Compared to air and naval units, ground units are very slow but also very cheap. Ground units uniquely have a game dynamic called _digging in_, where they become immobile but in exchange they have greatly boosted defense in one direction. Since their defensive advantage is only in one direction, _dug in_ units are vulnerable to attack from behind or to the side. 
+
+Ground combat is also unique in that it relies on logistics units like trucks to move attacking units around. Without trucks, ground units move too slowly and inefficiently to threaten the enemy (the tank being the only exception to this rule).
+
+### Ground attack units
+- **Infantry**, the simplest unit.
+- **Artillery**, depicted as several soldiers with a large artillery piece. It can only attack from a distance while it is _dug in_.
+- **Anti-Tank Gun**. This unit is also depicted as several soldiers with a large cannon. It behaves like infantry except it cannot attack, but it is very strong defensively against tanks. 
+- **Tanks** can do a lot of damage attacking, even against _dug in_ infantry. They can also move fast. 
+- **Anti-Air** cannot attack, but will defend a wide area against aircraft.
+
+
+### Ground logistics units
+- **Trucks** can be loaded up with ground attack units or supplies, whereafter they can relocate their cargo quickly and efficiently
+- **Semi-Truck** is just like a truck, except it can carry more cargo, and it is disadvantaged in that it can only travel on roads.
+
+
+## Air Units
+Air units can move very fast and far and are not impeded by terrain. They cannot stay airborne long, and need to land at airfields for replenishment.
+### Air attack units
+- **Fighter planes** can attack any air or ground unit with great effect. They can also defend regions of air space.
+- **Bombers** have a very large range and are highly destructive to any ground unit, ground structure or naval unit. They cannot attack air units.
+
+### Air logistics units
+- **Recon Planes** cannot attack or move cargo, but they have good visibility and so are useful for spotting enemy forces. They are cheap to make and operate.
+- **Transport Helicopters** behave much like trucks. Helicopters can also land anywhere, which means they are not necessarily consuming lots of fuel simply due to being away from an airfield.
+- **Cargo Planes** can carry large amounts of ground units and supplies and have an enormous range, but can only load cargo at airfields (they can however drop cargo or infantry anywhere via parachutes).
+
+## Naval Units
+Navals units are fairly large and expensive. It is cost-effective to fight them with air units due to air units being cheaper.
+
+Naval units also have a rock-paper-scissors dynamic between Torpedo Boats, Destroyers, and Battleships. It is therefore advantageous to group naval units into large flotillas that move together, so that the strengths of different ships compliment each other.
+
+### Water attack units
+- **Torpedo Boats** are small and cheap and very effective against large naval units like Battleships, Cargo Ships, and Aircraft Carriers.
+- **Submarines** are slow and weak but can submerge thereby becoming undetectable.
+- **Destroyers** are medium sized ships that are very effective against Torpedo Boats. They are also the only unit that can attack Submarines.
+- **Battleships** are very large and powerful ships that are very effective against Destroyers. They are also uniquely useful in that they can do long distance attacks onto ground units much like artillery.
+- **Aircraft Carriers** are boats that behave in game essentially as airfields. Aircraft carriers can carry and replenish aircraft.
+
+## Water logistics units
+- **Cargo Ships** can carry enormous amounts of supplies and units, and they can also replenish ships, but they can only load or unload at ports. 
+- **Landers** are similar to Cargo ships, except that they are much smaller and can load or unload on beaches too.
 
 ## Background
 
