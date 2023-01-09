@@ -28,13 +28,15 @@ impl ToString for UnitId {
 pub enum Unit {
     Infantry,
     Tank,
+    Truck,
 }
 
 impl Unit {
     pub fn get_mobility_range(&self) -> usize {
         match self {
             Unit::Infantry => 2,
-            Unit::Tank => 8,
+            Unit::Tank => 6,
+            Unit::Truck => 7,
         }
     }
 }

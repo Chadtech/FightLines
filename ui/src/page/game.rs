@@ -5,14 +5,14 @@ use crate::web_sys::HtmlCanvasElement;
 use crate::{api, assets, core_ext, global, Row, Style, Toast};
 use seed::app::CmdHandle;
 use seed::prelude::{cmds, el_ref, At, El, ElRef, IndexMap, Node, Orders, St, ToClasses, UpdateEl};
-use seed::{attrs, canvas, log, style, C};
+use seed::{attrs, canvas, style, C};
 use shared::api::endpoint::Endpoint;
 use shared::api::game::submit_turn;
 use shared::arrow::Arrow;
 use shared::direction::Direction;
 use shared::facing_direction::FacingDirection;
 use shared::frame_count::FrameCount;
-use shared::game::{Game, GameId, Turn};
+use shared::game::{Game, GameId, Turn, UnitPlace};
 use shared::id::Id;
 use shared::located::Located;
 use shared::point::Point;
@@ -534,15 +534,17 @@ fn handle_click_on_screen_when_move_mode(model: &mut Model) -> Result<(), (Strin
         mode: Mode::MovingUnit(moving_model),
     } = &model.stage
     {
-        let unit_loc = model.game.units.get(&moving_model.unit_id).ok_or((
+        let unit = model.game.units.get(&moving_model.unit_id).ok_or((
             "handle move click".to_string(),
             "Could not find unit when moving unit SirttBHL".to_string(),
         ))?;
 
         let mut path: Vec<Located<Direction>> = Vec::new();
 
-        let mut pos_x: u16 = unit_loc.x;
-        let mut pos_y: u16 = unit_loc.y;
+        let (mut pos_x, mut pos_y) = match &unit.place {
+            UnitPlace::OnMap(loc_facing_dir) => (loc_facing_dir.x, loc_facing_dir.y),
+            UnitPlace::InUnit(_) => return Ok(()),
+        };
 
         if let Some((dir, _)) = &moving_model.arrows.first() {
             path.push(Located {
@@ -634,14 +636,21 @@ fn handle_mouse_move_for_mode(
             Mode::None => {}
             Mode::MovingUnit(moving_model) => {
                 if moving_model.mobility.contains(&mouse_loc) {
-                    let unit_loc = model.game.units.get(&moving_model.unit_id).ok_or((
+                    let unit_model = model.game.units.get(&moving_model.unit_id).ok_or((
                         "handle mouse move in move mode".to_string(),
                         "Could not find unit in moving model".to_string(),
                     ))?;
 
+                    let loc = match &unit_model.place {
+                        UnitPlace::OnMap(loc) => loc,
+                        UnitPlace::InUnit(_) => {
+                            return Ok(());
+                        }
+                    };
+
                     let mouse_point = Point {
-                        x: mouse_loc.x as i32 - unit_loc.x as i32,
-                        y: mouse_loc.y as i32 - unit_loc.y as i32,
+                        x: mouse_loc.x as i32 - loc.x as i32,
+                        y: mouse_loc.y as i32 - loc.y as i32,
                     };
 
                     let arrows = calc_arrows(
@@ -653,7 +662,7 @@ fn handle_mouse_move_for_mode(
                                 .map(|(dir, _)| dir.clone())
                                 .collect::<Vec<_>>(),
                         ),
-                        unit_loc.value.unit.get_mobility_range(),
+                        unit_model.unit.get_mobility_range(),
                     );
 
                     moving_model.arrows = arrows;
@@ -745,11 +754,13 @@ fn draw_mode_from_mouse_event(model: &Model) -> Result<(), (String, String)> {
                     "Could not get unit in moving mode".to_string(),
                 ))?;
 
-                let mut arrow_x = unit.x;
-                let mut arrow_y = unit.y;
-                for (dir, arrow) in &moving_model.arrows {
-                    draw_arrows(&ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y, false)
-                        .map_err(|err_msg| ("rendering mobility range".to_string(), err_msg))?;
+                if let UnitPlace::OnMap(loc) = &unit.place {
+                    let mut arrow_x = loc.x;
+                    let mut arrow_y = loc.y;
+                    for (dir, arrow) in &moving_model.arrows {
+                        draw_arrows(&ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y, false)
+                            .map_err(|err_msg| ("rendering mobility range".to_string(), err_msg))?;
+                    }
                 }
             }
         },
@@ -899,110 +910,111 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
     ctx.begin_path();
     ctx.clear_rect(0., 0., width, height);
 
-    for (unit_id, located_unit) in model.game.units.iter() {
-        let location = Located {
-            x: located_unit.x,
-            y: located_unit.y,
-            value: (),
-        };
-
-        if visibility.contains(&location) {
-            let x = (located_unit.x * tile::PIXEL_WIDTH) as f64;
-            let y = (located_unit.y * tile::PIXEL_HEIGHT) as f64;
-
-            let unit_model = located_unit.clone().value;
-
-            let sheet = match unit_model.facing {
-                FacingDirection::Left => &model.assets.sheet_flipped,
-                FacingDirection::Right => &model.assets.sheet,
+    for (unit_id, unit_model) in model.game.units.iter() {
+        if let UnitPlace::OnMap(loc_facing) = &unit_model.place {
+            let location = Located {
+                x: loc_facing.x,
+                y: loc_facing.y,
+                value: (),
             };
 
-            let has_moved = model.moved_units.contains(unit_id);
+            if visibility.contains(&location) {
+                let x = (loc_facing.x * tile::PIXEL_WIDTH) as f64;
+                let y = (loc_facing.y * tile::PIXEL_HEIGHT) as f64;
 
-            let (sx, sy) = {
-                let mut sx = {
-                    let sprite_sheet_x = match model.frame_count {
-                        FrameCount::F1 => 0.0,
-                        FrameCount::F2 => 1.0,
-                        FrameCount::F3 => 2.0,
-                        FrameCount::F4 => 3.0,
+                let sheet = match loc_facing.value {
+                    FacingDirection::Left => &model.assets.sheet_flipped,
+                    FacingDirection::Right => &model.assets.sheet,
+                };
+
+                let has_moved = model.moved_units.contains(unit_id);
+
+                let (sx, sy) = {
+                    let mut sx = {
+                        let sprite_sheet_x = match model.frame_count {
+                            FrameCount::F1 => 0.0,
+                            FrameCount::F2 => 1.0,
+                            FrameCount::F3 => 2.0,
+                            FrameCount::F4 => 3.0,
+                        };
+                        match loc_facing.value {
+                            FacingDirection::Left => SPRITE_SHEET_WIDTH - sprite_sheet_x - 1.0,
+                            FacingDirection::Right => sprite_sheet_x,
+                        }
                     };
-                    match unit_model.facing {
-                        FacingDirection::Left => SPRITE_SHEET_WIDTH - sprite_sheet_x - 1.0,
-                        FacingDirection::Right => sprite_sheet_x,
+
+                    if has_moved {
+                        match loc_facing.value {
+                            FacingDirection::Left => {
+                                sx -= 4.0;
+                            }
+                            FacingDirection::Right => {
+                                sx += 4.0;
+                            }
+                        }
                     }
+
+                    let mut sy = match unit_model.unit {
+                        Unit::Infantry => 0.0,
+                        Unit::Tank => 2.0,
+                        Unit::Truck => 4.0,
+                    };
+
+                    if unit_model.color == TeamColor::Blue {
+                        sy += 1.0;
+                    };
+
+                    (sx * tile::PIXEL_WIDTH_FL, sy * tile::PIXEL_WIDTH_FL)
                 };
 
                 if has_moved {
-                    match unit_model.facing {
-                        FacingDirection::Left => {
-                            sx -= 4.0;
-                        }
-                        FacingDirection::Right => {
-                            sx += 4.0;
-                        }
-                    }
-                }
+                    ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+                        sheet,
+                        sx,
+                        sy,
+                        tile::PIXEL_WIDTH_FL,
+                        tile::PIXEL_HEIGHT_FL,
+                        x,
+                        y,
+                        tile::PIXEL_WIDTH_FL,
+                        tile::PIXEL_HEIGHT_FL,
+                    )
+                        .map_err(|_| "Could not draw unit outline image on canvas".to_string())?;
 
-                let mut sy = match unit_model.unit {
-                    Unit::Infantry => 0.0,
-                    Unit::Tank => 2.0,
-                };
-
-                if unit_model.color == TeamColor::Blue {
-                    sy += 1.0;
-                };
-
-                (sx * tile::PIXEL_WIDTH_FL, sy * tile::PIXEL_WIDTH_FL)
-            };
-
-            if has_moved {
-                ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                    sheet,
-                    sx,
-                    sy,
-                    tile::PIXEL_WIDTH_FL,
-                    tile::PIXEL_HEIGHT_FL,
-                    x,
-                    y,
-                    tile::PIXEL_WIDTH_FL,
-                    tile::PIXEL_HEIGHT_FL,
-                )
-                .map_err(|_| "Could not draw unit outline image on canvas".to_string())?;
-
-                match model.get_units_move(unit_id) {
-                    None => {}
-                    Some(action) => match action {
-                        Action::TraveledTo { arrows, .. } => {
-                            let mut arrow_x = located_unit.x;
-                            let mut arrow_y = located_unit.y;
-                            for (dir, arrow) in arrows {
-                                draw_arrows(
-                                    &ctx,
-                                    model,
-                                    arrow,
-                                    dir,
-                                    &mut arrow_x,
-                                    &mut arrow_y,
-                                    true,
-                                )?;
+                    match model.get_units_move(unit_id) {
+                        None => {}
+                        Some(action) => match action {
+                            Action::TraveledTo { arrows, .. } => {
+                                let mut arrow_x = loc_facing.x;
+                                let mut arrow_y = loc_facing.y;
+                                for (dir, arrow) in arrows {
+                                    draw_arrows(
+                                        &ctx,
+                                        model,
+                                        arrow,
+                                        dir,
+                                        &mut arrow_x,
+                                        &mut arrow_y,
+                                        true,
+                                    )?;
+                                }
                             }
-                        }
-                    },
+                        },
+                    }
+                } else {
+                    ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+                        sheet,
+                        sx,
+                        sy,
+                        tile::PIXEL_WIDTH_FL,
+                        tile::PIXEL_HEIGHT_FL,
+                        x,
+                        y,
+                        tile::PIXEL_WIDTH_FL,
+                        tile::PIXEL_HEIGHT_FL,
+                    )
+                        .map_err(|_| "Could not draw unit image on canvas".to_string())?;
                 }
-            } else {
-                ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                    sheet,
-                    sx,
-                    sy,
-                    tile::PIXEL_WIDTH_FL,
-                    tile::PIXEL_HEIGHT_FL,
-                    x,
-                    y,
-                    tile::PIXEL_WIDTH_FL,
-                    tile::PIXEL_HEIGHT_FL,
-                )
-                .map_err(|_| "Could not draw unit image on canvas".to_string())?;
             }
         }
     }

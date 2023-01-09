@@ -1,3 +1,4 @@
+use crate::direction::Direction;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -18,6 +19,29 @@ impl FacingDirection {
             FacingDirection::Left => "left",
             FacingDirection::Right => "right",
         }
+    }
+    pub fn from_directions(dirs: Vec<Direction>) -> Option<FacingDirection> {
+        let mut ret = None;
+
+        let mut dirs = dirs;
+        dirs.reverse();
+        let mut dirs_peek = dirs.into_iter().peekable();
+
+        while let Some(dir) = dirs_peek.next() {
+            match dir {
+                Direction::North | Direction::South => {}
+                Direction::East => {
+                    ret = Some(FacingDirection::Right);
+                    break;
+                }
+                Direction::West => {
+                    ret = Some(FacingDirection::Left);
+                    break;
+                }
+            }
+        }
+
+        ret
     }
 }
 

@@ -53,7 +53,7 @@ pub struct Game {
     // remaining guests
     pub remaining_guests: Vec<(Id, Guest)>,
     //
-    pub units: HashMap<UnitId, Located<UnitModel>>,
+    pub units: HashMap<UnitId, UnitModel>,
     pub units_by_location_index: HashMap<Point<u16>, Vec<(UnitId, UnitModel)>>,
     pub units_by_player_index: HashMap<Id, Vec<(UnitId, UnitModel)>>,
     pub map: Map,
@@ -96,9 +96,16 @@ pub enum Outcome {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct UnitModel {
     pub unit: Unit,
-    pub facing: FacingDirection,
+    pub place: UnitPlace,
     pub owner: Id,
     pub color: TeamColor,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+
+pub enum UnitPlace {
+    OnMap(Located<FacingDirection>),
+    InUnit(UnitId),
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -234,9 +241,31 @@ impl Game {
             match outcome {
                 Outcome::Traveled { unit_id, path } => {
                     if let Some(loc_dir) = path.last() {
-                        if let Some(loc_unit) = self.units.get_mut(&unit_id) {
-                            loc_unit.x = loc_dir.x;
-                            loc_unit.y = loc_dir.y;
+                        if let Some(unit) = self.units.get_mut(&unit_id) {
+                            let new_facing_dir = FacingDirection::from_directions(
+                                path.clone()
+                                    .into_iter()
+                                    .map(|loc_dir| loc_dir.value)
+                                    .collect(),
+                            )
+                            .unwrap_or_else(|| {
+                                match unit.place.clone() {
+                                    UnitPlace::OnMap(loc_facing_dir) => loc_facing_dir.value,
+                                    UnitPlace::InUnit(_) => {
+                                        // This is a value of last resort after we have
+                                        // exhausted all other information. This
+                                        // code may be unreachable
+                                        // - Chad Jan 8 2023
+                                        FacingDirection::Right
+                                    }
+                                }
+                            });
+
+                            unit.place = UnitPlace::OnMap(Located {
+                                x: loc_dir.x,
+                                y: loc_dir.y,
+                                value: new_facing_dir,
+                            });
                         }
                     }
                 }
@@ -318,33 +347,34 @@ impl Game {
                 let mut id_units = |units: Vec<Located<(FacingDirection, Unit)>>,
                                     owner_id: &Id,
                                     color: &TeamColor|
-                 -> Vec<(UnitId, Located<UnitModel>)> {
-                    let mut units_with_ids: Vec<(UnitId, Located<UnitModel>)> = vec![];
+                 -> Vec<(UnitId, UnitModel)> {
+                    let mut units_with_ids: Vec<(UnitId, UnitModel)> = vec![];
 
                     for located_unit in units {
                         let unit_id = UnitId::new(rng);
 
                         let (facing, unit) = located_unit.value;
 
-                        let new_located_unit = Located::<UnitModel> {
-                            value: UnitModel {
-                                unit,
-                                owner: owner_id.clone(),
-                                facing,
-                                color: color.clone(),
-                            },
+                        let place: UnitPlace = UnitPlace::OnMap(Located {
                             x: located_unit.x,
                             y: located_unit.y,
+                            value: facing,
+                        });
+
+                        let new_unit: UnitModel = UnitModel {
+                            unit,
+                            owner: owner_id.clone(),
+                            place,
+                            color: color.clone(),
                         };
 
-                        units_with_ids.push((unit_id, new_located_unit));
+                        units_with_ids.push((unit_id, new_unit));
                     }
 
                     units_with_ids
                 };
 
-                let mut remaining_guests_with_militaries: Vec<(UnitId, Located<UnitModel>)> =
-                    vec![];
+                let mut remaining_guests_with_militaries: Vec<(UnitId, UnitModel)> = vec![];
 
                 for (index, (guest_id, guest)) in rest.iter().enumerate() {
                     let initial_military = initial_militaries
@@ -372,14 +402,14 @@ impl Game {
                     &first_guest.color,
                 );
 
-                let units: Vec<(UnitId, Located<UnitModel>)> = vec![
+                let units: Vec<(UnitId, UnitModel)> = vec![
                     vec![host_units, first_guest_units].concat().to_vec(),
                     remaining_guests_with_militaries,
                 ]
                 .concat()
                 .to_vec();
 
-                let mut unit_hashmap: HashMap<UnitId, Located<UnitModel>> = HashMap::new();
+                let mut unit_hashmap: HashMap<UnitId, UnitModel> = HashMap::new();
 
                 for (unit_id, unit) in units {
                     unit_hashmap.insert(unit_id, unit);
@@ -453,55 +483,56 @@ impl Game {
     }
 
     pub fn get_units_mobility(&self, unit_id: &UnitId) -> Result<HashSet<Located<()>>, String> {
-        let maybe_loc_unit = self.units.get(unit_id);
+        let maybe_unit = self.units.get(unit_id);
 
-        match maybe_loc_unit {
+        match maybe_unit {
             None => Err("unit not found when getting units mobility".to_string()),
-            Some(loc_unit) => {
+            Some(unit_model) => {
                 let mut mobility = HashSet::new();
 
-                let unit = &loc_unit.value.unit;
-                let x = loc_unit.x;
-                let y = loc_unit.y;
+                if let UnitPlace::OnMap(loc_unit) = &unit_model.place {
+                    let x = loc_unit.x;
+                    let y = loc_unit.y;
 
-                let mut index = 0;
-                let unit_range = unit.get_mobility_range() - 1;
+                    let mut index = 0;
+                    let unit_range = unit_model.unit.get_mobility_range() - 1;
 
-                let mut mobility_pre_filter: HashSet<Point<i16>> = HashSet::new();
+                    let mut mobility_pre_filter: HashSet<Point<i16>> = HashSet::new();
 
-                let x = x as i16;
-                let y = y as i16;
+                    let x = x as i16;
+                    let y = y as i16;
 
-                mobility_pre_filter.insert(Point { x: x + 1, y });
-                mobility_pre_filter.insert(Point { x: x - 1, y });
-                mobility_pre_filter.insert(Point { x, y: y + 1 });
-                mobility_pre_filter.insert(Point { x, y: y - 1 });
+                    mobility_pre_filter.insert(Point { x: x + 1, y });
+                    mobility_pre_filter.insert(Point { x: x - 1, y });
+                    mobility_pre_filter.insert(Point { x, y: y + 1 });
+                    mobility_pre_filter.insert(Point { x, y: y - 1 });
 
-                while index < unit_range {
-                    let mut new_points = vec![];
-                    for p in mobility_pre_filter.iter() {
-                        new_points.push(Point { x: p.x + 1, y: p.y });
-                        new_points.push(Point { x: p.x - 1, y: p.y });
-                        new_points.push(Point { x: p.x, y: p.y + 1 });
-                        new_points.push(Point { x: p.x, y: p.y - 1 });
+                    while index < unit_range {
+                        let mut new_points = vec![];
+                        for p in mobility_pre_filter.iter() {
+                            new_points.push(Point { x: p.x + 1, y: p.y });
+                            new_points.push(Point { x: p.x - 1, y: p.y });
+                            new_points.push(Point { x: p.x, y: p.y + 1 });
+                            new_points.push(Point { x: p.x, y: p.y - 1 });
+                        }
+
+                        for p in new_points {
+                            mobility_pre_filter.insert(p);
+                        }
+
+                        index += 1;
                     }
 
-                    for p in new_points {
-                        mobility_pre_filter.insert(p);
-                    }
+                    for p in mobility_pre_filter {
+                        if p.x >= 0 && p.y >= 0 {
+                            let loc = Located {
+                                x: p.x as u16,
+                                y: p.y as u16,
+                                value: (),
+                            };
 
-                    index += 1;
-                }
-
-                for p in mobility_pre_filter {
-                    if p.x >= 0 && p.y >= 0 {
-                        let loc = Located {
-                            x: p.x as u16,
-                            y: p.y as u16,
-                            value: (),
-                        };
-
-                        mobility.insert(loc);
+                            mobility.insert(loc);
+                        }
                     }
                 }
 
@@ -538,14 +569,12 @@ impl Game {
 }
 
 fn index_units_by_player(
-    units: &HashMap<UnitId, Located<UnitModel>>,
+    units: &HashMap<UnitId, UnitModel>,
 ) -> HashMap<Id, Vec<(UnitId, UnitModel)>> {
     let mut ret = HashMap::new();
 
-    for (unit_id, loc_unit) in units.iter() {
-        let key = loc_unit.value.owner.clone();
-
-        let unit = &loc_unit.value;
+    for (unit_id, unit) in units.iter() {
+        let key = unit.owner.clone();
 
         let val = || (unit_id.clone(), unit.clone());
 
@@ -558,23 +587,23 @@ fn index_units_by_player(
 }
 
 fn index_units_by_location(
-    units: &HashMap<UnitId, Located<UnitModel>>,
+    units: &HashMap<UnitId, UnitModel>,
 ) -> HashMap<Point<u16>, Vec<(UnitId, UnitModel)>> {
     let mut ret = HashMap::new();
 
-    for (unit_id, loc_unit) in units.iter() {
-        let key = Point {
-            x: loc_unit.x,
-            y: loc_unit.y,
-        };
+    for (unit_id, unit) in units.iter() {
+        if let UnitPlace::OnMap(loc_facing_dir) = unit.place.clone() {
+            let key = Point {
+                x: loc_facing_dir.x,
+                y: loc_facing_dir.y,
+            };
 
-        let unit = &loc_unit.value;
+            let val = || (unit_id.clone(), unit.clone());
 
-        let val = || (unit_id.clone(), unit.clone());
+            let entry = ret.entry(key).or_insert_with(Vec::new);
 
-        let entry = ret.entry(key).or_insert_with(Vec::new);
-
-        entry.push(val());
+            entry.push(val());
+        }
     }
 
     ret
@@ -583,45 +612,47 @@ fn index_units_by_location(
 fn calculate_player_visibility(
     player_id: &Id,
     _map: &Map,
-    units: &HashMap<UnitId, Located<UnitModel>>,
+    units: &HashMap<UnitId, UnitModel>,
 ) -> HashSet<Located<()>> {
     let mut visible_spots = HashSet::new();
 
-    for loc_unit in units.values() {
-        if &loc_unit.value.owner == player_id {
-            if loc_unit.x > 0 {
+    for unit in units.values() {
+        if let UnitPlace::OnMap(loc) = &unit.place {
+            if &unit.owner == player_id {
+                if loc.x > 0 {
+                    visible_spots.insert(Located {
+                        value: (),
+                        x: loc.x - 1,
+                        y: loc.y,
+                    });
+                }
+
                 visible_spots.insert(Located {
                     value: (),
-                    x: loc_unit.x - 1,
-                    y: loc_unit.y,
+                    x: loc.x + 1,
+                    y: loc.y,
                 });
-            }
 
-            visible_spots.insert(Located {
-                value: (),
-                x: loc_unit.x + 1,
-                y: loc_unit.y,
-            });
+                if loc.y > 0 {
+                    visible_spots.insert(Located {
+                        value: (),
+                        x: loc.x,
+                        y: loc.y - 1,
+                    });
+                }
 
-            if loc_unit.y > 0 {
                 visible_spots.insert(Located {
                     value: (),
-                    x: loc_unit.x,
-                    y: loc_unit.y - 1,
+                    x: loc.x,
+                    y: loc.y + 1,
+                });
+
+                visible_spots.insert(Located {
+                    value: (),
+                    x: loc.x,
+                    y: loc.y,
                 });
             }
-
-            visible_spots.insert(Located {
-                value: (),
-                x: loc_unit.x,
-                y: loc_unit.y + 1,
-            });
-
-            visible_spots.insert(Located {
-                value: (),
-                x: loc_unit.x,
-                y: loc_unit.y,
-            });
         }
     }
 
