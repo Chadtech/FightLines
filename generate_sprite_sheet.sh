@@ -18,6 +18,13 @@
     ./shared/src/sprites/tank_blue_moved.aseprite \
   --sheet ./shared/src/sprites/unit_moved_sheet.png
 
+# Flags
+/Applications/Aseprite.app/Contents/MacOS/aseprite \
+  --batch \
+    ./shared/src/sprites/many_red.aseprite \
+    ./shared/src/sprites/many_blue.aseprite \
+  --sheet ./shared/src/sprites/flags_sheet.png
+
 # Misc
 /Applications/Aseprite.app/Contents/MacOS/aseprite \
   --batch \
@@ -52,6 +59,7 @@
     ./shared/src/sprites/units_sheet.png \
     ./shared/src/sprites/unit_moved_sheet.png \
     ./shared/src/sprites/misc_sheet.png \
+    ./shared/src/sprites/flags_sheet.png \
   --sheet ./server/src/assets/sheet.png \
   --sheet-type columns
 
