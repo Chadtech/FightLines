@@ -5,7 +5,7 @@ use crate::web_sys::HtmlCanvasElement;
 use crate::{api, assets, core_ext, global, Row, Style, Toast};
 use seed::app::CmdHandle;
 use seed::prelude::{cmds, el_ref, At, El, ElRef, IndexMap, Node, Orders, St, ToClasses, UpdateEl};
-use seed::{attrs, canvas, style, C};
+use seed::{attrs, canvas, log, style, C};
 use shared::api::endpoint::Endpoint;
 use shared::api::game::submit_turn;
 use shared::arrow::Arrow;
@@ -592,7 +592,7 @@ fn handle_click_on_screen_when_no_mode(
     if let Some(units_at_pos) = model.game.get_units_by_location(&Point { x, y }) {
         if let Some((first, rest)) = units_at_pos.split_first() {
             if rest.is_empty() {
-                let (unit_id, _) = first;
+                let (unit_id, _, _) = first;
 
                 match model.game.get_units_mobility(unit_id) {
                     Ok(mobility) => {
@@ -910,24 +910,26 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
     ctx.begin_path();
     ctx.clear_rect(0., 0., width, height);
 
-    for (unit_id, unit_model) in model.game.units.iter() {
-        if let UnitPlace::OnMap(loc_facing) = &unit_model.place {
-            let location = Located {
-                x: loc_facing.x,
-                y: loc_facing.y,
-                value: (),
-            };
+    for (game_pos, units) in model.game.units_by_location_index.iter() {
+        let location = Located {
+            x: game_pos.x,
+            y: game_pos.y,
+            value: (),
+        };
 
-            if visibility.contains(&location) {
-                let x = (loc_facing.x * tile::PIXEL_WIDTH) as f64;
-                let y = (loc_facing.y * tile::PIXEL_HEIGHT) as f64;
+        if visibility.contains(&location) {
+            let x = (game_pos.x * tile::PIXEL_WIDTH) as f64;
+            let y = (game_pos.y * tile::PIXEL_HEIGHT) as f64;
 
-                let sheet = match loc_facing.value {
+            if units.len() == 1 {
+                let (unit_id, facing_direction, unit_model) = units.get(0).unwrap();
+
+                let sheet = match facing_direction {
                     FacingDirection::Left => &model.assets.sheet_flipped,
                     FacingDirection::Right => &model.assets.sheet,
                 };
 
-                let has_moved = model.moved_units.contains(unit_id);
+                let maybe_units_move = model.get_units_move(unit_id);
 
                 let (sx, sy) = {
                     let mut sx = {
@@ -937,14 +939,14 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
                             FrameCount::F3 => 2.0,
                             FrameCount::F4 => 3.0,
                         };
-                        match loc_facing.value {
+                        match facing_direction {
                             FacingDirection::Left => SPRITE_SHEET_WIDTH - sprite_sheet_x - 1.0,
                             FacingDirection::Right => sprite_sheet_x,
                         }
                     };
 
-                    if has_moved {
-                        match loc_facing.value {
+                    if maybe_units_move.is_some() {
+                        match facing_direction {
                             FacingDirection::Left => {
                                 sx -= 4.0;
                             }
@@ -964,57 +966,78 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
                         sy += 1.0;
                     };
 
-                    (sx * tile::PIXEL_WIDTH_FL, sy * tile::PIXEL_WIDTH_FL)
+                    let sx_px = sx * tile::PIXEL_WIDTH_FL;
+                    let sy_px = sy * tile::PIXEL_HEIGHT_FL;
+
+                    (sx_px, sy_px)
                 };
 
-                if has_moved {
-                    ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                        sheet,
-                        sx,
-                        sy,
-                        tile::PIXEL_WIDTH_FL,
-                        tile::PIXEL_HEIGHT_FL,
-                        x,
-                        y,
-                        tile::PIXEL_WIDTH_FL,
-                        tile::PIXEL_HEIGHT_FL,
-                    )
-                        .map_err(|_| "Could not draw unit outline image on canvas".to_string())?;
+                ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+                    sheet,
+                    sx,
+                    sy,
+                    tile::PIXEL_WIDTH_FL,
+                    tile::PIXEL_HEIGHT_FL,
+                    x,
+                    y,
+                    tile::PIXEL_WIDTH_FL,
+                    tile::PIXEL_HEIGHT_FL,
+                )
+                .map_err(|_| "Could not draw unit image on canvas".to_string())?;
 
-                    match model.get_units_move(unit_id) {
-                        None => {}
-                        Some(action) => match action {
-                            Action::TraveledTo { arrows, .. } => {
-                                let mut arrow_x = loc_facing.x;
-                                let mut arrow_y = loc_facing.y;
-                                for (dir, arrow) in arrows {
-                                    draw_arrows(
-                                        &ctx,
-                                        model,
-                                        arrow,
-                                        dir,
-                                        &mut arrow_x,
-                                        &mut arrow_y,
-                                        true,
-                                    )?;
-                                }
+                if let Some(units_move) = maybe_units_move {
+                    match units_move {
+                        Action::TraveledTo { arrows, .. } => {
+                            let mut arrow_x = game_pos.x;
+                            let mut arrow_y = game_pos.y;
+                            for (dir, arrow) in arrows {
+                                draw_arrows(
+                                    &ctx,
+                                    model,
+                                    arrow,
+                                    dir,
+                                    &mut arrow_x,
+                                    &mut arrow_y,
+                                    true,
+                                )?;
                             }
-                        },
-                    }
-                } else {
-                    ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                        sheet,
-                        sx,
-                        sy,
-                        tile::PIXEL_WIDTH_FL,
-                        tile::PIXEL_HEIGHT_FL,
-                        x,
-                        y,
-                        tile::PIXEL_WIDTH_FL,
-                        tile::PIXEL_HEIGHT_FL,
-                    )
-                        .map_err(|_| "Could not draw unit image on canvas".to_string())?;
+                        }
+                    };
                 }
+            } else if units.len() > 1 {
+                let mut colors = HashSet::new();
+
+                for (_, _, unit_model) in units {
+                    colors.insert(unit_model.color.clone());
+                }
+
+                let colors_vec = colors.into_iter().collect::<Vec<TeamColor>>();
+
+                let sy = if colors_vec.len() == 1 {
+                    let color = colors_vec.get(0).unwrap();
+
+                    let y = match color {
+                        TeamColor::Red => 0.0,
+                        TeamColor::Blue => 1.0,
+                    };
+
+                    y * tile::PIXEL_HEIGHT_FL
+                } else {
+                    todo!("Sprite for game pos with multiple teams on it")
+                };
+
+                ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+                    &model.assets.sheet,
+                    9.0 * tile::PIXEL_WIDTH_FL,
+                    sy,
+                    tile::PIXEL_WIDTH_FL,
+                    tile::PIXEL_HEIGHT_FL,
+                    x,
+                    y,
+                    tile::PIXEL_WIDTH_FL,
+                    tile::PIXEL_HEIGHT_FL,
+                )
+                .map_err(|_| "Could not draw unit outline image on canvas".to_string())?;
             }
         }
     }
@@ -1259,7 +1282,7 @@ fn overlay_view(model: &Model) -> Cell<Msg> {
 }
 
 const MISC_SPRITE_SHEET_COLUMN: f64 = 128.0;
-const SPRITE_SHEET_WIDTH: f64 = 9.0;
+const SPRITE_SHEET_WIDTH: f64 = 10.0;
 
 fn calc_arrows(
     mouse_pos: Point<i32>,
