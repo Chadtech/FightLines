@@ -25,9 +25,8 @@ impl FacingDirection {
 
         let mut dirs = dirs;
         dirs.reverse();
-        let mut dirs_peek = dirs.into_iter().peekable();
 
-        while let Some(dir) = dirs_peek.next() {
+        for dir in dirs {
             match dir {
                 Direction::North | Direction::South => {}
                 Direction::East => {

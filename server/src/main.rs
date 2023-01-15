@@ -6,7 +6,7 @@ use std::thread;
 
 use actix_cors::Cors;
 use actix_web::{web, App, HttpResponse, HttpServer};
-use image::imageops::flip_horizontal;
+use image::imageops;
 use image::io::Reader as ImageReader;
 use notify::{raw_watcher, RecursiveMode, Watcher};
 
@@ -97,7 +97,8 @@ async fn main() -> Result<(), String> {
         }
         Flags::Sprites => {
             flip_sprite_sheet()?;
-            flip_sprites()?;
+            darken_units()?;
+            // flip_sprites()?;
             move_sprites()?;
 
             Ok(())
@@ -111,7 +112,7 @@ fn flip_sprite_sheet() -> Result<(), String> {
         .decode()
         .map_err(|err| err.to_string())?;
 
-    let flipped_sheet = flip_horizontal(&sheet);
+    let flipped_sheet = imageops::flip_horizontal(&sheet);
 
     flipped_sheet
         .save("./server/src/assets/sheet-flipped.png")
@@ -146,7 +147,7 @@ fn move_sprites() -> Result<(), String> {
     Ok(())
 }
 
-fn flip_sprites() -> Result<(), String> {
+fn darken_units() -> Result<(), String> {
     for path_result in read_sprite_dir() {
         let path = path_result.unwrap().path();
 
@@ -154,9 +155,9 @@ fn flip_sprites() -> Result<(), String> {
 
         let path_str = path.to_str().unwrap();
         let is_flip = path_str.ends_with("-l.png");
+        let is_darkened = path_str.ends_with("_moved.png");
 
-        // If its a png and it isnt itself a flipped image, flip it.
-        if ext == "png" && !is_flip {
+        if ext == "png" && !is_flip && !is_darkened {
             let img = ImageReader::open(path.to_str().unwrap())
                 .map_err(|err| err.to_string())?
                 .decode()
@@ -166,12 +167,14 @@ fn flip_sprites() -> Result<(), String> {
 
             let name = path_no_extension.to_str().unwrap();
 
-            let flipped_img = flip_horizontal(&img);
+            let darkened_img = imageops::brighten(&img, -64);
 
             let mut save_name = name.to_string();
-            save_name.push_str("-l.png");
+            save_name.push_str("_moved.png");
 
-            flipped_img.save(save_name).map_err(|err| err.to_string())?;
+            darkened_img
+                .save(save_name)
+                .map_err(|err| err.to_string())?;
         }
     }
     Ok(())
