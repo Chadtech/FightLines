@@ -1,21 +1,79 @@
+# Make blue units
+/Applications/Aseprite.app/Contents/MacOS/aseprite \
+  -b \
+  ./shared/src/sprites/units/tank_red.aseprite \
+  --palette ./shared/src/sprites/palette_blue.aseprite \
+  --save-as ./shared/src/sprites/units/tank_blue.aseprite
+
+/Applications/Aseprite.app/Contents/MacOS/aseprite \
+  -b \
+  ./shared/src/sprites/units/infantry_red.aseprite \
+  --palette ./shared/src/sprites/palette_blue.aseprite \
+  --save-as ./shared/src/sprites/units/infantry_blue.aseprite
+
+/Applications/Aseprite.app/Contents/MacOS/aseprite \
+  -b \
+  ./shared/src/sprites/units/truck_red.aseprite \
+  --palette ./shared/src/sprites/palette_blue.aseprite \
+  --save-as ./shared/src/sprites/units/truck_blue.aseprite
+
+# Make moved units
+/Applications/Aseprite.app/Contents/MacOS/aseprite \
+  -b \
+  ./shared/src/sprites/units/infantry_red.aseprite \
+  --palette ./shared/src/sprites/palette_red_moved.aseprite \
+  --save-as ./shared/src/sprites/units/infantry_red_moved.aseprite
+
+/Applications/Aseprite.app/Contents/MacOS/aseprite \
+  -b \
+  ./shared/src/sprites/units/tank_red.aseprite \
+  --palette ./shared/src/sprites/palette_red_moved.aseprite \
+  --save-as ./shared/src/sprites/units/tank_red_moved.aseprite
+
+/Applications/Aseprite.app/Contents/MacOS/aseprite \
+  -b \
+  ./shared/src/sprites/units/truck_red.aseprite \
+  --palette ./shared/src/sprites/palette_red_moved.aseprite \
+  --save-as ./shared/src/sprites/units/truck_red_moved.aseprite
+
+/Applications/Aseprite.app/Contents/MacOS/aseprite \
+  -b \
+  ./shared/src/sprites/units/infantry_blue.aseprite \
+  --palette ./shared/src/sprites/palette_blue_moved.aseprite \
+  --save-as ./shared/src/sprites/units/infantry_blue_moved.aseprite
+
+/Applications/Aseprite.app/Contents/MacOS/aseprite \
+  -b \
+  ./shared/src/sprites/units/tank_blue.aseprite \
+  --palette ./shared/src/sprites/palette_blue_moved.aseprite \
+  --save-as ./shared/src/sprites/units/tank_blue_moved.aseprite
+
+/Applications/Aseprite.app/Contents/MacOS/aseprite \
+  -b \
+  ./shared/src/sprites/units/truck_blue.aseprite \
+  --palette ./shared/src/sprites/palette_blue_moved.aseprite \
+  --save-as ./shared/src/sprites/units/truck_blue_moved.aseprite
+
 # Units
 /Applications/Aseprite.app/Contents/MacOS/aseprite \
   --batch \
-    ./shared/src/sprites/infantry_red.aseprite \
-    ./shared/src/sprites/infantry_blue.aseprite \
-    ./shared/src/sprites/tank_red.aseprite \
-    ./shared/src/sprites/tank_blue.aseprite \
-    ./shared/src/sprites/truck_red.aseprite \
-    ./shared/src/sprites/truck_blue.aseprite \
+    ./shared/src/sprites/units/infantry_red.aseprite \
+    ./shared/src/sprites/units/infantry_blue.aseprite \
+    ./shared/src/sprites/units/tank_red.aseprite \
+    ./shared/src/sprites/units/tank_blue.aseprite \
+    ./shared/src/sprites/units/truck_red.aseprite \
+    ./shared/src/sprites/units/truck_blue.aseprite \
   --sheet ./shared/src/sprites/units_sheet.png
 
 # Moved Units
 /Applications/Aseprite.app/Contents/MacOS/aseprite \
   --batch \
-    ./shared/src/sprites/infantry_red_moved.aseprite \
-    ./shared/src/sprites/infantry_blue_moved.aseprite \
-    ./shared/src/sprites/tank_red_moved.aseprite \
-    ./shared/src/sprites/tank_blue_moved.aseprite \
+    ./shared/src/sprites/units/infantry_red_moved.aseprite \
+    ./shared/src/sprites/units/infantry_blue_moved.aseprite \
+    ./shared/src/sprites/units/tank_red_moved.aseprite \
+    ./shared/src/sprites/units/tank_blue_moved.aseprite \
+    ./shared/src/sprites/units/truck_red_moved.aseprite \
+    ./shared/src/sprites/units/truck_blue_moved.aseprite \
   --sheet ./shared/src/sprites/unit_moved_sheet.png
 
 # Flags

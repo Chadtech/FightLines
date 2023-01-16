@@ -125,9 +125,9 @@ fn move_sprites() -> Result<(), String> {
     for path_result in read_sprite_dir() {
         let path = path_result.unwrap().path();
 
-        let ext = path.extension().unwrap().to_str().unwrap();
+        let ext = path.extension().map(|ext| ext.to_str().unwrap());
 
-        if ext == "png" {
+        if ext == Some("png") {
             let img = ImageReader::open(path.to_str().unwrap())
                 .map_err(|err| err.to_string())?
                 .decode()
@@ -148,7 +148,7 @@ fn move_sprites() -> Result<(), String> {
 }
 
 fn darken_units() -> Result<(), String> {
-    for path_result in read_sprite_dir() {
+    for path_result in fs::read_dir("./shared/src/sprites/units").unwrap() {
         let path = path_result.unwrap().path();
 
         let ext = path.extension().unwrap().to_str().unwrap();
