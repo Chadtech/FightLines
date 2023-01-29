@@ -46,7 +46,7 @@ impl ToString for Unit {
         match self {
             Unit::Infantry => "infantry".to_string(),
             Unit::Tank => "tanks".to_string(),
-            Unit::Truck => "trucks".to_string(),
+            Unit::Truck => "truck".to_string(),
         }
     }
 }

@@ -67,6 +67,7 @@ pub struct Model {
 
 pub enum Sidebar {
     None,
+    UnitSelected { unit_id: UnitId },
     GroupSelected { units: Vec<UnitId> },
 }
 
@@ -597,50 +598,67 @@ fn handle_click_on_screen_when_no_mode(
     x: u16,
     y: u16,
 ) {
-    if let Some(units_at_pos) = model.game.get_units_by_location(&Point { x, y }) {
-        if let Some((first, rest)) = units_at_pos.split_first() {
-            let (first_unit_id, _, _) = first;
-
-            if rest.is_empty() {
-                match model.game.get_units_mobility(first_unit_id) {
-                    Ok(mobility) => {
-                        model.stage = Stage::TakingTurn {
-                            mode: Mode::MovingUnit(MovingUnitModel {
-                                unit_id: first_unit_id.clone(),
-                                mobility,
-                                arrows: Vec::new(),
-                            }),
-                        };
-
-                        if let Err((err_title, err_msg)) = draw_mode_from_mouse_event(model) {
-                            global.toast(
-                                Toast::init("error", err_title.as_str())
-                                    .error()
-                                    .with_more_info(err_msg.as_str()),
-                            );
-                        }
-                    }
-                    Err(err_msg) => {
-                        global.toast(
-                            Toast::init("error", "could not get mobility range of unit")
-                                .error()
-                                .with_more_info(err_msg.as_str()),
-                        );
-                    }
-                }
-            } else {
-                let mut units = vec![];
-
-                units.push(first_unit_id.clone());
-
-                for (unit_id, _, _) in rest {
-                    units.push(unit_id.clone());
-                }
-
-                model.sidebar = Sidebar::GroupSelected { units };
-            }
+    let units_at_pos = match model.game.get_units_by_location(&Point { x, y }) {
+        Some(units) => units,
+        None => {
+            return;
         }
     };
+
+    let (first, rest) = match units_at_pos.split_first() {
+        Some(s) => s,
+        None => {
+            return;
+        }
+    };
+    let (first_unit_id, _, unit_model) = first;
+
+    if unit_model.owner != global.viewer_id() {
+        return;
+    }
+
+    if rest.is_empty() {
+        model.sidebar = Sidebar::UnitSelected {
+            unit_id: first_unit_id.clone(),
+        };
+
+        match model.game.get_units_mobility(first_unit_id) {
+            Ok(mobility) => {
+                model.stage = Stage::TakingTurn {
+                    mode: Mode::MovingUnit(MovingUnitModel {
+                        unit_id: first_unit_id.clone(),
+                        mobility,
+                        arrows: Vec::new(),
+                    }),
+                };
+
+                if let Err((err_title, err_msg)) = draw_mode_from_mouse_event(model) {
+                    global.toast(
+                        Toast::init("error", err_title.as_str())
+                            .error()
+                            .with_more_info(err_msg.as_str()),
+                    );
+                }
+            }
+            Err(err_msg) => {
+                global.toast(
+                    Toast::init("error", "could not get mobility range of unit")
+                        .error()
+                        .with_more_info(err_msg.as_str()),
+                );
+            }
+        }
+    } else {
+        let mut units = vec![];
+
+        units.push(first_unit_id.clone());
+
+        for (unit_id, _, _) in rest {
+            units.push(unit_id.clone());
+        }
+
+        model.sidebar = Sidebar::GroupSelected { units };
+    }
 }
 
 fn handle_mouse_move_for_mode(
@@ -1269,6 +1287,14 @@ fn sidebar_content(model: &Model) -> Vec<Cell<Msg>> {
                 unit_rows,
             )]
         }
+        Sidebar::UnitSelected { unit_id } => match model.game.units.get(unit_id) {
+            None => {
+                todo!("Could not find unit")
+            }
+            Some(unit_model) => {
+                vec![]
+            }
+        },
     }
 }
 
