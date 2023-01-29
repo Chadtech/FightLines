@@ -196,6 +196,10 @@ a.button {
     border-right: var(--s-1) solid var(--content-2);
 }
 
+.border-r-content-1 {
+    border-right: var(--s-1) solid var(--content-0);
+}
+
 .border-content-1 {
     border: var(--s-1) solid var(--content-1);
 }

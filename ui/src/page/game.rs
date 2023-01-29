@@ -62,6 +62,12 @@ pub struct Model {
     stage: Stage,
     dialog: Option<Dialog>,
     status: Status,
+    sidebar: Sidebar,
+}
+
+pub enum Sidebar {
+    None,
+    GroupSelected { units: Vec<UnitId> },
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -253,6 +259,7 @@ pub fn init(
         stage,
         dialog: None,
         status: Status::Ready,
+        sidebar: Sidebar::None,
     };
 
     Ok(model)
@@ -567,6 +574,7 @@ fn handle_click_on_screen_when_move_mode(model: &mut Model) -> Result<(), (Strin
         let unit_id = moving_model.unit_id.clone();
 
         model.moved_units.push(unit_id.clone());
+
         model.moves_index.insert(
             unit_id,
             Action::TraveledTo {
@@ -591,14 +599,14 @@ fn handle_click_on_screen_when_no_mode(
 ) {
     if let Some(units_at_pos) = model.game.get_units_by_location(&Point { x, y }) {
         if let Some((first, rest)) = units_at_pos.split_first() {
-            if rest.is_empty() {
-                let (unit_id, _, _) = first;
+            let (first_unit_id, _, _) = first;
 
-                match model.game.get_units_mobility(unit_id) {
+            if rest.is_empty() {
+                match model.game.get_units_mobility(first_unit_id) {
                     Ok(mobility) => {
                         model.stage = Stage::TakingTurn {
                             mode: Mode::MovingUnit(MovingUnitModel {
-                                unit_id: unit_id.clone(),
+                                unit_id: first_unit_id.clone(),
                                 mobility,
                                 arrows: Vec::new(),
                             }),
@@ -621,7 +629,15 @@ fn handle_click_on_screen_when_no_mode(
                     }
                 }
             } else {
-                todo!("Clicked on many units")
+                let mut units = vec![];
+
+                units.push(first_unit_id.clone());
+
+                for (unit_id, _, _) in rest {
+                    units.push(unit_id.clone());
+                }
+
+                model.sidebar = Sidebar::GroupSelected { units };
             }
         }
     };
@@ -1099,7 +1115,7 @@ pub fn view(global: &global::Model, model: &Model) -> Cell<Msg> {
             cursor_canvas_cell(model),
             click_screen(model),
             overlay_view(model),
-            primary_options_view(global, model),
+            sidebar_view(global, model),
             dialog_view(model),
         ],
     )
@@ -1196,6 +1212,66 @@ fn click_screen(model: &Model) -> Cell<Msg> {
     })
 }
 
+fn sidebar_view(global: &global::Model, model: &Model) -> Cell<Msg> {
+    let submit_button = {
+        let label = "submit turn";
+
+        Button::simple(label)
+            .set_primary(model.all_units_moved(global.viewer_id()))
+            .disable(!model.is_ready() || model.is_waiting_stage())
+            .on_click(|_| Msg::ClickedSubmitTurn)
+    };
+
+    Cell::group(
+        vec![
+            Style::W8,
+            Style::Absolute,
+            Style::Bottom0,
+            Style::Top0,
+            Style::Left0,
+            Style::BgContent1,
+            Style::BorderRContent0,
+            Style::P4,
+            Style::FlexCol,
+        ],
+        vec![
+            Cell::group(vec![Style::Grow, Style::FlexCol], sidebar_content(model)),
+            submit_button.cell(),
+        ],
+    )
+}
+
+fn sidebar_content(model: &Model) -> Vec<Cell<Msg>> {
+    match &model.sidebar {
+        Sidebar::None => {
+            vec![]
+        }
+        Sidebar::GroupSelected { units } => {
+            let mut unit_rows = vec![];
+
+            for unit_id in units {
+                if let Some(unit_model) = model.game.units.get(unit_id) {
+                    let label = unit_model
+                        .name
+                        .as_ref()
+                        .cloned()
+                        .unwrap_or_else(|| unit_model.unit.to_string());
+
+                    let unit_row =
+                        Cell::group(vec![], vec![Cell::from_str(vec![], label.as_str())]);
+
+                    unit_rows.push(unit_row);
+                }
+            }
+
+            vec![Cell::group(
+                vec![Style::FlexCol, Style::Inset, Style::BgBackground1],
+                unit_rows,
+            )]
+        }
+    }
+}
+
 fn dialog_view(model: &Model) -> Cell<Msg> {
     match &model.dialog {
         None => Cell::none(),
@@ -1238,29 +1314,6 @@ fn dialog_view(model: &Model) -> Cell<Msg> {
                 )
             }
         },
-    }
-}
-
-fn primary_options_view(global: &global::Model, model: &Model) -> Cell<Msg> {
-    if model.dialog.is_none() {
-        let submit_move_button = {
-            let label = "submit turn";
-
-            Button::simple(label)
-                .set_primary(model.all_units_moved(global.viewer_id()))
-                .disable(!model.is_ready() || model.is_waiting_stage())
-                .on_click(|_| Msg::ClickedSubmitTurn)
-        };
-
-        Cell::group(
-            vec![Style::Absolute, Style::Bottom4, Style::Left4],
-            vec![Card::cell_from_rows(
-                vec![],
-                vec![Row::from_cells(vec![], vec![submit_move_button.cell()])],
-            )],
-        )
-    } else {
-        Cell::none()
     }
 }
 

@@ -98,7 +98,6 @@ async fn main() -> Result<(), String> {
         Flags::Sprites => {
             flip_sprite_sheet()?;
             darken_units()?;
-            // flip_sprites()?;
             move_sprites()?;
 
             Ok(())

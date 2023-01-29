@@ -99,6 +99,7 @@ pub struct UnitModel {
     pub place: UnitPlace,
     pub owner: Id,
     pub color: TeamColor,
+    pub name: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -366,6 +367,7 @@ impl Game {
                             owner: owner_id.clone(),
                             place,
                             color: color.clone(),
+                            name: None,
                         };
 
                         units_with_ids.push((unit_id, new_unit));

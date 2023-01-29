@@ -40,3 +40,13 @@ impl Unit {
         }
     }
 }
+
+impl ToString for Unit {
+    fn to_string(&self) -> String {
+        match self {
+            Unit::Infantry => "infantry".to_string(),
+            Unit::Tank => "tanks".to_string(),
+            Unit::Truck => "trucks".to_string(),
+        }
+    }
+}

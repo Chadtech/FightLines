@@ -112,6 +112,11 @@ impl MapOpt {
                         x: (map.width as u16) - 4,
                         y: (map.height as u16) - 5,
                     },
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Left, Unit::Truck),
+                        x: (map.width as u16) - 5,
+                        y: (map.height as u16) - 4,
+                    },
                 ],
                 rest_players_miliatries: vec![],
             },
