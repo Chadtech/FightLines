@@ -47,6 +47,8 @@ pub async fn handle(
         }
     };
 
+    game.take_changes(&mut req.changes.clone());
+
     if let Err(err) = game.set_turn(player_id, req.moves) {
         return HttpResponse::BadRequest().body(err);
     };

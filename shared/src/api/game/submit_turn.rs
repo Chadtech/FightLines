@@ -9,11 +9,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
 pub struct Request {
     pub moves: Vec<game::Action>,
+    pub changes: Vec<game::Change>,
 }
 
 impl Request {
-    pub fn init(moves: Vec<game::Action>) -> Request {
-        Request { moves }
+    pub fn init(moves: Vec<game::Action>, changes: Vec<game::Change>) -> Request {
+        Request { moves, changes }
     }
 
     pub fn to_bytes(&self) -> bincode::Result<Vec<u8>> {

@@ -59,6 +59,7 @@ pub struct Game {
     pub map: Map,
     pub turn_number: u32,
     pub prev_outcomes: Vec<Outcome>,
+    pub turns_changes: Vec<Change>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -86,10 +87,19 @@ pub enum Action {
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub enum Change {
+    NameUnit { name: String, unit_id: UnitId },
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum Outcome {
     Traveled {
         unit_id: UnitId,
         path: Vec<Located<Direction>>,
+    },
+    NamedUnit {
+        unit_id: UnitId,
+        name: String,
     },
 }
 
@@ -164,6 +174,11 @@ impl Game {
 
         Ok(player_moves)
     }
+
+    pub fn take_changes(&mut self, changes: &mut Vec<Change>) {
+        self.turns_changes.append(changes);
+    }
+
     pub fn advance_turn(&mut self, seed: RandSeed) -> Result<bool, String> {
         let mut rng = RandGen::from_seed(seed);
         let mut player_moves: Vec<(Id, Vec<Action>)> = match &mut self.all_players_turns() {
@@ -220,6 +235,7 @@ impl Game {
         }
 
         self.turn_number += 1;
+        self.consume_changes();
         self.consume_outcomes(outcomes.clone());
         self.prev_outcomes = outcomes.clone();
         self.units_by_location_index = index_units_by_location(&self.units);
@@ -237,6 +253,21 @@ impl Game {
 
         Ok(true)
     }
+
+    fn consume_changes(&mut self) {
+        for change in &self.turns_changes {
+            match change {
+                Change::NameUnit { unit_id, name } => {
+                    if let Some(unit_model) = self.units.get_mut(&unit_id) {
+                        if unit_model.name.is_none() {
+                            unit_model.name = Some(name.clone());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     pub fn consume_outcomes(&mut self, outcomes: Vec<Outcome>) {
         for outcome in outcomes {
             match outcome {
@@ -268,6 +299,11 @@ impl Game {
                                 value: new_facing_dir,
                             });
                         }
+                    }
+                }
+                Outcome::NamedUnit { unit_id, name } => {
+                    if let Some(unit) = self.units.get_mut(&unit_id) {
+                        unit.name = Some(name);
                     }
                 }
             }
@@ -452,6 +488,7 @@ impl Game {
                     map,
                     turn_number: 0,
                     prev_outcomes: Vec::new(),
+                    turns_changes: Vec::new(),
                 };
 
                 Ok(game)

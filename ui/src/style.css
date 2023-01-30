@@ -100,6 +100,8 @@ body {
     border-left: var(--s-1) solid var(--content-0);
     padding: var(--s-3);
 
+    width: 100%;
+
     outline: none;
 }
 

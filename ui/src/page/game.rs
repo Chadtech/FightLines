@@ -1,6 +1,7 @@
 use crate::view::button::Button;
 use crate::view::card::Card;
 use crate::view::cell::Cell;
+use crate::view::text_field::TextField;
 use crate::web_sys::HtmlCanvasElement;
 use crate::{api, assets, core_ext, global, Row, Style, Toast};
 use seed::app::CmdHandle;
@@ -58,6 +59,7 @@ pub struct Model {
     frame_count: FrameCount,
     moved_units: Vec<UnitId>,
     moves_index: HashMap<UnitId, Action>,
+    changes: Vec<Change>,
     mouse_game_position: Option<Point<u32>>,
     stage: Stage,
     dialog: Option<Dialog>,
@@ -65,10 +67,16 @@ pub struct Model {
     sidebar: Sidebar,
 }
 
-pub enum Sidebar {
+enum Sidebar {
     None,
-    UnitSelected { unit_id: UnitId },
+    UnitSelected(UnitSelectedModel),
     GroupSelected { units: Vec<UnitId> },
+}
+
+struct UnitSelectedModel {
+    unit_id: UnitId,
+    name_field: String,
+    name_submitted: bool,
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -133,12 +141,16 @@ struct MovingUnitModel {
     arrows: Vec<(Direction, Arrow)>,
 }
 
-#[derive(PartialEq, Debug, Clone)]
 enum Action {
     TraveledTo {
         path: Vec<Located<Direction>>,
         arrows: Vec<(Direction, Arrow)>,
     },
+}
+
+#[derive(PartialEq, Debug, Clone)]
+enum Change {
+    NameUnit { name: String, unit_id: UnitId },
 }
 
 #[derive(Clone, Debug)]
@@ -154,6 +166,8 @@ pub enum Msg {
     GotTurnSubmitResponse(Box<Result<submit_turn::Response, String>>),
     GotGame(Box<Result<shared::api::game::get::Response, String>>),
     GameReloadTimeExpired,
+    UpdatedUnitNameField(String),
+    ClickedSetName,
 }
 
 ///////////////////////////////////////////////////////////////
@@ -256,6 +270,7 @@ pub fn init(
         frame_count: FrameCount::F1,
         moved_units,
         moves_index,
+        changes: Vec::new(),
         mouse_game_position: None,
         stage,
         dialog: None,
@@ -431,6 +446,22 @@ pub fn update(
                 }
             });
         }
+        Msg::UpdatedUnitNameField(new_field) => {
+            if let Sidebar::UnitSelected(sub_model) = &mut model.sidebar {
+                sub_model.name_field = new_field;
+            }
+        }
+        Msg::ClickedSetName => {
+            if let Sidebar::UnitSelected(sub_model) = &mut model.sidebar {
+                if !sub_model.name_submitted {
+                    sub_model.name_submitted = true;
+                    model.changes.push(Change::NameUnit {
+                        name: sub_model.name_field.clone(),
+                        unit_id: sub_model.unit_id.clone(),
+                    })
+                }
+            }
+        }
     }
 }
 
@@ -462,7 +493,18 @@ fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl 
         })
         .collect();
 
-    let req: submit_turn::Request = submit_turn::Request::init(req_moves);
+    let req_changes: Vec<game::Change> = model
+        .changes
+        .iter()
+        .map(|change| match change {
+            Change::NameUnit { unit_id, name } => game::Change::NameUnit {
+                unit_id: unit_id.clone(),
+                name: name.clone(),
+            },
+        })
+        .collect();
+
+    let req: submit_turn::Request = submit_turn::Request::init(req_moves, req_changes);
 
     let url = Endpoint::submit_turn(model.game_id.clone(), global.viewer_id());
 
@@ -618,9 +660,11 @@ fn handle_click_on_screen_when_no_mode(
     }
 
     if rest.is_empty() {
-        model.sidebar = Sidebar::UnitSelected {
+        model.sidebar = Sidebar::UnitSelected(UnitSelectedModel {
             unit_id: first_unit_id.clone(),
-        };
+            name_field: String::new(),
+            name_submitted: false,
+        });
 
         match model.game.get_units_mobility(first_unit_id) {
             Ok(mobility) => {
@@ -1287,12 +1331,35 @@ fn sidebar_content(model: &Model) -> Vec<Cell<Msg>> {
                 unit_rows,
             )]
         }
-        Sidebar::UnitSelected { unit_id } => match model.game.units.get(unit_id) {
+        Sidebar::UnitSelected(sub_model) => match model.game.units.get(&sub_model.unit_id) {
             None => {
                 todo!("Could not find unit")
             }
             Some(unit_model) => {
-                vec![]
+                let name_view = match &unit_model.name {
+                    Some(name) => Cell::from_str(vec![], name.as_str()),
+                    None => {
+                        let save_name_button = Button::simple("save")
+                            .on_click(|_| Msg::ClickedSetName)
+                            .disable(sub_model.name_submitted)
+                            .cell();
+
+                        Cell::group(
+                            vec![Style::FlexRow, Style::G4],
+                            vec![
+                                TextField::simple(
+                                    sub_model.name_field.as_str(),
+                                    Msg::UpdatedUnitNameField,
+                                )
+                                .with_placeholder("unit name".to_string())
+                                .cell(),
+                                save_name_button,
+                            ],
+                        )
+                    }
+                };
+
+                vec![name_view]
             }
         },
     }

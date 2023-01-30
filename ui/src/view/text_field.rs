@@ -12,6 +12,7 @@ use std::rc::Rc;
 pub struct TextField<Msg: 'static> {
     value: String,
     on_input: Rc<dyn Fn(String) -> Msg>,
+    placeholder: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////
@@ -26,7 +27,12 @@ impl<Msg: 'static> TextField<Msg> {
         TextField {
             value: value.to_string(),
             on_input: Rc::new(move |event| on_input.clone()(event)),
+            placeholder: None,
         }
+    }
+    pub fn with_placeholder(mut self, text: String) -> TextField<Msg> {
+        self.placeholder = Some(text);
+        self
     }
     pub fn html(self) -> Node<Msg> {
         let mut element: El<Msg> = El::empty(Tag::Custom(Cow::Borrowed("input")));
@@ -39,6 +45,10 @@ impl<Msg: 'static> TextField<Msg> {
 
         element.add_attr(Cow::Borrowed("value"), self.value);
         element.add_attr(Cow::Borrowed("spellcheck"), "false");
+
+        if let Some(placeholder_text) = self.placeholder {
+            element.add_attr(Cow::Borrowed("placeholder"), placeholder_text);
+        }
 
         Node::Element(element)
     }
