@@ -70,13 +70,30 @@ pub struct Model {
 enum Sidebar {
     None,
     UnitSelected(UnitSelectedModel),
-    GroupSelected { units: Vec<UnitId> },
+    GroupSelected(GroupSelectedModel),
+}
+
+#[derive(Clone)]
+struct GroupSelectedModel {
+    units: Vec<UnitId>,
 }
 
 struct UnitSelectedModel {
     unit_id: UnitId,
     name_field: String,
     name_submitted: bool,
+    from_group: Option<GroupSelectedModel>,
+}
+
+impl UnitSelectedModel {
+    pub fn init(unit_id: UnitId, from_group: Option<GroupSelectedModel>) -> UnitSelectedModel {
+        UnitSelectedModel {
+            unit_id: unit_id.clone(),
+            name_field: String::new(),
+            name_submitted: false,
+            from_group,
+        }
+    }
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -168,6 +185,8 @@ pub enum Msg {
     GameReloadTimeExpired,
     UpdatedUnitNameField(String),
     ClickedSetName,
+    ClickedUnitInGroup(UnitId),
+    ClickedBackToGroup,
 }
 
 ///////////////////////////////////////////////////////////////
@@ -462,6 +481,21 @@ pub fn update(
                 }
             }
         }
+        Msg::ClickedUnitInGroup(unit_id) => {
+            if let Sidebar::GroupSelected(sub_model) = &mut model.sidebar {
+                model.sidebar = Sidebar::UnitSelected(UnitSelectedModel::init(
+                    unit_id,
+                    Some(sub_model.clone()),
+                ));
+            }
+        }
+        Msg::ClickedBackToGroup => {
+            if let Sidebar::UnitSelected(sub_model) = &mut model.sidebar {
+                if let Some(group_model) = sub_model.from_group.clone() {
+                    model.sidebar = Sidebar::GroupSelected(group_model);
+                }
+            }
+        }
     }
 }
 
@@ -660,11 +694,7 @@ fn handle_click_on_screen_when_no_mode(
     }
 
     if rest.is_empty() {
-        model.sidebar = Sidebar::UnitSelected(UnitSelectedModel {
-            unit_id: first_unit_id.clone(),
-            name_field: String::new(),
-            name_submitted: false,
-        });
+        model.sidebar = Sidebar::UnitSelected(UnitSelectedModel::init(first_unit_id.clone(), None));
 
         match model.game.get_units_mobility(first_unit_id) {
             Ok(mobility) => {
@@ -701,7 +731,7 @@ fn handle_click_on_screen_when_no_mode(
             units.push(unit_id.clone());
         }
 
-        model.sidebar = Sidebar::GroupSelected { units };
+        model.sidebar = Sidebar::GroupSelected(GroupSelectedModel { units });
     }
 }
 
@@ -1308,7 +1338,7 @@ fn sidebar_content(model: &Model) -> Vec<Cell<Msg>> {
         Sidebar::None => {
             vec![]
         }
-        Sidebar::GroupSelected { units } => {
+        Sidebar::GroupSelected(GroupSelectedModel { units }) => {
             let mut unit_rows = vec![];
 
             for unit_id in units {
@@ -1319,8 +1349,13 @@ fn sidebar_content(model: &Model) -> Vec<Cell<Msg>> {
                         .cloned()
                         .unwrap_or_else(|| unit_model.unit.to_string());
 
-                    let unit_row =
-                        Cell::group(vec![], vec![Cell::from_str(vec![], label.as_str())]);
+                    let clicked_unit_id = unit_id.clone();
+
+                    let unit_row = Cell::group(
+                        vec![],
+                        vec![Cell::from_str(vec![Style::P4], label.as_str())],
+                    )
+                    .on_mouse_up(|_| Msg::ClickedUnitInGroup(clicked_unit_id));
 
                     unit_rows.push(unit_row);
                 }
@@ -1333,9 +1368,15 @@ fn sidebar_content(model: &Model) -> Vec<Cell<Msg>> {
         }
         Sidebar::UnitSelected(sub_model) => match model.game.units.get(&sub_model.unit_id) {
             None => {
-                todo!("Could not find unit")
+                vec![Cell::from_str(vec![], "Error: Could not find unit")]
             }
             Some(unit_model) => {
+                let back_button_row = match sub_model.from_group {
+                    None => Cell::none(),
+                    Some(_) => Button::simple("back to group")
+                        .on_click(|_| Msg::ClickedBackToGroup)
+                        .cell(),
+                };
                 let name_view = match &unit_model.name {
                     Some(name) => Cell::from_str(vec![], name.as_str()),
                     None => {
@@ -1359,7 +1400,7 @@ fn sidebar_content(model: &Model) -> Vec<Cell<Msg>> {
                     }
                 };
 
-                vec![name_view]
+                vec![back_button_row, name_view]
             }
         },
     }
