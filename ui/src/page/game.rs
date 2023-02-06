@@ -1,3 +1,7 @@
+mod action;
+mod group_selected;
+
+use crate::page::game::action::Action;
 use crate::view::button::Button;
 use crate::view::card::Card;
 use crate::view::cell::Cell;
@@ -95,23 +99,18 @@ pub struct Model {
 enum Sidebar {
     None,
     UnitSelected(UnitSelectedModel),
-    GroupSelected(GroupSelectedModel),
-}
-
-#[derive(Clone)]
-struct GroupSelectedModel {
-    units: Vec<UnitId>,
+    GroupSelected(group_selected::Model),
 }
 
 struct UnitSelectedModel {
     unit_id: UnitId,
     name_field: String,
     name_submitted: bool,
-    from_group: Option<GroupSelectedModel>,
+    from_group: Option<group_selected::Model>,
 }
 
 impl UnitSelectedModel {
-    pub fn init(unit_id: UnitId, from_group: Option<GroupSelectedModel>) -> UnitSelectedModel {
+    pub fn init(unit_id: UnitId, from_group: Option<group_selected::Model>) -> UnitSelectedModel {
         UnitSelectedModel {
             unit_id,
             name_field: String::new(),
@@ -193,13 +192,6 @@ impl MovingUnitModel {
     }
 }
 
-enum Action {
-    TraveledTo {
-        path: Vec<Located<Direction>>,
-        arrows: Vec<(Direction, Arrow)>,
-    },
-}
-
 #[derive(PartialEq, Debug, Clone)]
 enum Change {
     NameUnit { name: String, unit_id: UnitId },
@@ -220,7 +212,7 @@ pub enum Msg {
     GameReloadTimeExpired,
     UpdatedUnitNameField(String),
     ClickedSetName,
-    ClickedUnitInGroup(UnitId),
+    GroupSelectedSidebar(group_selected::Msg),
     ClickedBackToGroup,
 }
 
@@ -516,20 +508,22 @@ pub fn update(
                 }
             }
         }
-        Msg::ClickedUnitInGroup(unit_id) => {
-            if model.get_units_move(&unit_id).is_none() {
-                if let Sidebar::GroupSelected(sub_model) = &mut model.sidebar {
-                    model.sidebar = Sidebar::UnitSelected(UnitSelectedModel::init(
-                        unit_id.clone(),
-                        Some(sub_model.clone()),
-                    ));
+        Msg::GroupSelectedSidebar(sub_msg) => match sub_msg {
+            group_selected::Msg::ClickedUnitInGroup(unit_id) => {
+                if model.get_units_move(&unit_id).is_none() {
+                    if let Sidebar::GroupSelected(sub_model) = &mut model.sidebar {
+                        model.sidebar = Sidebar::UnitSelected(UnitSelectedModel::init(
+                            unit_id.clone(),
+                            Some(sub_model.clone()),
+                        ));
 
-                    if let Stage::TakingTurn { .. } = &mut model.stage {
-                        set_to_moving_unit_mode(global, model, unit_id)
+                        if let Stage::TakingTurn { .. } = &mut model.stage {
+                            set_to_moving_unit_mode(global, model, unit_id)
+                        }
                     }
                 }
             }
-        }
+        },
         Msg::ClickedBackToGroup => {
             if let Sidebar::UnitSelected(sub_model) = &mut model.sidebar {
                 if let Some(group_model) = sub_model.from_group.clone() {
@@ -743,7 +737,10 @@ fn handle_click_on_screen_when_no_mode(
     }
 
     if rest.is_empty() {
-        model.sidebar = Sidebar::UnitSelected(UnitSelectedModel::init(first_unit_id.clone(), None));
+        model.sidebar = Sidebar::UnitSelected(UnitSelectedModel::init(
+            first_unit_id.clone(),
+            None::<group_selected::Model>,
+        ));
 
         set_to_moving_unit_mode(global, model, first_unit_id.clone());
     } else {
@@ -755,7 +752,7 @@ fn handle_click_on_screen_when_no_mode(
             units.push(unit_id.clone());
         }
 
-        model.sidebar = Sidebar::GroupSelected(GroupSelectedModel { units });
+        model.sidebar = Sidebar::GroupSelected(group_selected::Model::init(units));
     }
 }
 
@@ -1367,76 +1364,11 @@ fn sidebar_content(model: &Model) -> Vec<Cell<Msg>> {
         Sidebar::None => {
             vec![]
         }
-        Sidebar::GroupSelected(GroupSelectedModel { units }) => {
-            let mut unit_rows = vec![];
-
-            for unit_id in units {
-                if let Some(unit_model) = model.game.units.get(unit_id) {
-                    let label = unit_model
-                        .name
-                        .as_ref()
-                        .cloned()
-                        .unwrap_or_else(|| unit_model.unit.to_string());
-
-                    let clicked_unit_id = unit_id.clone();
-
-                    let unit_moved = model.get_units_move(unit_id).is_some();
-
-                    let text_color = if unit_moved {
-                        Style::TextContent2
-                    } else {
-                        Style::none()
-                    };
-
-                    let background_color_hover = if unit_moved {
-                        Style::none()
-                    } else {
-                        Style::BgBackground4Hover
-                    };
-
-                    let unit_row = Cell::group(
-                        vec![
-                            Style::CursorPointer,
-                            background_color_hover,
-                            Style::P4,
-                            Style::G4,
-                            Style::FlexRow,
-                        ],
-                        vec![
-                            Cell::group(
-                                vec![Style::FlexCol, Style::JustifyCenter],
-                                vec![
-                                    Cell::empty(vec![Style::W5, Style::H5, Style::BgBackground4])
-                                        .with_img_src(
-                                            Endpoint::ThumbnailAsset(
-                                                unit_model.unit.clone(),
-                                                unit_model.color.clone(),
-                                            )
-                                            .to_string(),
-                                        ),
-                                ],
-                            ),
-                            Cell::from_str(
-                                vec![
-                                    text_color,
-                                    Style::TextSelectNone,
-                                    Style::FlexCol,
-                                    Style::JustifyCenter,
-                                ],
-                                label.as_str(),
-                            ),
-                        ],
-                    )
-                    .on_click(|_| Msg::ClickedUnitInGroup(clicked_unit_id));
-
-                    unit_rows.push(unit_row);
-                }
-            }
-
-            vec![Cell::group(
-                vec![Style::FlexCol, Style::Inset, Style::BgBackground1],
-                unit_rows,
-            )]
+        Sidebar::GroupSelected(sub_model) => {
+            group_selected::sidebar_content(sub_model, &model.moves_index, &model.game)
+                .into_iter()
+                .map(|cell| cell.map_msg(Msg::GroupSelectedSidebar))
+                .collect::<Vec<_>>()
         }
         Sidebar::UnitSelected(sub_model) => match model.game.units.get(&sub_model.unit_id) {
             None => {
