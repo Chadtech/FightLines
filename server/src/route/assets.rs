@@ -5,6 +5,11 @@ pub fn routes() -> actix_web::Scope {
         .route("/sheet.png", web::get().to(sheet_route))
         .route("/sheet-flipped.png", web::get().to(sheet_flipped_route))
         .route("/infantry-red.png", web::get().to(infantry_red_route))
+        .route("/tank-red.png", web::get().to(tank_red_route))
+        .route("/truck-red.png", web::get().to(truck_red_route))
+        .route("/infantry-blue.png", web::get().to(infantry_blue_route))
+        .route("/tank-blue.png", web::get().to(tank_blue_route))
+        .route("/truck-blue.png", web::get().to(truck_blue_route))
 }
 
 async fn sheet_route() -> HttpResponse {
@@ -23,4 +28,24 @@ async fn sprite_route(bytes: &'static [u8]) -> HttpResponse {
 
 async fn infantry_red_route() -> HttpResponse {
     sprite_route(include_bytes!("../assets/infantry_red.png")).await
+}
+
+async fn tank_red_route() -> HttpResponse {
+    sprite_route(include_bytes!("../assets/tank_red.png")).await
+}
+
+async fn truck_red_route() -> HttpResponse {
+    sprite_route(include_bytes!("../assets/truck_red.png")).await
+}
+
+async fn infantry_blue_route() -> HttpResponse {
+    sprite_route(include_bytes!("../assets/infantry_blue.png")).await
+}
+
+async fn tank_blue_route() -> HttpResponse {
+    sprite_route(include_bytes!("../assets/tank_blue.png")).await
+}
+
+async fn truck_blue_route() -> HttpResponse {
+    sprite_route(include_bytes!("../assets/truck_blue.png")).await
 }

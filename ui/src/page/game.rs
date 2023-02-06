@@ -1170,7 +1170,7 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
                 .map_err(|_| "Could not draw unit outline image on canvas".to_string())?;
 
                 for (unit_id, _, _) in units {
-                    draw_units_move(model.get_units_move(&unit_id))?;
+                    draw_units_move(model.get_units_move(unit_id))?;
                 }
             }
         }
@@ -1407,7 +1407,13 @@ fn sidebar_content(model: &Model) -> Vec<Cell<Msg>> {
                                 vec![Style::FlexCol, Style::JustifyCenter],
                                 vec![
                                     Cell::empty(vec![Style::W5, Style::H5, Style::BgBackground4])
-                                        .with_img_src("/asset/infantry-red.png".to_string()),
+                                        .with_img_src(
+                                            Endpoint::ThumbnailAsset(
+                                                unit_model.unit.clone(),
+                                                unit_model.color.clone(),
+                                            )
+                                            .to_string(),
+                                        ),
                                 ],
                             ),
                             Cell::from_str(

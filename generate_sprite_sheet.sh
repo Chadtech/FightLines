@@ -88,7 +88,7 @@ cp ./shared/src/sprites/units/infantry_blue1.png ./server/src/assets/infantry_bl
   --oneframe \
   ./shared/src/sprites/units/tank_blue.aseprite \
   --save-as ./shared/src/sprites/units/tank_blue.png
-cp ./shared/src/sprites/units/truck_blue1.png ./server/src/assets/truck_blue.png
+cp ./shared/src/sprites/units/tank_blue1.png ./server/src/assets/tank_blue.png
 
 /Applications/Aseprite.app/Contents/MacOS/aseprite \
   -b \

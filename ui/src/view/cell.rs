@@ -113,6 +113,10 @@ impl<Msg: 'static> Cell<Msg> {
                     element.add_event_handler(mouse_ev(Ev::MouseMove, move |event| msg(event)));
                 }
 
+                if let Some(msg) = model.click_handler {
+                    element.add_event_handler(mouse_ev(Ev::Click, move |event| msg(event)));
+                }
+
                 Node::Element(element)
             }
         }
