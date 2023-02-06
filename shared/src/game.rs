@@ -258,7 +258,7 @@ impl Game {
         for change in &self.turns_changes {
             match change {
                 Change::NameUnit { unit_id, name } => {
-                    if let Some(unit_model) = self.units.get_mut(&unit_id) {
+                    if let Some(unit_model) = self.units.get_mut(unit_id) {
                         if unit_model.name.is_none() {
                             unit_model.name = Some(name.clone());
                         }

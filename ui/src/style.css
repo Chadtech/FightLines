@@ -48,6 +48,7 @@ body {
     --s-6: 64px;
     --s-7: 128px;
     --s-8: 256px;
+    --s-8p5: 384px;
     --s-9: 512px;
     --s-a: 1024px;
 
@@ -230,6 +231,11 @@ a.button {
     padding: var(--s-4);
 }
 
+.py-4 {
+    padding-top: var(--s-4);
+    padding-bottom: var(--s-4);
+}
+
 .g-3 {
     gap: var(--s-3);
 }
@@ -247,8 +253,20 @@ a.button {
     color: var(--content-1);
 }
 
+.text-content-2 {
+    color: var(--content-2);
+}
+
 .text-content-5 {
     color: var(--content-5);
+}
+
+.w-4 {
+    width: var(--s-4);
+}
+
+.w-5 {
+    width: var(--s-5);
 }
 
 .w-7 {
@@ -257,6 +275,10 @@ a.button {
 
 .w-8 {
     width: var(--s-8);
+}
+
+.w-8p5 {
+    width: var(--s-8p5);
 }
 
 .w-9 {
@@ -296,13 +318,28 @@ a.button {
     background-color: var(--bg-0);
 }
 
-.backdrop {
-    background-color: var(--backdrop-color);
-
-}
-
 .bg-background-1 {
     background-color: var(--bg-1);
+}
+
+.bg-background-2 {
+    background-color: var(--bg-2);
+}
+
+.bg-background-4 {
+    background-color: var(--bg-4);
+}
+
+.bg-background-2-hover:hover {
+    background-color: var(--bg-2);
+}
+
+.bg-background-4-hover:hover {
+    background-color: var(--bg-4);
+}
+
+.backdrop {
+    background-color: var(--backdrop-color);
 }
 
 .bg-problem-1 {
@@ -364,6 +401,10 @@ spinner {
     top: 0px;
 }
 
+img {
+    image-rendering: pixelated;
+}
+
 @keyframes slideby {
     from {
        left: var(--s-neg-7);
@@ -400,6 +441,10 @@ spinner {
 
 .outline-none {
     outline: none;
+}
+
+.text-select-none {
+    user-select: none;
 }
 
 .pointer {

@@ -24,6 +24,8 @@ pub struct Model<Msg> {
     mouse_down_handler: Option<Rc<dyn Fn(MouseEvent) -> Msg>>,
     mouse_up_handler: Option<Rc<dyn Fn(MouseEvent) -> Msg>>,
     mouse_move_handler: Option<Rc<dyn Fn(MouseEvent) -> Msg>>,
+    click_handler: Option<Rc<dyn Fn(MouseEvent) -> Msg>>,
+    as_img: Option<String>,
 }
 
 #[derive(Clone)]
@@ -75,6 +77,10 @@ impl<Msg: 'static> Cell<Msg> {
         Cell::None
     }
 
+    pub fn empty(styles: Vec<Style>) -> Cell<Msg> {
+        Cell::group(styles, vec![])
+    }
+
     pub fn html(self) -> Node<Msg> {
         match self {
             Cell::None => text(""),
@@ -85,6 +91,10 @@ impl<Msg: 'static> Cell<Msg> {
                     for class in style.css_classes() {
                         element.add_class(class);
                     }
+                }
+
+                if let Some(img_source) = model.as_img {
+                    element.add_attr(Cow::Borrowed("src"), img_source);
                 }
 
                 for child in model.children {
@@ -189,6 +199,37 @@ impl<Msg: 'static> Cell<Msg> {
         }
     }
 
+    pub fn on_click(self, msg: impl FnOnce(MouseEvent) -> Msg + Clone + 'static) -> Cell<Msg> {
+        self.on_click_helper(Some(msg))
+    }
+
+    fn on_click_helper(
+        self,
+        maybe_msg: Option<impl FnOnce(MouseEvent) -> Msg + Clone + 'static>,
+    ) -> Cell<Msg> {
+        match self {
+            Cell::None => Cell::None,
+            Cell::Model(mut model) => match maybe_msg {
+                Some(msg) => {
+                    model.click_handler = Some(Rc::new(move |event| msg.clone()(event)));
+                    Cell::Model(model)
+                }
+                None => Cell::Model(model),
+            },
+        }
+    }
+
+    pub fn with_img_src(self, source: String) -> Cell<Msg> {
+        match self {
+            Cell::None => Cell::None,
+            Cell::Model(mut model) => {
+                model.as_img = Some(source);
+                model.tag_name = "img";
+                Cell::Model(model)
+            }
+        }
+    }
+
     pub fn from_html(styles: Vec<Style>, html: Vec<Node<Msg>>) -> Cell<Msg> {
         Cell::new(styles, html, DEFAULT_TAG_NAME)
     }
@@ -221,6 +262,8 @@ impl<Msg: 'static> Cell<Msg> {
             mouse_down_handler: None,
             mouse_up_handler: None,
             mouse_move_handler: None,
+            click_handler: None,
+            as_img: None,
         })
     }
 
@@ -251,9 +294,21 @@ impl<Msg: 'static> Cell<Msg> {
                     move |event| msg_mapper(msg(event))
                 });
 
+                let new_on_mouse_move = model.mouse_move_handler.map(|msg| {
+                    let msg_mapper = f.clone();
+                    move |event| msg_mapper(msg(event))
+                });
+
+                let new_on_click = model.click_handler.map(|msg| {
+                    let msg_mapper = f.clone();
+                    move |event| msg_mapper(msg(event))
+                });
+
                 Cell::new(model.styles, new_children, model.tag_name)
                     .on_mouse_down_helper(new_on_mouse_down)
                     .on_mouse_up_helper(new_on_mouse_up)
+                    .on_mouse_move_helper(new_on_mouse_move)
+                    .on_click_helper(new_on_click)
             }
         }
     }
@@ -266,6 +321,8 @@ impl<Msg: 'static> Cell<Msg> {
             mouse_down_handler: None,
             mouse_up_handler: None,
             mouse_move_handler: None,
+            click_handler: None,
+            as_img: None,
         })
     }
 }

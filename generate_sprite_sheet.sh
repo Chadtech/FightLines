@@ -54,6 +54,48 @@
   --palette ./shared/src/sprites/palette_blue_moved.aseprite \
   --save-as ./shared/src/sprites/units/truck_blue_moved.aseprite
 
+# Make Unit Thumbnails
+/Applications/Aseprite.app/Contents/MacOS/aseprite \
+  -b \
+  --oneframe \
+  ./shared/src/sprites/units/infantry_red.aseprite \
+  --save-as ./shared/src/sprites/units/infantry_red.png
+cp ./shared/src/sprites/units/infantry_red1.png ./server/src/assets/infantry_red.png
+
+/Applications/Aseprite.app/Contents/MacOS/aseprite \
+  -b \
+  --oneframe \
+  ./shared/src/sprites/units/tank_red.aseprite \
+  --save-as ./shared/src/sprites/units/tank_red.png
+cp ./shared/src/sprites/units/tank_red1.png ./server/src/assets/tank_red.png
+
+/Applications/Aseprite.app/Contents/MacOS/aseprite \
+  -b \
+  --oneframe \
+  ./shared/src/sprites/units/truck_red.aseprite \
+  --save-as ./shared/src/sprites/units/truck_red.png
+cp ./shared/src/sprites/units/truck_red1.png ./server/src/assets/truck_red.png
+
+/Applications/Aseprite.app/Contents/MacOS/aseprite \
+  -b \
+  --oneframe \
+  ./shared/src/sprites/units/infantry_blue.aseprite \
+  --save-as ./shared/src/sprites/units/infantry_blue.png
+cp ./shared/src/sprites/units/infantry_blue1.png ./server/src/assets/infantry_blue.png
+
+/Applications/Aseprite.app/Contents/MacOS/aseprite \
+  -b \
+  --oneframe \
+  ./shared/src/sprites/units/tank_blue.aseprite \
+  --save-as ./shared/src/sprites/units/tank_blue.png
+cp ./shared/src/sprites/units/truck_blue1.png ./server/src/assets/truck_blue.png
+
+/Applications/Aseprite.app/Contents/MacOS/aseprite \
+  -b \
+  --oneframe \
+  ./shared/src/sprites/units/truck_blue.aseprite \
+  --save-as ./shared/src/sprites/units/truck_blue.png
+
 # Units
 /Applications/Aseprite.app/Contents/MacOS/aseprite \
   --batch \

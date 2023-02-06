@@ -36,6 +36,31 @@ fn wait_for_game_reload_timeout(orders: &mut impl Orders<Msg>) -> CmdHandle {
     orders.perform_cmd_with_handle(cmds::timeout(4096, || Msg::GameReloadTimeExpired))
 }
 
+fn set_to_moving_unit_mode(global: &mut global::Model, model: &mut Model, unit_id: UnitId) {
+    match model.game.get_units_mobility(&unit_id.clone()) {
+        Ok(mobility) => {
+            model.stage = Stage::TakingTurn {
+                mode: Mode::MovingUnit(MovingUnitModel::init(unit_id, mobility)),
+            };
+
+            if let Err((err_title, err_msg)) = draw_mode_from_mouse_event(model) {
+                global.toast(
+                    Toast::init("error", err_title.as_str())
+                        .error()
+                        .with_more_info(err_msg.as_str()),
+                );
+            }
+        }
+        Err(err_msg) => {
+            global.toast(
+                Toast::init("error", "could not get mobility range of unit")
+                    .error()
+                    .with_more_info(err_msg.as_str()),
+            );
+        }
+    }
+}
+
 const MIN_RENDER_TIME: u32 = 256;
 
 ///////////////////////////////////////////////////////////////
@@ -88,7 +113,7 @@ struct UnitSelectedModel {
 impl UnitSelectedModel {
     pub fn init(unit_id: UnitId, from_group: Option<GroupSelectedModel>) -> UnitSelectedModel {
         UnitSelectedModel {
-            unit_id: unit_id.clone(),
+            unit_id,
             name_field: String::new(),
             name_submitted: false,
             from_group,
@@ -158,6 +183,16 @@ struct MovingUnitModel {
     arrows: Vec<(Direction, Arrow)>,
 }
 
+impl MovingUnitModel {
+    pub fn init(unit_id: UnitId, mobility: HashSet<Located<()>>) -> MovingUnitModel {
+        MovingUnitModel {
+            unit_id,
+            mobility,
+            arrows: Vec::new(),
+        }
+    }
+}
+
 enum Action {
     TraveledTo {
         path: Vec<Located<Direction>>,
@@ -209,7 +244,7 @@ pub fn init(
     let game_pixel_width = (flags.game.map.width as u16) * tile::PIXEL_WIDTH;
     let game_pixel_height = (flags.game.map.height as u16) * tile::PIXEL_HEIGHT;
 
-    let game_x = (window_size.width / 2.0) - (game_pixel_width as f64);
+    let game_x = (window_size.width / 2.0) - (game_pixel_width as f64) + 192.0;
 
     let game_y = (window_size.height / 2.0) - (game_pixel_height as f64);
 
@@ -482,11 +517,17 @@ pub fn update(
             }
         }
         Msg::ClickedUnitInGroup(unit_id) => {
-            if let Sidebar::GroupSelected(sub_model) = &mut model.sidebar {
-                model.sidebar = Sidebar::UnitSelected(UnitSelectedModel::init(
-                    unit_id,
-                    Some(sub_model.clone()),
-                ));
+            if model.get_units_move(&unit_id).is_none() {
+                if let Sidebar::GroupSelected(sub_model) = &mut model.sidebar {
+                    model.sidebar = Sidebar::UnitSelected(UnitSelectedModel::init(
+                        unit_id.clone(),
+                        Some(sub_model.clone()),
+                    ));
+
+                    if let Stage::TakingTurn { .. } = &mut model.stage {
+                        set_to_moving_unit_mode(global, model, unit_id)
+                    }
+                }
             }
         }
         Msg::ClickedBackToGroup => {
@@ -503,6 +544,7 @@ fn refetch_game(model: &mut Model, fetched_game: Game, orders: &mut impl Orders<
     if model.game.turn_number == fetched_game.turn_number {
         model.handle_game_reload_timeout = Some(wait_for_game_reload_timeout(orders));
     } else {
+        model.sidebar = Sidebar::None;
         model.stage = Stage::TakingTurn { mode: Mode::None };
         model.status = Status::Ready;
         model.moved_units = Vec::new();
@@ -663,6 +705,13 @@ fn handle_click_on_screen_when_move_mode(model: &mut Model) -> Result<(), (Strin
         model
             .clear_mode()
             .map_err(|msg| ("clear_mode_canvas".to_string(), msg))?;
+
+        if let Sidebar::UnitSelected(unit_selected_model) = &model.sidebar {
+            model.sidebar = match &unit_selected_model.from_group {
+                None => Sidebar::None,
+                Some(group_selected_model) => Sidebar::GroupSelected(group_selected_model.clone()),
+            };
+        }
     }
 
     Ok(())
@@ -696,32 +745,7 @@ fn handle_click_on_screen_when_no_mode(
     if rest.is_empty() {
         model.sidebar = Sidebar::UnitSelected(UnitSelectedModel::init(first_unit_id.clone(), None));
 
-        match model.game.get_units_mobility(first_unit_id) {
-            Ok(mobility) => {
-                model.stage = Stage::TakingTurn {
-                    mode: Mode::MovingUnit(MovingUnitModel {
-                        unit_id: first_unit_id.clone(),
-                        mobility,
-                        arrows: Vec::new(),
-                    }),
-                };
-
-                if let Err((err_title, err_msg)) = draw_mode_from_mouse_event(model) {
-                    global.toast(
-                        Toast::init("error", err_title.as_str())
-                            .error()
-                            .with_more_info(err_msg.as_str()),
-                    );
-                }
-            }
-            Err(err_msg) => {
-                global.toast(
-                    Toast::init("error", "could not get mobility range of unit")
-                        .error()
-                        .with_more_info(err_msg.as_str()),
-                );
-            }
-        }
+        set_to_moving_unit_mode(global, model, first_unit_id.clone());
     } else {
         let mut units = vec![];
 
@@ -1025,6 +1049,22 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
             value: (),
         };
 
+        let draw_units_move = |maybe_units_move: Option<&Action>| -> Result<(), String> {
+            if let Some(units_move) = maybe_units_move {
+                match units_move {
+                    Action::TraveledTo { arrows, .. } => {
+                        let mut arrow_x = game_pos.x;
+                        let mut arrow_y = game_pos.y;
+                        for (dir, arrow) in arrows {
+                            draw_arrows(&ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y, true)?;
+                        }
+                    }
+                };
+            }
+
+            Ok(())
+        };
+
         if visibility.contains(&location) {
             let x = (game_pos.x * tile::PIXEL_WIDTH) as f64;
             let y = (game_pos.y * tile::PIXEL_HEIGHT) as f64;
@@ -1093,25 +1133,7 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
                 )
                 .map_err(|_| "Could not draw unit image on canvas".to_string())?;
 
-                if let Some(units_move) = maybe_units_move {
-                    match units_move {
-                        Action::TraveledTo { arrows, .. } => {
-                            let mut arrow_x = game_pos.x;
-                            let mut arrow_y = game_pos.y;
-                            for (dir, arrow) in arrows {
-                                draw_arrows(
-                                    &ctx,
-                                    model,
-                                    arrow,
-                                    dir,
-                                    &mut arrow_x,
-                                    &mut arrow_y,
-                                    true,
-                                )?;
-                            }
-                        }
-                    };
-                }
+                draw_units_move(maybe_units_move)?;
             } else {
                 let mut colors = HashSet::new();
 
@@ -1146,6 +1168,10 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
                     tile::PIXEL_HEIGHT_FL,
                 )
                 .map_err(|_| "Could not draw unit outline image on canvas".to_string())?;
+
+                for (unit_id, _, _) in units {
+                    draw_units_move(model.get_units_move(&unit_id))?;
+                }
             }
         }
     }
@@ -1316,7 +1342,7 @@ fn sidebar_view(global: &global::Model, model: &Model) -> Cell<Msg> {
 
     Cell::group(
         vec![
-            Style::W8,
+            Style::W8P5,
             Style::Absolute,
             Style::Bottom0,
             Style::Top0,
@@ -1327,7 +1353,10 @@ fn sidebar_view(global: &global::Model, model: &Model) -> Cell<Msg> {
             Style::FlexCol,
         ],
         vec![
-            Cell::group(vec![Style::Grow, Style::FlexCol], sidebar_content(model)),
+            Cell::group(
+                vec![Style::Grow, Style::FlexCol, Style::G4],
+                sidebar_content(model),
+            ),
             submit_button.cell(),
         ],
     )
@@ -1351,11 +1380,48 @@ fn sidebar_content(model: &Model) -> Vec<Cell<Msg>> {
 
                     let clicked_unit_id = unit_id.clone();
 
+                    let unit_moved = model.get_units_move(unit_id).is_some();
+
+                    let text_color = if unit_moved {
+                        Style::TextContent2
+                    } else {
+                        Style::none()
+                    };
+
+                    let background_color_hover = if unit_moved {
+                        Style::none()
+                    } else {
+                        Style::BgBackground4Hover
+                    };
+
                     let unit_row = Cell::group(
-                        vec![],
-                        vec![Cell::from_str(vec![Style::P4], label.as_str())],
+                        vec![
+                            Style::CursorPointer,
+                            background_color_hover,
+                            Style::P4,
+                            Style::G4,
+                            Style::FlexRow,
+                        ],
+                        vec![
+                            Cell::group(
+                                vec![Style::FlexCol, Style::JustifyCenter],
+                                vec![
+                                    Cell::empty(vec![Style::W5, Style::H5, Style::BgBackground4])
+                                        .with_img_src("/asset/infantry-red.png".to_string()),
+                                ],
+                            ),
+                            Cell::from_str(
+                                vec![
+                                    text_color,
+                                    Style::TextSelectNone,
+                                    Style::FlexCol,
+                                    Style::JustifyCenter,
+                                ],
+                                label.as_str(),
+                            ),
+                        ],
                     )
-                    .on_mouse_up(|_| Msg::ClickedUnitInGroup(clicked_unit_id));
+                    .on_click(|_| Msg::ClickedUnitInGroup(clicked_unit_id));
 
                     unit_rows.push(unit_row);
                 }

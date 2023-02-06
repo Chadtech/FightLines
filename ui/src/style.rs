@@ -19,15 +19,20 @@ pub enum Style {
     P2,
     P3,
     P4,
+    PY4,
     G3,
     G4,
     M2,
     MT4,
     TextImportant4,
     TextContent1,
+    TextContent2,
     TextContent5,
+    W4,
+    W5,
     W7,
     W8,
+    W8P5,
     W9,
     WA,
     W512px,
@@ -40,6 +45,10 @@ pub enum Style {
     InsetImportant,
     BgBackground0,
     BgBackground1,
+    BgBackground2,
+    BgBackground4,
+    BgBackground2Hover,
+    BgBackground4Hover,
     BgImportant1,
     BgProblem1,
     BgBackDrop,
@@ -67,6 +76,7 @@ pub enum Style {
     Bottom4,
     CursorPointer,
     CursorNone,
+    TextSelectNone,
 }
 
 impl Style {
@@ -88,6 +98,7 @@ impl Style {
             Style::P2 => vec!["p-2"],
             Style::P3 => vec!["p-3"],
             Style::P4 => vec!["p-4"],
+            Style::PY4 => vec!["py-4"],
             Style::G3 => vec!["g-3"],
             Style::G4 => vec!["g-4"],
             Style::M2 => vec!["m-2"],
@@ -97,11 +108,16 @@ impl Style {
                 .map(|style| style.css_classes())
                 .collect::<Vec<Vec<&'static str>>>()
                 .concat(),
+
             Style::TextImportant4 => vec!["text-important-4"],
             Style::TextContent1 => vec!["text-content-1"],
+            Style::TextContent2 => vec!["text-content-2"],
             Style::TextContent5 => vec!["text-content-5"],
+            Style::W4 => vec!["w-4"],
+            Style::W5 => vec!["w-5"],
             Style::W7 => vec!["w-7"],
             Style::W8 => vec!["w-8"],
+            Style::W8P5 => vec!["w-8p5"],
             Style::W9 => vec!["w-9"],
             Style::WA => vec!["w-a"],
             Style::WFull => vec!["w-full"],
@@ -113,6 +129,10 @@ impl Style {
             Style::InsetImportant => vec!["inset-important"],
             Style::BgBackground0 => vec!["bg-background-0"],
             Style::BgBackground1 => vec!["bg-background-1"],
+            Style::BgBackground2 => vec!["bg-background-2"],
+            Style::BgBackground4 => vec!["bg-background-4"],
+            Style::BgBackground2Hover => vec!["bg-background-2-hover"],
+            Style::BgBackground4Hover => vec!["bg-background-4-hover"],
             Style::BgProblem1 => vec!["bg-problem-1"],
             Style::H4 => vec!["h-4"],
             Style::H5 => vec!["h-5"],
@@ -141,6 +161,7 @@ impl Style {
             Style::CursorPointer => vec!["cursor-pointer"],
             Style::CursorNone => vec!["cursor-none"],
             Style::BgBackDrop => vec!["backdrop"],
+            Style::TextSelectNone => vec!["text-select-none"],
         }
     }
 }
