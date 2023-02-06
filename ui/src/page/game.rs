@@ -1,11 +1,11 @@
 mod action;
 mod group_selected;
+mod unit_selected;
 
 use crate::page::game::action::Action;
 use crate::view::button::Button;
 use crate::view::card::Card;
 use crate::view::cell::Cell;
-use crate::view::text_field::TextField;
 use crate::web_sys::HtmlCanvasElement;
 use crate::{api, assets, core_ext, global, Row, Style, Toast};
 use seed::app::CmdHandle;
@@ -98,26 +98,8 @@ pub struct Model {
 
 enum Sidebar {
     None,
-    UnitSelected(UnitSelectedModel),
+    UnitSelected(unit_selected::Model),
     GroupSelected(group_selected::Model),
-}
-
-struct UnitSelectedModel {
-    unit_id: UnitId,
-    name_field: String,
-    name_submitted: bool,
-    from_group: Option<group_selected::Model>,
-}
-
-impl UnitSelectedModel {
-    pub fn init(unit_id: UnitId, from_group: Option<group_selected::Model>) -> UnitSelectedModel {
-        UnitSelectedModel {
-            unit_id,
-            name_field: String::new(),
-            name_submitted: false,
-            from_group,
-        }
-    }
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -210,10 +192,9 @@ pub enum Msg {
     GotTurnSubmitResponse(Box<Result<submit_turn::Response, String>>),
     GotGame(Box<Result<shared::api::game::get::Response, String>>),
     GameReloadTimeExpired,
-    UpdatedUnitNameField(String),
-    ClickedSetName,
+
     GroupSelectedSidebar(group_selected::Msg),
-    ClickedBackToGroup,
+    UnitSelectedSidebar(unit_selected::Msg),
 }
 
 ///////////////////////////////////////////////////////////////
@@ -492,27 +473,36 @@ pub fn update(
                 }
             });
         }
-        Msg::UpdatedUnitNameField(new_field) => {
-            if let Sidebar::UnitSelected(sub_model) = &mut model.sidebar {
-                sub_model.name_field = new_field;
-            }
-        }
-        Msg::ClickedSetName => {
-            if let Sidebar::UnitSelected(sub_model) = &mut model.sidebar {
-                if !sub_model.name_submitted {
-                    sub_model.name_submitted = true;
-                    model.changes.push(Change::NameUnit {
-                        name: sub_model.name_field.clone(),
-                        unit_id: sub_model.unit_id.clone(),
-                    })
+        Msg::UnitSelectedSidebar(sub_msg) => match sub_msg {
+            unit_selected::Msg::UpdatedUnitNameField(new_field) => {
+                if let Sidebar::UnitSelected(sub_model) = &mut model.sidebar {
+                    sub_model.name_field = new_field;
                 }
             }
-        }
+            unit_selected::Msg::ClickedSetName => {
+                if let Sidebar::UnitSelected(sub_model) = &mut model.sidebar {
+                    if !sub_model.name_submitted {
+                        sub_model.name_submitted = true;
+                        model.changes.push(Change::NameUnit {
+                            name: sub_model.name_field.clone(),
+                            unit_id: sub_model.unit_id.clone(),
+                        })
+                    }
+                }
+            }
+            unit_selected::Msg::ClickedBackToGroup => {
+                if let Sidebar::UnitSelected(sub_model) = &mut model.sidebar {
+                    if let Some(group_model) = sub_model.from_group.clone() {
+                        model.sidebar = Sidebar::GroupSelected(group_model);
+                    }
+                }
+            }
+        },
         Msg::GroupSelectedSidebar(sub_msg) => match sub_msg {
             group_selected::Msg::ClickedUnitInGroup(unit_id) => {
                 if model.get_units_move(&unit_id).is_none() {
                     if let Sidebar::GroupSelected(sub_model) = &mut model.sidebar {
-                        model.sidebar = Sidebar::UnitSelected(UnitSelectedModel::init(
+                        model.sidebar = Sidebar::UnitSelected(unit_selected::Model::init(
                             unit_id.clone(),
                             Some(sub_model.clone()),
                         ));
@@ -524,13 +514,6 @@ pub fn update(
                 }
             }
         },
-        Msg::ClickedBackToGroup => {
-            if let Sidebar::UnitSelected(sub_model) = &mut model.sidebar {
-                if let Some(group_model) = sub_model.from_group.clone() {
-                    model.sidebar = Sidebar::GroupSelected(group_model);
-                }
-            }
-        }
     }
 }
 
@@ -737,7 +720,7 @@ fn handle_click_on_screen_when_no_mode(
     }
 
     if rest.is_empty() {
-        model.sidebar = Sidebar::UnitSelected(UnitSelectedModel::init(
+        model.sidebar = Sidebar::UnitSelected(unit_selected::Model::init(
             first_unit_id.clone(),
             None::<group_selected::Model>,
         ));
@@ -1374,38 +1357,10 @@ fn sidebar_content(model: &Model) -> Vec<Cell<Msg>> {
             None => {
                 vec![Cell::from_str(vec![], "Error: Could not find unit")]
             }
-            Some(unit_model) => {
-                let back_button_row = match sub_model.from_group {
-                    None => Cell::none(),
-                    Some(_) => Button::simple("back to group")
-                        .on_click(|_| Msg::ClickedBackToGroup)
-                        .cell(),
-                };
-                let name_view = match &unit_model.name {
-                    Some(name) => Cell::from_str(vec![], name.as_str()),
-                    None => {
-                        let save_name_button = Button::simple("save")
-                            .on_click(|_| Msg::ClickedSetName)
-                            .disable(sub_model.name_submitted)
-                            .cell();
-
-                        Cell::group(
-                            vec![Style::FlexRow, Style::G4],
-                            vec![
-                                TextField::simple(
-                                    sub_model.name_field.as_str(),
-                                    Msg::UpdatedUnitNameField,
-                                )
-                                .with_placeholder("unit name".to_string())
-                                .cell(),
-                                save_name_button,
-                            ],
-                        )
-                    }
-                };
-
-                vec![back_button_row, name_view]
-            }
+            Some(unit_model) => unit_selected::sidebar_content(sub_model, unit_model)
+                .into_iter()
+                .map(|cell| cell.map_msg(Msg::UnitSelectedSidebar))
+                .collect::<Vec<_>>(),
         },
     }
 }
