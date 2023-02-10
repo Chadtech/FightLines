@@ -24,7 +24,7 @@ use shared::located::Located;
 use shared::point::Point;
 use shared::team_color::TeamColor;
 use shared::unit::{Unit, UnitId};
-use shared::{game, tile};
+use shared::{game, located, tile};
 use std::collections::{HashMap, HashSet};
 
 ///////////////////////////////////////////////////////////////
@@ -351,11 +351,7 @@ pub fn update(
             {
                 None
             } else {
-                let mouse_loc = Located {
-                    value: (),
-                    x: x as u16,
-                    y: y as u16,
-                };
+                let mouse_loc = located::unit(x as u16, y as u16);
 
                 if let Err((err_title, err_msg)) = handle_mouse_move_for_mode(model, mouse_loc) {
                     global.toast(
@@ -590,7 +586,7 @@ fn handle_click_on_screen_during_turn(
                 let x = x as u16;
                 let y = y as u16;
 
-                let mouse_loc = Located { x, y, value: () };
+                let mouse_loc = located::unit(x, y);
 
                 if let Some(units) = model.game.units_by_location_index.get(&mouse_loc) {
                     let rideable_units = units
@@ -701,7 +697,7 @@ fn handle_click_on_screen_when_no_mode(
     x: u16,
     y: u16,
 ) {
-    let units_at_pos = match model.game.get_units_by_location(&Located::<()>::unit(x, y)) {
+    let units_at_pos = match model.game.get_units_by_location(&located::unit(x, y)) {
         Some(units) => units,
         None => {
             return;
@@ -976,11 +972,7 @@ fn draw_visibility(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(
             let x_u16 = x as u16;
             let y_u16 = y as u16;
 
-            let loc = Located {
-                value: (),
-                x: x_u16,
-                y: y_u16,
-            };
+            let loc = located::unit(x_u16, y_u16);
 
             if !visibility.contains(&loc) {
                 let sheet = &model.assets.sheet;
@@ -1024,11 +1016,7 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
     ctx.clear_rect(0., 0., width, height);
 
     for (game_pos, units) in model.game.units_by_location_index.iter() {
-        let location = Located {
-            x: game_pos.x,
-            y: game_pos.y,
-            value: (),
-        };
+        let location = located::unit(game_pos.x, game_pos.y);
 
         let draw_units_move = |maybe_units_move: Option<&Action>| -> Result<(), String> {
             if let Some(units_move) = maybe_units_move {
