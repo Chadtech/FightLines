@@ -39,6 +39,14 @@ impl Unit {
             Unit::Truck => 7,
         }
     }
+
+    pub fn is_rideable(&self) -> bool {
+        match self {
+            Unit::Infantry => false,
+            Unit::Tank => false,
+            Unit::Truck => true,
+        }
+    }
 }
 
 impl ToString for Unit {

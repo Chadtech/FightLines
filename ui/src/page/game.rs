@@ -1,5 +1,6 @@
 mod action;
 mod group_selected;
+mod mode;
 mod unit_selected;
 
 use crate::page::game::action::Action;
@@ -44,7 +45,7 @@ fn set_to_moving_unit_mode(global: &mut global::Model, model: &mut Model, unit_i
     match model.game.get_units_mobility(&unit_id.clone()) {
         Ok(mobility) => {
             model.stage = Stage::TakingTurn {
-                mode: Mode::MovingUnit(MovingUnitModel::init(unit_id, mobility)),
+                mode: Mode::MovingUnit(mode::moving::Model::init(unit_id, mobility)),
             };
 
             if let Err((err_title, err_msg)) = draw_mode_from_mouse_event(model) {
@@ -154,24 +155,7 @@ enum Stage {
 #[derive(Debug)]
 enum Mode {
     None,
-    MovingUnit(MovingUnitModel),
-}
-
-#[derive(Debug)]
-struct MovingUnitModel {
-    unit_id: UnitId,
-    mobility: HashSet<Located<()>>,
-    arrows: Vec<(Direction, Arrow)>,
-}
-
-impl MovingUnitModel {
-    pub fn init(unit_id: UnitId, mobility: HashSet<Located<()>>) -> MovingUnitModel {
-        MovingUnitModel {
-            unit_id,
-            mobility,
-            arrows: Vec::new(),
-        }
-    }
+    MovingUnit(mode::moving::Model),
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -192,7 +176,6 @@ pub enum Msg {
     GotTurnSubmitResponse(Box<Result<submit_turn::Response, String>>),
     GotGame(Box<Result<shared::api::game::get::Response, String>>),
     GameReloadTimeExpired,
-
     GroupSelectedSidebar(group_selected::Msg),
     UnitSelectedSidebar(unit_selected::Msg),
 }
@@ -604,13 +587,31 @@ fn handle_click_on_screen_during_turn(
         Stage::TakingTurn { mode } => match mode {
             Mode::None => handle_click_on_screen_when_no_mode(global, model, x, y),
             Mode::MovingUnit(moving_model) => {
-                let mouse_loc = Located {
-                    x: x as u16,
-                    y: y as u16,
-                    value: (),
-                };
+                let x = x as u16;
+                let y = y as u16;
 
-                if moving_model.mobility.contains(&mouse_loc) {
+                let mouse_loc = Located { x, y, value: () };
+
+                if let Some(units) = model.game.units_by_location_index.get(&mouse_loc) {
+                    let rideable_units = units
+                        .into_iter()
+                        .filter_map(|(ridable_unit_id, _, possibly_rideable_unit)| {
+                            if possibly_rideable_unit.unit.is_rideable() {
+                                Some(mode::moving::RideOption::init(
+                                    ridable_unit_id.clone(),
+                                    possibly_rideable_unit
+                                        .name
+                                        .clone()
+                                        .unwrap_or(possibly_rideable_unit.unit.to_string()),
+                                ))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect::<Vec<mode::moving::RideOption>>();
+
+                    moving_model.with_options(x, y, rideable_units);
+                } else if moving_model.mobility.contains(&mouse_loc) {
                     if let Err((err_title, err_msg)) = handle_click_on_screen_when_move_mode(model)
                     {
                         global.toast(
@@ -700,7 +701,7 @@ fn handle_click_on_screen_when_no_mode(
     x: u16,
     y: u16,
 ) {
-    let units_at_pos = match model.game.get_units_by_location(&Point { x, y }) {
+    let units_at_pos = match model.game.get_units_by_location(&Located::<()>::unit(x, y)) {
         Some(units) => units,
         None => {
             return;
