@@ -2,6 +2,7 @@ use crate::style::Style;
 use crate::view::text::text;
 use seed::dom_entity_names::Tag;
 use seed::prelude::{mouse_ev, El, Ev, MessageMapper, Node};
+use shared::point::Point;
 use std::borrow::Cow;
 use std::rc::Rc;
 use web_sys::MouseEvent;
@@ -26,6 +27,7 @@ pub struct Model<Msg> {
     mouse_move_handler: Option<Rc<dyn Fn(MouseEvent) -> Msg>>,
     click_handler: Option<Rc<dyn Fn(MouseEvent) -> Msg>>,
     as_img: Option<String>,
+    screen_pos: Option<Point<i16>>,
 }
 
 #[derive(Clone)]
@@ -115,6 +117,18 @@ impl<Msg: 'static> Cell<Msg> {
 
                 if let Some(msg) = model.click_handler {
                     element.add_event_handler(mouse_ev(Ev::Click, move |event| msg(event)));
+                }
+
+                if let Some(screen_pos) = model.screen_pos {
+                    let mut style_str = "position:absolute; ".to_string();
+                    style_str.push_str("top:");
+                    style_str.push_str(screen_pos.y.to_string().as_str());
+                    style_str.push_str("px; ");
+                    style_str.push_str("left:");
+                    style_str.push_str(screen_pos.x.to_string().as_str());
+                    style_str.push_str("px; ");
+
+                    element.add_attr(Cow::Borrowed("style"), style_str);
                 }
 
                 Node::Element(element)
@@ -223,6 +237,17 @@ impl<Msg: 'static> Cell<Msg> {
         }
     }
 
+    pub fn at_screen_pos(self, x: i16, y: i16) -> Cell<Msg> {
+        match self {
+            Cell::None => Cell::None,
+            Cell::Model(mut model) => {
+                model.screen_pos = Some(Point { x, y });
+
+                Cell::Model(model)
+            }
+        }
+    }
+
     pub fn with_img_src(self, source: String) -> Cell<Msg> {
         match self {
             Cell::None => Cell::None,
@@ -268,6 +293,7 @@ impl<Msg: 'static> Cell<Msg> {
             mouse_move_handler: None,
             click_handler: None,
             as_img: None,
+            screen_pos: None,
         })
     }
 
@@ -327,6 +353,7 @@ impl<Msg: 'static> Cell<Msg> {
             mouse_move_handler: None,
             click_handler: None,
             as_img: None,
+            screen_pos: None,
         })
     }
 }

@@ -1,7 +1,6 @@
 use shared::arrow::Arrow;
 use shared::direction::Direction;
 use shared::located::Located;
-use shared::point::Point;
 use shared::unit::UnitId;
 use std::collections::HashSet;
 
@@ -10,7 +9,7 @@ pub struct Model {
     pub unit_id: UnitId,
     pub mobility: HashSet<Located<()>>,
     pub arrows: Vec<(Direction, Arrow)>,
-    pub ride_options: Option<Located<Vec<RideOption>>>,
+    pub ride_options: Option<Located<RideOptionsModel>>,
 }
 
 impl Model {
@@ -23,15 +22,32 @@ impl Model {
         }
     }
 
-    pub fn with_options(&mut self, x: u16, y: u16, options: Vec<RideOption>) -> &mut Model {
+    pub fn with_options(
+        &mut self,
+        x: u16,
+        y: u16,
+        options: Vec<RideOption>,
+        path: Vec<Located<Direction>>,
+    ) -> &mut Model {
+        let options_model = RideOptionsModel {
+            ride_options: options,
+            path,
+        };
+
         self.ride_options = Some(Located {
             x,
             y,
-            value: options,
+            value: options_model,
         });
 
         self
     }
+}
+
+#[derive(Debug)]
+pub struct RideOptionsModel {
+    pub ride_options: Vec<RideOption>,
+    pub path: Vec<Located<Direction>>,
 }
 
 #[derive(Debug)]

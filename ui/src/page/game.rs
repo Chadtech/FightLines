@@ -588,27 +588,9 @@ fn handle_click_on_screen_during_turn(
 
                 let mouse_loc = located::unit(x, y);
 
-                if let Some(units) = model.game.units_by_location_index.get(&mouse_loc) {
-                    let rideable_units = units
-                        .into_iter()
-                        .filter_map(|(ridable_unit_id, _, possibly_rideable_unit)| {
-                            if possibly_rideable_unit.unit.is_rideable() {
-                                Some(mode::moving::RideOption::init(
-                                    ridable_unit_id.clone(),
-                                    possibly_rideable_unit
-                                        .name
-                                        .clone()
-                                        .unwrap_or(possibly_rideable_unit.unit.to_string()),
-                                ))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect::<Vec<mode::moving::RideOption>>();
-
-                    moving_model.with_options(x, y, rideable_units);
-                } else if moving_model.mobility.contains(&mouse_loc) {
-                    if let Err((err_title, err_msg)) = handle_click_on_screen_when_move_mode(model)
+                if moving_model.mobility.contains(&mouse_loc) {
+                    if let Err((err_title, err_msg)) =
+                        handle_click_on_screen_when_move_mode(model, &mouse_loc)
                     {
                         global.toast(
                             Toast::init("error", err_title.as_str())
@@ -629,10 +611,13 @@ fn handle_click_on_screen_during_turn(
     }
 }
 
-fn handle_click_on_screen_when_move_mode(model: &mut Model) -> Result<(), (String, String)> {
+fn handle_click_on_screen_when_move_mode(
+    model: &mut Model,
+    mouse_loc: &Located<()>,
+) -> Result<(), (String, String)> {
     if let Stage::TakingTurn {
         mode: Mode::MovingUnit(moving_model),
-    } = &model.stage
+    } = &mut model.stage
     {
         let unit = model.game.units.get(&moving_model.unit_id).ok_or((
             "handle move click".to_string(),
@@ -664,27 +649,50 @@ fn handle_click_on_screen_when_move_mode(model: &mut Model) -> Result<(), (Strin
             });
         }
 
-        let unit_id = moving_model.unit_id.clone();
+        if let Some(units) = model.game.units_by_location_index.get(&mouse_loc) {
+            let rideable_units = units
+                .into_iter()
+                .filter_map(|(ridable_unit_id, _, possibly_rideable_unit)| {
+                    if possibly_rideable_unit.unit.is_rideable() {
+                        Some(mode::moving::RideOption::init(
+                            ridable_unit_id.clone(),
+                            possibly_rideable_unit
+                                .name
+                                .clone()
+                                .unwrap_or(possibly_rideable_unit.unit.to_string()),
+                        ))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<mode::moving::RideOption>>();
 
-        model.moved_units.push(unit_id.clone());
+            moving_model.with_options(mouse_loc.x, mouse_loc.y, rideable_units, path);
+        } else {
+            let unit_id = moving_model.unit_id.clone();
 
-        model.moves_index.insert(
-            unit_id,
-            Action::TraveledTo {
-                path,
-                arrows: moving_model.arrows.clone(),
-            },
-        );
+            model.moved_units.push(unit_id.clone());
 
-        model
-            .clear_mode()
-            .map_err(|msg| ("clear_mode_canvas".to_string(), msg))?;
+            model.moves_index.insert(
+                unit_id,
+                Action::TraveledTo {
+                    path,
+                    arrows: moving_model.arrows.clone(),
+                },
+            );
 
-        if let Sidebar::UnitSelected(unit_selected_model) = &model.sidebar {
-            model.sidebar = match &unit_selected_model.from_group {
-                None => Sidebar::None,
-                Some(group_selected_model) => Sidebar::GroupSelected(group_selected_model.clone()),
-            };
+            model
+                .clear_mode()
+                .map_err(|msg| ("clear_mode_canvas".to_string(), msg))?;
+
+            if let Sidebar::UnitSelected(unit_selected_model) = &model.sidebar {
+                model.sidebar = match &unit_selected_model.from_group {
+                    None => Sidebar::None,
+                    Some(group_selected_model) => {
+                        Sidebar::GroupSelected(group_selected_model.clone())
+                    }
+                };
+            }
         }
     }
 
@@ -1201,7 +1209,8 @@ pub fn view(global: &global::Model, model: &Model) -> Cell<Msg> {
             mode_canvas_cell(model),
             cursor_canvas_cell(model),
             click_screen(model),
-            overlay_view(model),
+            flyout_view(model),
+            snackbar_view(model),
             sidebar_view(global, model),
             dialog_view(model),
         ],
@@ -1399,7 +1408,39 @@ fn dialog_view(model: &Model) -> Cell<Msg> {
     }
 }
 
-fn overlay_view(model: &Model) -> Cell<Msg> {
+fn flyout_view(model: &Model) -> Cell<Msg> {
+    if let Stage::TakingTurn {
+        mode: Mode::MovingUnit(moving_model),
+    } = &model.stage
+    {
+        match &moving_model.ride_options {
+            None => Cell::none(),
+            Some(loc_ride_options) => {
+                let screen_x = {
+                    let game_pos_px = loc_ride_options.x * tile::PIXEL_WIDTH * 2;
+
+                    model.game_pos.x + (game_pos_px as i16)
+                };
+
+                let screen_y = {
+                    let game_pos_px = (loc_ride_options.y + 1) * tile::PIXEL_HEIGHT * 2;
+
+                    model.game_pos.y + (game_pos_px as i16) + 1
+                };
+
+                Cell::group(
+                    vec![Style::W8, Style::H8, Style::Outset, Style::BgContent1],
+                    vec![Cell::from_str(vec![], "Hello!")],
+                )
+                .at_screen_pos(screen_x, screen_y)
+            }
+        }
+    } else {
+        Cell::none()
+    }
+}
+
+fn snackbar_view(model: &Model) -> Cell<Msg> {
     if !model.is_waiting_stage() || model.dialog.is_some() {
         Cell::none()
     } else {
