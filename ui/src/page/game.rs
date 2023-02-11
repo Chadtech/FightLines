@@ -178,6 +178,7 @@ pub enum Msg {
     GameReloadTimeExpired,
     GroupSelectedSidebar(group_selected::Msg),
     UnitSelectedSidebar(unit_selected::Msg),
+    MovingFlyoutMsg(mode::moving::Msg),
 }
 
 ///////////////////////////////////////////////////////////////
@@ -493,6 +494,7 @@ pub fn update(
                 }
             }
         },
+        Msg::MovingFlyoutMsg(_) => {}
     }
 }
 
@@ -752,39 +754,41 @@ fn handle_mouse_move_for_mode(
         Stage::TakingTurn { mode } => match mode {
             Mode::None => {}
             Mode::MovingUnit(moving_model) => {
-                if moving_model.mobility.contains(&mouse_loc) {
-                    let unit_model = model.game.units.get(&moving_model.unit_id).ok_or((
-                        "handle mouse move in move mode".to_string(),
-                        "Could not find unit in moving model".to_string(),
-                    ))?;
+                if moving_model.ride_options.is_none() {
+                    if moving_model.mobility.contains(&mouse_loc) {
+                        let unit_model = model.game.units.get(&moving_model.unit_id).ok_or((
+                            "handle mouse move in move mode".to_string(),
+                            "Could not find unit in moving model".to_string(),
+                        ))?;
 
-                    let loc = match &unit_model.place {
-                        UnitPlace::OnMap(loc) => loc,
-                        UnitPlace::InUnit(_) => {
-                            return Ok(());
-                        }
-                    };
+                        let loc = match &unit_model.place {
+                            UnitPlace::OnMap(loc) => loc,
+                            UnitPlace::InUnit(_) => {
+                                return Ok(());
+                            }
+                        };
 
-                    let mouse_point = Point {
-                        x: mouse_loc.x as i32 - loc.x as i32,
-                        y: mouse_loc.y as i32 - loc.y as i32,
-                    };
+                        let mouse_point = Point {
+                            x: mouse_loc.x as i32 - loc.x as i32,
+                            y: mouse_loc.y as i32 - loc.y as i32,
+                        };
 
-                    let arrows = calc_arrows(
-                        mouse_point,
-                        Some(
-                            &moving_model
-                                .arrows
-                                .iter()
-                                .map(|(dir, _)| dir.clone())
-                                .collect::<Vec<_>>(),
-                        ),
-                        unit_model.unit.get_mobility_range(),
-                    );
+                        let arrows = calc_arrows(
+                            mouse_point,
+                            Some(
+                                &moving_model
+                                    .arrows
+                                    .iter()
+                                    .map(|(dir, _)| dir.clone())
+                                    .collect::<Vec<_>>(),
+                            ),
+                            unit_model.unit.get_mobility_range(),
+                        );
 
-                    moving_model.arrows = arrows;
-                } else {
-                    moving_model.arrows = vec![];
+                        moving_model.arrows = arrows;
+                    } else {
+                        moving_model.arrows = vec![];
+                    }
                 }
 
                 draw_mode_from_mouse_event(model)?;
@@ -1413,28 +1417,7 @@ fn flyout_view(model: &Model) -> Cell<Msg> {
         mode: Mode::MovingUnit(moving_model),
     } = &model.stage
     {
-        match &moving_model.ride_options {
-            None => Cell::none(),
-            Some(loc_ride_options) => {
-                let screen_x = {
-                    let game_pos_px = loc_ride_options.x * tile::PIXEL_WIDTH * 2;
-
-                    model.game_pos.x + (game_pos_px as i16)
-                };
-
-                let screen_y = {
-                    let game_pos_px = (loc_ride_options.y + 1) * tile::PIXEL_HEIGHT * 2;
-
-                    model.game_pos.y + (game_pos_px as i16) + 1
-                };
-
-                Cell::group(
-                    vec![Style::W8, Style::H8, Style::Outset, Style::BgContent1],
-                    vec![Cell::from_str(vec![], "Hello!")],
-                )
-                .at_screen_pos(screen_x, screen_y)
-            }
-        }
+        mode::moving::flyout_view(moving_model, &model.game_pos).map_msg(Msg::MovingFlyoutMsg)
     } else {
         Cell::none()
     }

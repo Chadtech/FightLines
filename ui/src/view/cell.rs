@@ -237,11 +237,15 @@ impl<Msg: 'static> Cell<Msg> {
         }
     }
 
-    pub fn at_screen_pos(self, x: i16, y: i16) -> Cell<Msg> {
+    pub fn at_screen_pos(self, pos: Point<i16>) -> Cell<Msg> {
+        self.at_screen_pos_helper(Some(pos))
+    }
+
+    fn at_screen_pos_helper(self, pos: Option<Point<i16>>) -> Cell<Msg> {
         match self {
             Cell::None => Cell::None,
             Cell::Model(mut model) => {
-                model.screen_pos = Some(Point { x, y });
+                model.screen_pos = pos;
 
                 Cell::Model(model)
             }
@@ -339,6 +343,7 @@ impl<Msg: 'static> Cell<Msg> {
                     .on_mouse_up_helper(new_on_mouse_up)
                     .on_mouse_move_helper(new_on_mouse_move)
                     .on_click_helper(new_on_click)
+                    .at_screen_pos_helper(model.screen_pos)
             }
         }
     }

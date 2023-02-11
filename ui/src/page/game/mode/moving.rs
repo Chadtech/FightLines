@@ -1,8 +1,17 @@
+use crate::style::Style;
+use crate::view::button::Button;
+use crate::view::cell::Cell;
 use shared::arrow::Arrow;
 use shared::direction::Direction;
 use shared::located::Located;
+use shared::point::Point;
+use shared::tile;
 use shared::unit::UnitId;
 use std::collections::HashSet;
+
+///////////////////////////////////////////////////////////////
+// Types
+///////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
 pub struct Model {
@@ -59,5 +68,68 @@ pub struct RideOption {
 impl RideOption {
     pub fn init(unit_id: UnitId, label: String) -> RideOption {
         RideOption { unit_id, label }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum Msg {
+    ClickedLoadInto(UnitId),
+    ClickedMoveTo,
+}
+///////////////////////////////////////////////////////////////
+// View
+///////////////////////////////////////////////////////////////
+
+pub fn flyout_view(model: &Model, game_screen_pos: &Point<i16>) -> Cell<Msg> {
+    match &model.ride_options {
+        None => Cell::none(),
+        Some(loc_ride_options) => {
+            let screen_x = {
+                let game_pos_px = loc_ride_options.x * tile::PIXEL_WIDTH * 2;
+
+                game_screen_pos.x + (game_pos_px as i16)
+            };
+
+            let screen_y = {
+                let game_pos_px = (loc_ride_options.y + 1) * tile::PIXEL_HEIGHT * 2;
+
+                game_screen_pos.y + (game_pos_px as i16) + 1
+            };
+
+            let mut move_buttons = vec![];
+
+            move_buttons.push(
+                Button::simple("move to")
+                    .on_click(|_| Msg::ClickedMoveTo)
+                    .cell(),
+            );
+
+            for ride_option in &loc_ride_options.value.ride_options {
+                let label = format!("load into {}", ride_option.label);
+
+                let click_unit_id = model.unit_id.clone();
+
+                let button = Button::simple(label.as_str())
+                    .on_click(|_| Msg::ClickedLoadInto(click_unit_id))
+                    .cell();
+
+                move_buttons.push(button)
+            }
+
+            Cell::group(
+                vec![
+                    Style::Outset,
+                    Style::BgContent1,
+                    Style::P2,
+                    Style::FlexCol,
+                    Style::G3,
+                ],
+                move_buttons,
+            )
+            .at_screen_pos(Point {
+                x: screen_x,
+                y: screen_y,
+            })
+        }
     }
 }
