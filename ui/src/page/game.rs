@@ -524,47 +524,48 @@ pub fn update(
             }
         },
         Msg::MovingFlyout(sub_msg) => {
-            if let Stage::TakingTurn {
-                mode: Mode::MovingUnit(sub_model),
-            } = &mut model.stage
-            {
-                match sub_msg {
-                    mode::moving::Msg::ClickedLoadInto(_) => {}
-                    mode::moving::Msg::ClickedMoveTo => {
-                        match model.game.units.get(&sub_model.unit_id) {
-                            None => {
-                                global.toast(
-                                    Toast::init("error", "handle move select")
-                                        .error()
-                                        .with_more_info(
-                                            "Could not find unit when moving unit sxgpGCdl"
-                                                .to_string(),
-                                        ),
-                                );
-                            }
-                            Some(unit) => {
-                                let unit_id = &sub_model.unit_id.clone();
-                                let arrows = &sub_model.arrows.clone();
-
-                                let path = match sub_model.path(unit) {
-                                    Some(p) => p,
-                                    None => return,
-                                };
-                                if let Err((err_title, err_msg)) =
-                                    model.travel_unit(unit_id, path, arrows)
-                                {
-                                    global.toast(
-                                        Toast::init("error", err_title.as_str())
-                                            .error()
-                                            .with_more_info(err_msg.as_str()),
-                                    );
-                                }
-                            }
-                        }
-                    }
-                }
+            if let Err((err_title, err_msg)) = handle_moving_flyout_msg(model, sub_msg) {
+                global.toast(
+                    Toast::init("error", err_title.as_str())
+                        .error()
+                        .with_more_info(err_msg.as_str()),
+                );
             }
         }
+    }
+}
+
+fn handle_moving_flyout_msg(
+    model: &mut Model,
+    msg: mode::moving::Msg,
+) -> Result<(), (String, String)> {
+    let sub_model = if let Stage::TakingTurn {
+        mode: Mode::MovingUnit(sub_model),
+    } = &mut model.stage
+    {
+        sub_model
+    } else {
+        return Ok(());
+    };
+
+    match msg {
+        mode::moving::Msg::ClickedLoadInto(_) => Ok(()),
+        mode::moving::Msg::ClickedMoveTo => match model.game.units.get(&sub_model.unit_id) {
+            None => Err((
+                "handle move select".to_string(),
+                "Could not find unit when moving unit sxgpGCdl".to_string(),
+            )),
+            Some(unit) => {
+                let unit_id = &sub_model.unit_id.clone();
+                let arrows = &sub_model.arrows.clone();
+
+                let path = match sub_model.path(unit) {
+                    Some(p) => p,
+                    None => return Ok(()),
+                };
+                model.travel_unit(unit_id, path, arrows)
+            }
+        },
     }
 }
 
