@@ -142,6 +142,35 @@ pub enum FromLobbyError {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl Game {
+    pub fn get_rideable_units_by_location(
+        &self,
+        owner_id: Id,
+        mouse_loc: &Located<()>,
+    ) -> Option<Vec<(UnitId, UnitModel)>> {
+        match self.units_by_location_index.get(mouse_loc) {
+            Some(units) => {
+                let rideable_units = units
+                    .iter()
+                    .filter_map(|(rideable_unit_id, _, possibly_rideable_unit)| {
+                        if possibly_rideable_unit.unit.is_rideable()
+                            && possibly_rideable_unit.owner == owner_id
+                        {
+                            Some((rideable_unit_id.clone(), possibly_rideable_unit.clone()))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<(UnitId, UnitModel)>>();
+
+                if rideable_units.is_empty() {
+                    None
+                } else {
+                    Some(rideable_units)
+                }
+            }
+            None => None,
+        }
+    }
     pub fn all_players_turns(&self) -> Result<Vec<(Id, Vec<Action>)>, String> {
         let mut player_moves: Vec<(Id, Vec<Action>)> = Vec::new();
 

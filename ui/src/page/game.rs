@@ -114,6 +114,35 @@ enum Dialog {
 }
 
 impl Model {
+    fn travel_unit(
+        &mut self,
+        unit_id: &UnitId,
+        path: Vec<Located<Direction>>,
+        arrows: &[(Direction, Arrow)],
+    ) -> Result<(), (String, String)> {
+        self.moved_units.push(unit_id.clone());
+
+        self.moves_index.insert(
+            unit_id.clone(),
+            Action::TraveledTo {
+                path,
+                arrows: arrows.to_owned(),
+            },
+        );
+
+        self.clear_mode()
+            .map_err(|msg| ("clear_mode_canvas".to_string(), msg))?;
+
+        if let Sidebar::UnitSelected(unit_selected_model) = &self.sidebar {
+            self.sidebar = match &unit_selected_model.from_group {
+                None => Sidebar::None,
+                Some(group_selected_model) => Sidebar::GroupSelected(group_selected_model.clone()),
+            };
+        }
+
+        Ok(())
+    }
+
     fn get_units_move(&self, unit_id: &UnitId) -> Option<&Action> {
         self.moves_index.get(unit_id)
     }
@@ -178,7 +207,7 @@ pub enum Msg {
     GameReloadTimeExpired,
     GroupSelectedSidebar(group_selected::Msg),
     UnitSelectedSidebar(unit_selected::Msg),
-    MovingFlyoutMsg(mode::moving::Msg),
+    MovingFlyout(mode::moving::Msg),
 }
 
 ///////////////////////////////////////////////////////////////
@@ -494,7 +523,48 @@ pub fn update(
                 }
             }
         },
-        Msg::MovingFlyoutMsg(_) => {}
+        Msg::MovingFlyout(sub_msg) => {
+            if let Stage::TakingTurn {
+                mode: Mode::MovingUnit(sub_model),
+            } = &mut model.stage
+            {
+                match sub_msg {
+                    mode::moving::Msg::ClickedLoadInto(_) => {}
+                    mode::moving::Msg::ClickedMoveTo => {
+                        match model.game.units.get(&sub_model.unit_id) {
+                            None => {
+                                global.toast(
+                                    Toast::init("error", "handle move select")
+                                        .error()
+                                        .with_more_info(
+                                            "Could not find unit when moving unit sxgpGCdl"
+                                                .to_string(),
+                                        ),
+                                );
+                            }
+                            Some(unit) => {
+                                let unit_id = &sub_model.unit_id.clone();
+                                let arrows = &sub_model.arrows.clone();
+
+                                let path = match sub_model.path(unit) {
+                                    Some(p) => p,
+                                    None => return,
+                                };
+                                if let Err((err_title, err_msg)) =
+                                    model.travel_unit(unit_id, path, arrows)
+                                {
+                                    global.toast(
+                                        Toast::init("error", err_title.as_str())
+                                            .error()
+                                            .with_more_info(err_msg.as_str()),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -592,7 +662,7 @@ fn handle_click_on_screen_during_turn(
 
                 if moving_model.mobility.contains(&mouse_loc) {
                     if let Err((err_title, err_msg)) =
-                        handle_click_on_screen_when_move_mode(model, &mouse_loc)
+                        handle_click_on_screen_when_move_mode(global.viewer_id(), model, &mouse_loc)
                     {
                         global.toast(
                             Toast::init("error", err_title.as_str())
@@ -614,6 +684,7 @@ fn handle_click_on_screen_during_turn(
 }
 
 fn handle_click_on_screen_when_move_mode(
+    viewer_id: Id,
     model: &mut Model,
     mouse_loc: &Located<()>,
 ) -> Result<(), (String, String)> {
@@ -621,80 +692,38 @@ fn handle_click_on_screen_when_move_mode(
         mode: Mode::MovingUnit(moving_model),
     } = &mut model.stage
     {
+        let unit_id = moving_model.unit_id.clone();
         let unit = model.game.units.get(&moving_model.unit_id).ok_or((
             "handle move click".to_string(),
             "Could not find unit when moving unit SirttBHL".to_string(),
         ))?;
+        let arrows = moving_model.arrows.clone();
 
-        let mut path: Vec<Located<Direction>> = Vec::new();
-
-        let (mut pos_x, mut pos_y) = match &unit.place {
-            UnitPlace::OnMap(loc_facing_dir) => (loc_facing_dir.x, loc_facing_dir.y),
-            UnitPlace::InUnit(_) => return Ok(()),
+        let path = match moving_model.path(unit) {
+            None => return Ok(()),
+            Some(p) => p,
         };
 
-        if let Some((dir, _)) = &moving_model.arrows.first() {
-            path.push(Located {
-                x: pos_x,
-                y: pos_y,
-                value: dir.clone(),
-            });
-        }
-
-        for (dir, _) in &moving_model.arrows {
-            dir.adjust_coord(&mut pos_x, &mut pos_y);
-
-            path.push(Located {
-                x: pos_x,
-                y: pos_y,
-                value: dir.clone(),
-            });
-        }
-
-        if let Some(units) = model.game.units_by_location_index.get(&mouse_loc) {
-            let rideable_units = units
-                .into_iter()
-                .filter_map(|(ridable_unit_id, _, possibly_rideable_unit)| {
-                    if possibly_rideable_unit.unit.is_rideable() {
-                        Some(mode::moving::RideOption::init(
-                            ridable_unit_id.clone(),
-                            possibly_rideable_unit
-                                .name
-                                .clone()
-                                .unwrap_or(possibly_rideable_unit.unit.to_string()),
-                        ))
-                    } else {
-                        None
-                    }
+        if let Some(rideable_units) = model
+            .game
+            .get_rideable_units_by_location(viewer_id, mouse_loc)
+        {
+            let rideable_unit_options = rideable_units
+                .iter()
+                .map(|(rideable_unit_id, rideable_unit)| {
+                    mode::moving::RideOption::init(
+                        rideable_unit_id.clone(),
+                        rideable_unit
+                            .name
+                            .clone()
+                            .unwrap_or_else(|| rideable_unit.unit.to_string()),
+                    )
                 })
                 .collect::<Vec<mode::moving::RideOption>>();
 
-            moving_model.with_options(mouse_loc.x, mouse_loc.y, rideable_units, path);
+            moving_model.with_options(mouse_loc.x, mouse_loc.y, rideable_unit_options, path);
         } else {
-            let unit_id = moving_model.unit_id.clone();
-
-            model.moved_units.push(unit_id.clone());
-
-            model.moves_index.insert(
-                unit_id,
-                Action::TraveledTo {
-                    path,
-                    arrows: moving_model.arrows.clone(),
-                },
-            );
-
-            model
-                .clear_mode()
-                .map_err(|msg| ("clear_mode_canvas".to_string(), msg))?;
-
-            if let Sidebar::UnitSelected(unit_selected_model) = &model.sidebar {
-                model.sidebar = match &unit_selected_model.from_group {
-                    None => Sidebar::None,
-                    Some(group_selected_model) => {
-                        Sidebar::GroupSelected(group_selected_model.clone())
-                    }
-                };
-            }
+            model.travel_unit(&unit_id, path, &arrows)?;
         }
     }
 
@@ -1417,7 +1446,7 @@ fn flyout_view(model: &Model) -> Cell<Msg> {
         mode: Mode::MovingUnit(moving_model),
     } = &model.stage
     {
-        mode::moving::flyout_view(moving_model, &model.game_pos).map_msg(Msg::MovingFlyoutMsg)
+        mode::moving::flyout_view(moving_model, &model.game_pos).map_msg(Msg::MovingFlyout)
     } else {
         Cell::none()
     }

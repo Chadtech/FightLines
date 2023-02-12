@@ -3,6 +3,7 @@ use crate::view::button::Button;
 use crate::view::cell::Cell;
 use shared::arrow::Arrow;
 use shared::direction::Direction;
+use shared::game::{UnitModel, UnitPlace};
 use shared::located::Located;
 use shared::point::Point;
 use shared::tile;
@@ -51,6 +52,35 @@ impl Model {
 
         self
     }
+
+    pub fn path(&self, unit: &UnitModel) -> Option<Vec<Located<Direction>>> {
+        let mut path: Vec<Located<Direction>> = Vec::new();
+
+        let (mut pos_x, mut pos_y) = match &unit.place {
+            UnitPlace::OnMap(loc_facing_dir) => (loc_facing_dir.x, loc_facing_dir.y),
+            UnitPlace::InUnit(_) => return None,
+        };
+
+        if let Some((dir, _)) = &self.arrows.first() {
+            path.push(Located {
+                x: pos_x,
+                y: pos_y,
+                value: dir.clone(),
+            });
+        }
+
+        for (dir, _) in &self.arrows {
+            dir.adjust_coord(&mut pos_x, &mut pos_y);
+
+            path.push(Located {
+                x: pos_x,
+                y: pos_y,
+                value: dir.clone(),
+            });
+        }
+
+        Some(path)
+    }
 }
 
 #[derive(Debug)]
@@ -98,11 +128,7 @@ pub fn flyout_view(model: &Model, game_screen_pos: &Point<i16>) -> Cell<Msg> {
 
             let mut move_buttons = vec![];
 
-            move_buttons.push(
-                Button::simple("move to")
-                    .on_click(|_| Msg::ClickedMoveTo)
-                    .cell(),
-            );
+            move_buttons.push(Button::simple("move to").on_click(|_| Msg::ClickedMoveTo));
 
             for ride_option in &loc_ride_options.value.ride_options {
                 let label = format!("load into {}", ride_option.label);
@@ -111,7 +137,7 @@ pub fn flyout_view(model: &Model, game_screen_pos: &Point<i16>) -> Cell<Msg> {
 
                 let button = Button::simple(label.as_str())
                     .on_click(|_| Msg::ClickedLoadInto(click_unit_id))
-                    .cell();
+                    .full_width();
 
                 move_buttons.push(button)
             }
@@ -124,7 +150,10 @@ pub fn flyout_view(model: &Model, game_screen_pos: &Point<i16>) -> Cell<Msg> {
                     Style::FlexCol,
                     Style::G3,
                 ],
-                move_buttons,
+                move_buttons
+                    .into_iter()
+                    .map(|button| button.full_width().cell())
+                    .collect::<Vec<Cell<Msg>>>(),
             )
             .at_screen_pos(Point {
                 x: screen_x,
