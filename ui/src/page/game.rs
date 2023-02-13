@@ -130,8 +130,7 @@ impl Model {
             },
         );
 
-        self.clear_mode()
-            .map_err(|msg| ("clear_mode_canvas".to_string(), msg))?;
+        self.clear_mode()?;
 
         if let Sidebar::UnitSelected(unit_selected_model) = &self.sidebar {
             self.sidebar = match &unit_selected_model.from_group {
@@ -147,10 +146,10 @@ impl Model {
         self.moves_index.get(unit_id)
     }
 
-    fn clear_mode(&mut self) -> Result<(), String> {
+    fn clear_mode(&mut self) -> Result<(), (String, String)> {
         self.stage = Stage::TakingTurn { mode: Mode::None };
 
-        clear_mode_canvas(self)
+        clear_mode_canvas(self).map_err(|msg| ("clear mode anvas".to_string(), msg))
     }
 
     fn all_units_moved(&self, player_id: Id) -> bool {
@@ -267,6 +266,14 @@ pub fn init(
                                 },
                             );
                         }
+                        game::Action::LoadInto { unit_id, load_into } => {
+                            moves_ret.insert(
+                                unit_id.clone(),
+                                Action::LoadInto {
+                                    load_into: load_into.clone(),
+                                },
+                            );
+                        }
                     }
                 }
 
@@ -343,17 +350,9 @@ pub fn update(
 ) {
     match msg {
         Msg::RenderedFirstTime => {
-            let viewer_id = global.viewer_id();
-
-            if let Err(err) = draw_terrain(model) {
-                global.toast(
-                    Toast::init("error", "map rendering problem")
-                        .error()
-                        .with_more_info(err.as_str()),
-                );
-            }
-
-            if let Err((err_title, err_detail)) = draw(&viewer_id, model) {
+            if let Err((err_title, err_detail)) =
+                handle_rendered_first_frame(model, global.viewer_id())
+            {
                 global.toast(
                     Toast::init("error", err_title.as_str())
                         .error()
@@ -372,36 +371,9 @@ pub fn update(
             }
         }
         Msg::MouseMoveOnScreen(page_pos) => {
-            let Point { x, y } = click_pos_to_game_pos(page_pos, model);
-
-            model.mouse_game_position = if x < 0
-                || y < 0
-                || (model.game.map.width as i16) < x
-                || (model.game.map.height as i16) < y
-            {
-                None
-            } else {
-                let mouse_loc = located::unit(x as u16, y as u16);
-
-                if let Err((err_title, err_msg)) = handle_mouse_move_for_mode(model, mouse_loc) {
-                    global.toast(
-                        Toast::init("error", err_title.as_str())
-                            .error()
-                            .with_more_info(err_msg.as_str()),
-                    );
-                }
-
-                Some(Point {
-                    x: x as u32,
-                    y: y as u32,
-                })
-            };
-
-            let draw_result = draw_cursor(model);
-
-            if let Err(err_msg) = draw_result {
+            if let Err((err_title, err_msg)) = handle_mouse_move_on_screen(model, page_pos) {
                 global.toast(
-                    Toast::init("error", "could not render cursor")
+                    Toast::init("error", err_title.as_str())
                         .error()
                         .with_more_info(err_msg.as_str()),
                 );
@@ -482,31 +454,29 @@ pub fn update(
                 }
             });
         }
-        Msg::UnitSelectedSidebar(sub_msg) => match sub_msg {
-            unit_selected::Msg::UpdatedUnitNameField(new_field) => {
-                if let Sidebar::UnitSelected(sub_model) = &mut model.sidebar {
-                    sub_model.name_field = new_field;
-                }
-            }
-            unit_selected::Msg::ClickedSetName => {
-                if let Sidebar::UnitSelected(sub_model) = &mut model.sidebar {
-                    if !sub_model.name_submitted {
-                        sub_model.name_submitted = true;
-                        model.changes.push(Change::NameUnit {
-                            name: sub_model.name_field.clone(),
-                            unit_id: sub_model.unit_id.clone(),
-                        })
+        Msg::UnitSelectedSidebar(sub_msg) => {
+            if let Sidebar::UnitSelected(sub_model) = &mut model.sidebar {
+                match sub_msg {
+                    unit_selected::Msg::UpdatedUnitNameField(new_field) => {
+                        sub_model.name_field = new_field;
+                    }
+                    unit_selected::Msg::ClickedSetName => {
+                        if !sub_model.name_submitted {
+                            sub_model.name_submitted = true;
+                            model.changes.push(Change::NameUnit {
+                                name: sub_model.name_field.clone(),
+                                unit_id: sub_model.unit_id.clone(),
+                            })
+                        }
+                    }
+                    unit_selected::Msg::ClickedBackToGroup => {
+                        if let Some(group_model) = sub_model.from_group.clone() {
+                            model.sidebar = Sidebar::GroupSelected(group_model);
+                        }
                     }
                 }
             }
-            unit_selected::Msg::ClickedBackToGroup => {
-                if let Sidebar::UnitSelected(sub_model) = &mut model.sidebar {
-                    if let Some(group_model) = sub_model.from_group.clone() {
-                        model.sidebar = Sidebar::GroupSelected(group_model);
-                    }
-                }
-            }
-        },
+        }
         Msg::GroupSelectedSidebar(sub_msg) => match sub_msg {
             group_selected::Msg::ClickedUnitInGroup(unit_id) => {
                 if model.get_units_move(&unit_id).is_none() {
@@ -535,6 +505,38 @@ pub fn update(
     }
 }
 
+fn handle_mouse_move_on_screen(
+    model: &mut Model,
+    page_pos: Point<i16>,
+) -> Result<(), (String, String)> {
+    let Point { x, y } = click_pos_to_game_pos(page_pos, model);
+
+    model.mouse_game_position = if x < 0
+        || y < 0
+        || (model.game.map.width as i16) < x
+        || (model.game.map.height as i16) < y
+    {
+        None
+    } else {
+        let mouse_loc = located::unit(x as u16, y as u16);
+
+        handle_mouse_move_for_mode(model, mouse_loc)?;
+
+        Some(Point {
+            x: x as u32,
+            y: y as u32,
+        })
+    };
+
+    draw_cursor(model).map_err(|err_msg| ("could not render cursor".to_string(), err_msg))
+}
+
+fn handle_rendered_first_frame(model: &mut Model, viewer_id: Id) -> Result<(), (String, String)> {
+    draw_terrain(model).map_err(|err_msg| ("map rendering problem".to_string(), err_msg))?;
+
+    draw(&viewer_id, model)
+}
+
 fn handle_moving_flyout_msg(
     model: &mut Model,
     msg: mode::moving::Msg,
@@ -549,7 +551,18 @@ fn handle_moving_flyout_msg(
     };
 
     match msg {
-        mode::moving::Msg::ClickedLoadInto(_) => Ok(()),
+        mode::moving::Msg::ClickedLoadInto(rideable_unit_id) => {
+            model.moved_units.push(sub_model.unit_id.clone());
+
+            model.moves_index.insert(
+                sub_model.unit_id.clone(),
+                Action::LoadInto {
+                    load_into: rideable_unit_id.clone(),
+                },
+            );
+
+            model.clear_mode()
+        }
         mode::moving::Msg::ClickedMoveTo => match model.game.units.get(&sub_model.unit_id) {
             None => Err((
                 "handle move select".to_string(),
@@ -594,6 +607,10 @@ fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl 
                 unit_id: unit_id.clone(),
                 path: path.clone(),
                 arrows: arrows.clone(),
+            },
+            Action::LoadInto { load_into } => game::Action::LoadInto {
+                unit_id: unit_id.clone(),
+                load_into: load_into.clone(),
             },
         })
         .collect();
@@ -671,9 +688,9 @@ fn handle_click_on_screen_during_turn(
                                 .with_more_info(err_msg.as_str()),
                         );
                     }
-                } else if let Err(err_msg) = model.clear_mode() {
+                } else if let Err((err_title, err_msg)) = model.clear_mode() {
                     global.toast(
-                        Toast::init("error", "clear mode canvas")
+                        Toast::init("error", err_title.as_str())
                             .error()
                             .with_more_info(err_msg.as_str()),
                     );
@@ -1070,6 +1087,7 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
                             draw_arrows(&ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y, true)?;
                         }
                     }
+                    Action::LoadInto { .. } => {}
                 };
             }
 

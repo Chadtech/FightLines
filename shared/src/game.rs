@@ -84,6 +84,10 @@ pub enum Action {
         path: Vec<Located<Direction>>,
         arrows: Vec<(Direction, Arrow)>,
     },
+    LoadInto {
+        unit_id: UnitId,
+        load_into: UnitId,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -96,6 +100,10 @@ pub enum Outcome {
     Traveled {
         unit_id: UnitId,
         path: Vec<Located<Direction>>,
+    },
+    LoadedInto {
+        unit_id: UnitId,
+        loaded_into: UnitId,
     },
     NamedUnit {
         unit_id: UnitId,
@@ -252,6 +260,7 @@ impl Game {
                                 path: path.clone(),
                             });
                         }
+                        Action::LoadInto { .. } => {}
                     }
 
                     actions.remove(0);
@@ -333,6 +342,14 @@ impl Game {
                 Outcome::NamedUnit { unit_id, name } => {
                     if let Some(unit) = self.units.get_mut(&unit_id) {
                         unit.name = Some(name);
+                    }
+                }
+                Outcome::LoadedInto {
+                    unit_id,
+                    loaded_into,
+                } => {
+                    if let Some(unit) = self.units.get_mut(&unit_id) {
+                        unit.place = UnitPlace::InUnit(loaded_into.clone());
                     }
                 }
             }
