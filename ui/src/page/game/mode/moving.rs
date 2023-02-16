@@ -3,8 +3,10 @@ use crate::view::button::Button;
 use crate::view::cell::Cell;
 use shared::arrow::Arrow;
 use shared::direction::Direction;
+use shared::facing_direction::FacingDirection;
 use shared::game::{UnitModel, UnitPlace};
 use shared::located::Located;
+use shared::path::Path;
 use shared::point::Point;
 use shared::tile;
 use shared::unit::UnitId;
@@ -37,7 +39,7 @@ impl Model {
         x: u16,
         y: u16,
         options: Vec<RideOption>,
-        path: Vec<Located<Direction>>,
+        path: Path,
     ) -> &mut Model {
         let options_model = RideOptionsModel {
             ride_options: options,
@@ -53,31 +55,21 @@ impl Model {
         self
     }
 
-    pub fn path(&self, unit: &UnitModel) -> Option<Vec<Located<Direction>>> {
-        let mut path: Vec<Located<Direction>> = Vec::new();
-
-        let (mut pos_x, mut pos_y) = match &unit.place {
-            UnitPlace::OnMap(loc_facing_dir) => (loc_facing_dir.x, loc_facing_dir.y),
+    pub fn path(&self, unit: &UnitModel) -> Option<Path> {
+        let loc = match &unit.place {
+            UnitPlace::OnMap(loc_facing_dir) => loc_facing_dir,
             UnitPlace::InUnit(_) => return None,
         };
 
-        if let Some((dir, _)) = &self.arrows.first() {
-            path.push(Located {
-                x: pos_x,
-                y: pos_y,
-                value: dir.clone(),
-            });
-        }
-
-        for (dir, _) in &self.arrows {
-            dir.adjust_coord(&mut pos_x, &mut pos_y);
-
-            path.push(Located {
-                x: pos_x,
-                y: pos_y,
-                value: dir.clone(),
-            });
-        }
+        let path = Path::from_directions::<FacingDirection>(
+            loc,
+            &self
+                .arrows
+                .clone()
+                .into_iter()
+                .map(|(dir, _)| dir.clone())
+                .collect::<Vec<Direction>>(),
+        );
 
         Some(path)
     }
@@ -86,7 +78,7 @@ impl Model {
 #[derive(Debug)]
 pub struct RideOptionsModel {
     pub ride_options: Vec<RideOption>,
-    pub path: Vec<Located<Direction>>,
+    pub path: Path,
 }
 
 #[derive(Debug)]
@@ -133,7 +125,7 @@ pub fn flyout_view(model: &Model, game_screen_pos: &Point<i16>) -> Cell<Msg> {
             for ride_option in &loc_ride_options.value.ride_options {
                 let label = format!("load into {}", ride_option.label);
 
-                let click_unit_id = model.unit_id.clone();
+                let click_unit_id = ride_option.unit_id.clone();
 
                 let button = Button::simple(label.as_str())
                     .on_click(|_| Msg::ClickedLoadInto(click_unit_id))

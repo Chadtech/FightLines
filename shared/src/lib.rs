@@ -11,6 +11,7 @@ pub mod map;
 pub mod name;
 pub mod nonempty;
 pub mod owner;
+pub mod path;
 pub mod player;
 pub mod point;
 pub mod rng;

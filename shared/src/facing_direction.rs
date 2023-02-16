@@ -23,7 +23,7 @@ impl FacingDirection {
     pub fn from_directions(dirs: Vec<Direction>) -> Option<FacingDirection> {
         let mut ret = None;
 
-        let mut dirs = dirs;
+        let mut dirs = dirs.clone();
         dirs.reverse();
 
         for dir in dirs {

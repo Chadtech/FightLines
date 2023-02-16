@@ -1,5 +1,3 @@
-use crate::arrow::Arrow;
-use crate::direction::Direction;
 use crate::facing_direction::FacingDirection;
 use crate::game::FromLobbyError::CouldNotFindInitialMapMilitary;
 use crate::id::Id;
@@ -7,6 +5,7 @@ use crate::lobby::{Lobby, LobbyId};
 use crate::located::Located;
 use crate::map::{Map, MapOpt};
 use crate::owner::Owned;
+use crate::path::Path;
 use crate::player::Player;
 use crate::point::Point;
 use crate::rng::{RandGen, RandSeed};
@@ -81,12 +80,12 @@ impl Turn {
 pub enum Action {
     Traveled {
         unit_id: UnitId,
-        path: Vec<Located<Direction>>,
-        arrows: Vec<(Direction, Arrow)>,
+        path: Path,
     },
     LoadInto {
         unit_id: UnitId,
         load_into: UnitId,
+        path: Path,
     },
 }
 
@@ -99,7 +98,7 @@ pub enum Change {
 pub enum Outcome {
     Traveled {
         unit_id: UnitId,
-        path: Vec<Located<Direction>>,
+        path: Path,
     },
     LoadedInto {
         unit_id: UnitId,
@@ -251,7 +250,7 @@ impl Game {
         let mut cont = true;
 
         while cont {
-            if let Some((_player_id, actions)) = player_moves.get_mut(player_index) {
+            if let Some((_, actions)) = player_moves.get_mut(player_index) {
                 if let Some(first) = actions.first() {
                     match first {
                         Action::Traveled { unit_id, path, .. } => {
@@ -260,7 +259,12 @@ impl Game {
                                 path: path.clone(),
                             });
                         }
-                        Action::LoadInto { .. } => {}
+                        Action::LoadInto {
+                            unit_id, load_into, ..
+                        } => outcomes.push(Outcome::LoadedInto {
+                            unit_id: unit_id.clone(),
+                            loaded_into: load_into.clone(),
+                        }),
                     }
 
                     actions.remove(0);
@@ -312,24 +316,22 @@ impl Game {
                 Outcome::Traveled { unit_id, path } => {
                     if let Some(loc_dir) = path.last() {
                         if let Some(unit) = self.units.get_mut(&unit_id) {
-                            let new_facing_dir = FacingDirection::from_directions(
-                                path.clone()
-                                    .into_iter()
-                                    .map(|loc_dir| loc_dir.value)
-                                    .collect(),
-                            )
-                            .unwrap_or_else(|| {
-                                match unit.place.clone() {
-                                    UnitPlace::OnMap(loc_facing_dir) => loc_facing_dir.value,
-                                    UnitPlace::InUnit(_) => {
-                                        // This is a value of last resort after we have
-                                        // exhausted all other information. This
-                                        // code may be unreachable
-                                        // - Chad Jan 8 2023
-                                        FacingDirection::Right
-                                    }
-                                }
-                            });
+                            let new_facing_dir =
+                                FacingDirection::from_directions(path.clone().to_directions())
+                                    .unwrap_or_else(|| {
+                                        match unit.place.clone() {
+                                            UnitPlace::OnMap(loc_facing_dir) => {
+                                                loc_facing_dir.value
+                                            }
+                                            UnitPlace::InUnit(_) => {
+                                                // This is a value of last resort after we have
+                                                // exhausted all other information. This
+                                                // code may be unreachable
+                                                // - Chad Jan 8 2023
+                                                FacingDirection::Right
+                                            }
+                                        }
+                                    });
 
                             unit.place = UnitPlace::OnMap(Located {
                                 x: loc_dir.x,
@@ -680,6 +682,8 @@ fn index_units_by_location(
     let mut ret = HashMap::new();
 
     for (unit_id, unit) in units.iter() {
+        dbg!(&unit.place);
+
         if let UnitPlace::OnMap(loc_facing_dir) = unit.place.clone() {
             let key = Located {
                 x: loc_facing_dir.x,

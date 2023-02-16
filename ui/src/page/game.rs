@@ -21,6 +21,7 @@ use shared::frame_count::FrameCount;
 use shared::game::{Game, GameId, Turn, UnitPlace};
 use shared::id::Id;
 use shared::located::Located;
+use shared::path::Path;
 use shared::point::Point;
 use shared::team_color::TeamColor;
 use shared::unit::{Unit, UnitId};
@@ -87,8 +88,8 @@ pub struct Model {
     handle_minimum_framerate_timeout: CmdHandle,
     handle_game_reload_timeout: Option<CmdHandle>,
     frame_count: FrameCount,
-    moved_units: Vec<UnitId>,
     moves_index: HashMap<UnitId, Action>,
+    moves: Vec<Action>,
     changes: Vec<Change>,
     mouse_game_position: Option<Point<u32>>,
     stage: Stage,
@@ -117,18 +118,16 @@ impl Model {
     fn travel_unit(
         &mut self,
         unit_id: &UnitId,
-        path: Vec<Located<Direction>>,
+        path: Path,
         arrows: &[(Direction, Arrow)],
     ) -> Result<(), (String, String)> {
-        self.moved_units.push(unit_id.clone());
+        let action = Action::TraveledTo {
+            unit_id: unit_id.clone(),
+            path,
+            arrows: arrows.to_owned(),
+        };
 
-        self.moves_index.insert(
-            unit_id.clone(),
-            Action::TraveledTo {
-                path,
-                arrows: arrows.to_owned(),
-            },
-        );
+        self.moves_index.insert(unit_id.clone(), action);
 
         self.clear_mode()?;
 
@@ -153,7 +152,7 @@ impl Model {
     }
 
     fn all_units_moved(&self, player_id: Id) -> bool {
-        let total_moved_units = self.moved_units.len();
+        let total_moved_units = self.moves_index.keys().len();
 
         let total_units = self
             .game
@@ -245,35 +244,31 @@ pub fn init(
         Stage::Waiting
     };
 
-    let moves_index = match game.get_turn(global.viewer_id()) {
+    let moves: Vec<Action> = match game.get_turn(global.viewer_id()) {
         Ok(turn) => match turn {
-            Turn::Waiting => HashMap::new(),
+            Turn::Waiting => Vec::new(),
             Turn::Turn { moves } => {
-                let mut moves_ret = HashMap::new();
+                let mut moves_ret = Vec::new();
 
                 for m in moves {
                     match m {
-                        game::Action::Traveled {
+                        game::Action::Traveled { unit_id, path } => {
+                            moves_ret.push(Action::TraveledTo {
+                                unit_id: unit_id.clone(),
+                                path: path.clone(),
+                                arrows: path.with_arrows(),
+                            });
+                        }
+                        game::Action::LoadInto {
                             unit_id,
+                            load_into,
                             path,
-                            arrows,
-                        } => {
-                            moves_ret.insert(
-                                unit_id.clone(),
-                                Action::TraveledTo {
-                                    path: path.clone(),
-                                    arrows: arrows.clone(),
-                                },
-                            );
-                        }
-                        game::Action::LoadInto { unit_id, load_into } => {
-                            moves_ret.insert(
-                                unit_id.clone(),
-                                Action::LoadInto {
-                                    load_into: load_into.clone(),
-                                },
-                            );
-                        }
+                        } => moves_ret.push(Action::LoadInto {
+                            unit_id: unit_id.clone(),
+                            load_into: load_into.clone(),
+                            arrows: path.with_arrows(),
+                            path: path.clone(),
+                        }),
                     }
                 }
 
@@ -287,15 +282,29 @@ pub fn init(
                     .with_more_info(error.as_str()),
             );
 
-            HashMap::new()
+            Vec::new()
         }
     };
 
-    let moved_units = moves_index
-        .keys()
-        .into_iter()
-        .cloned()
-        .collect::<Vec<UnitId>>();
+    let moves_index = {
+        let mut moves_index_ret = HashMap::new();
+
+        for action in &moves {
+            match action {
+                Action::TraveledTo { unit_id, .. } => {
+                    moves_index_ret.insert(unit_id.clone(), action.clone());
+                }
+                Action::LoadInto {
+                    unit_id, load_into, ..
+                } => {
+                    moves_index_ret.insert(unit_id.clone(), action.clone());
+                    moves_index_ret.insert(load_into.clone(), action.clone());
+                }
+            }
+        }
+
+        moves_index_ret
+    };
 
     let model = Model {
         game,
@@ -315,8 +324,8 @@ pub fn init(
         handle_minimum_framerate_timeout: wait_for_render_timeout(orders),
         handle_game_reload_timeout: None,
         frame_count: FrameCount::F1,
-        moved_units,
         moves_index,
+        moves,
         changes: Vec::new(),
         mouse_game_position: None,
         stage,
@@ -550,35 +559,48 @@ fn handle_moving_flyout_msg(
         return Ok(());
     };
 
+    let unit = match model.game.units.get(&sub_model.unit_id) {
+        None => {
+            return Err((
+                "handle move select".to_string(),
+                "Could not find unit when moving unit sxgpGCdl".to_string(),
+            ))
+        }
+        Some(u) => u,
+    };
+
     match msg {
         mode::moving::Msg::ClickedLoadInto(rideable_unit_id) => {
-            model.moved_units.push(sub_model.unit_id.clone());
+            let unit_id = &sub_model.unit_id.clone();
+            let arrows = &sub_model.arrows.clone();
+
+            let path = match sub_model.path(unit) {
+                Some(p) => p,
+                None => return Ok(()),
+            };
 
             model.moves_index.insert(
                 sub_model.unit_id.clone(),
                 Action::LoadInto {
-                    load_into: rideable_unit_id.clone(),
+                    unit_id: unit_id.clone(),
+                    load_into: rideable_unit_id,
+                    arrows: arrows.clone(),
+                    path: path.clone(),
                 },
             );
 
             model.clear_mode()
         }
-        mode::moving::Msg::ClickedMoveTo => match model.game.units.get(&sub_model.unit_id) {
-            None => Err((
-                "handle move select".to_string(),
-                "Could not find unit when moving unit sxgpGCdl".to_string(),
-            )),
-            Some(unit) => {
-                let unit_id = &sub_model.unit_id.clone();
-                let arrows = &sub_model.arrows.clone();
+        mode::moving::Msg::ClickedMoveTo => {
+            let unit_id = &sub_model.unit_id.clone();
+            let arrows = &sub_model.arrows.clone();
 
-                let path = match sub_model.path(unit) {
-                    Some(p) => p,
-                    None => return Ok(()),
-                };
-                model.travel_unit(unit_id, path, arrows)
-            }
-        },
+            let path = match sub_model.path(unit) {
+                Some(p) => p,
+                None => return Ok(()),
+            };
+            model.travel_unit(unit_id, path, arrows)
+        }
     }
 }
 
@@ -589,8 +611,8 @@ fn refetch_game(model: &mut Model, fetched_game: Game, orders: &mut impl Orders<
         model.sidebar = Sidebar::None;
         model.stage = Stage::TakingTurn { mode: Mode::None };
         model.status = Status::Ready;
-        model.moved_units = Vec::new();
         model.moves_index = HashMap::new();
+        model.moves = Vec::new();
     }
 
     model.game = fetched_game;
@@ -603,14 +625,16 @@ fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl 
         .moves_index
         .iter()
         .map(|(unit_id, action)| match action {
-            Action::TraveledTo { path, arrows } => game::Action::Traveled {
+            Action::TraveledTo { path, .. } => game::Action::Traveled {
                 unit_id: unit_id.clone(),
                 path: path.clone(),
-                arrows: arrows.clone(),
             },
-            Action::LoadInto { load_into } => game::Action::LoadInto {
+            Action::LoadInto {
+                load_into, path, ..
+            } => game::Action::LoadInto {
                 unit_id: unit_id.clone(),
                 load_into: load_into.clone(),
+                path: path.clone(),
             },
         })
         .collect();
@@ -926,7 +950,7 @@ fn draw_mode_from_mouse_event(model: &Model) -> Result<(), (String, String)> {
                     let mut arrow_x = loc.x;
                     let mut arrow_y = loc.y;
                     for (dir, arrow) in &moving_model.arrows {
-                        draw_arrows(&ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y, false)
+                        draw_arrow(&ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y, false)
                             .map_err(|err_msg| ("rendering mobility range".to_string(), err_msg))?;
                     }
                 }
@@ -939,6 +963,21 @@ fn draw_mode_from_mouse_event(model: &Model) -> Result<(), (String, String)> {
 }
 
 fn draw_arrows(
+    ctx: &web_sys::CanvasRenderingContext2d,
+    model: &Model,
+    game_pos: &Located<()>,
+    arrows: &Vec<(Direction, Arrow)>,
+) -> Result<(), String> {
+    let mut arrow_x = game_pos.x;
+    let mut arrow_y = game_pos.y;
+    for (dir, arrow) in arrows {
+        draw_arrow(&ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y, true)?;
+    }
+
+    Ok(())
+}
+
+fn draw_arrow(
     ctx: &web_sys::CanvasRenderingContext2d,
     model: &Model,
     arrow: &Arrow,
@@ -1081,13 +1120,11 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
             if let Some(units_move) = maybe_units_move {
                 match units_move {
                     Action::TraveledTo { arrows, .. } => {
-                        let mut arrow_x = game_pos.x;
-                        let mut arrow_y = game_pos.y;
-                        for (dir, arrow) in arrows {
-                            draw_arrows(&ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y, true)?;
-                        }
+                        draw_arrows(&ctx, model, game_pos, arrows)?;
                     }
-                    Action::LoadInto { .. } => {}
+                    Action::LoadInto { arrows, .. } => {
+                        draw_arrows(&ctx, model, game_pos, arrows)?;
+                    }
                 };
             }
 
@@ -1498,7 +1535,7 @@ fn calc_arrows(
 ) -> Vec<(Direction, Arrow)> {
     let directions = calc_movement_path(mouse_pos, maybe_existing_path, range_limit);
 
-    path_with_arrows(&directions)
+    shared::path::path_with_arrows(&directions)
 }
 
 fn calc_movement_path(
@@ -1644,74 +1681,6 @@ fn path_to_positions(path: &Vec<Direction>) -> Vec<Point<i32>> {
     }
 
     ret
-}
-
-fn path_with_arrows(path: &[Direction]) -> Vec<(Direction, Arrow)> {
-    let mut filtered_path = path.iter().collect::<Vec<_>>();
-
-    let mut index = 0;
-    while index < filtered_path.len() {
-        let dir = path[index].clone();
-        if let Some(next) = path.get(index + 1) {
-            if dir == next.opposite() {
-                if (index + 1) < filtered_path.len() {
-                    filtered_path.remove(index + 1);
-                }
-
-                filtered_path.remove(index);
-
-                index = 0;
-            }
-        }
-        index += 1;
-    }
-
-    let mut filtered_path_peek = filtered_path.into_iter().peekable();
-
-    let mut arrows = vec![];
-
-    while let Some(dir) = filtered_path_peek.next() {
-        let maybe_next = filtered_path_peek.peek();
-
-        let arrow = match maybe_next {
-            None => match dir {
-                Direction::North => Arrow::EndUp,
-                Direction::South => Arrow::EndDown,
-                Direction::East => Arrow::EndRight,
-                Direction::West => Arrow::EndLeft,
-            },
-            Some(next) => match (dir, next) {
-                (Direction::North, Direction::North) => Arrow::Y,
-                (Direction::North, Direction::East) => Arrow::LeftDown,
-                (Direction::North, Direction::South) => {
-                    panic!("Cannot move up and then down")
-                }
-                (Direction::North, Direction::West) => Arrow::RightDown,
-                (Direction::East, Direction::North) => Arrow::RightUp,
-                (Direction::East, Direction::East) => Arrow::X,
-                (Direction::East, Direction::South) => Arrow::RightDown,
-                (Direction::East, Direction::West) => {
-                    panic!("Cannot move right then left")
-                }
-                (Direction::South, Direction::North) => {
-                    panic!("Cannot move down then up")
-                }
-                (Direction::South, Direction::East) => Arrow::LeftUp,
-                (Direction::South, Direction::South) => Arrow::Y,
-                (Direction::South, Direction::West) => Arrow::RightUp,
-                (Direction::West, Direction::North) => Arrow::LeftUp,
-                (Direction::West, Direction::East) => {
-                    panic!("Cannot move left then right")
-                }
-                (Direction::West, Direction::South) => Arrow::LeftDown,
-                (Direction::West, Direction::West) => Arrow::X,
-            },
-        };
-
-        arrows.push((dir.clone(), arrow));
-    }
-
-    arrows
 }
 
 #[cfg(test)]
