@@ -1,4 +1,5 @@
 pub mod action;
+pub mod place;
 
 use crate::id::Id;
 use crate::rng::RandGen;

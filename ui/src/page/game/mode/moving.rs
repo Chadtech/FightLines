@@ -4,11 +4,12 @@ use crate::view::cell::Cell;
 use shared::arrow::Arrow;
 use shared::direction::Direction;
 use shared::facing_direction::FacingDirection;
-use shared::game::{UnitModel, UnitPlace};
+use shared::game::UnitModel;
 use shared::located::Located;
 use shared::path::Path;
 use shared::point::Point;
 use shared::tile;
+use shared::unit::place::UnitPlace;
 use shared::unit::UnitId;
 use std::collections::HashSet;
 

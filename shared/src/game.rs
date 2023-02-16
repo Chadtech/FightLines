@@ -1,3 +1,5 @@
+pub mod unit_index;
+
 use crate::facing_direction::FacingDirection;
 use crate::game::FromLobbyError::CouldNotFindInitialMapMilitary;
 use crate::id::Id;
@@ -10,6 +12,7 @@ use crate::player::Player;
 use crate::point::Point;
 use crate::rng::{RandGen, RandSeed};
 use crate::team_color::TeamColor;
+use crate::unit::place::UnitPlace;
 use crate::unit::{Unit, UnitId};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -53,8 +56,9 @@ pub struct Game {
     pub remaining_guests: Vec<(Id, Guest)>,
     //
     pub units: HashMap<UnitId, UnitModel>,
-    pub units_by_location_index: HashMap<Located<()>, Vec<(UnitId, FacingDirection, UnitModel)>>,
-    pub units_by_player_index: HashMap<Id, Vec<(UnitId, UnitModel)>>,
+    pub units_by_location_index: unit_index::by_location::Index,
+    pub units_by_player_index: unit_index::by_player::Index,
+    pub units_by_transport_index: unit_index::by_transport::Index,
     pub map: Map,
     pub turn_number: u32,
     pub prev_outcomes: Vec<Outcome>,
@@ -117,13 +121,6 @@ pub struct UnitModel {
     pub owner: Id,
     pub color: TeamColor,
     pub name: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-
-pub enum UnitPlace {
-    OnMap(Located<FacingDirection>),
-    InUnit(UnitId),
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -280,8 +277,9 @@ impl Game {
         self.consume_changes();
         self.consume_outcomes(outcomes.clone());
         self.prev_outcomes = outcomes.clone();
-        self.units_by_location_index = index_units_by_location(&self.units);
-        self.units_by_player_index = index_units_by_player(&self.units);
+        self.units_by_location_index = unit_index::by_location::make(&self.units);
+        self.units_by_player_index = unit_index::by_player::make(&self.units);
+        self.units_by_transport_index = unit_index::by_transport::make(&self.units);
         self.host_visibility = calculate_player_visibility(&self.host_id, &self.map, &self.units);
         self.first_guest_visibility =
             calculate_player_visibility(&self.first_guest_id, &self.map, &self.units);
@@ -530,8 +528,9 @@ impl Game {
                     ),
                     first_guests_turn: Turn::Waiting,
                     remaining_guests,
-                    units_by_location_index: index_units_by_location(&unit_hashmap),
-                    units_by_player_index: index_units_by_player(&unit_hashmap),
+                    units_by_location_index: unit_index::by_location::make(&unit_hashmap),
+                    units_by_player_index: unit_index::by_player::make(&unit_hashmap),
+                    units_by_transport_index: unit_index::by_transport::make(&unit_hashmap),
                     units: unit_hashmap,
                     map,
                     turn_number: 0,
@@ -656,48 +655,6 @@ impl Game {
     pub fn num_players(&self) -> usize {
         2 + self.remaining_guests.len()
     }
-}
-
-fn index_units_by_player(
-    units: &HashMap<UnitId, UnitModel>,
-) -> HashMap<Id, Vec<(UnitId, UnitModel)>> {
-    let mut ret = HashMap::new();
-
-    for (unit_id, unit) in units.iter() {
-        let key = unit.owner.clone();
-
-        let val = || (unit_id.clone(), unit.clone());
-
-        let entry = ret.entry(key).or_insert_with(Vec::new);
-
-        entry.push(val());
-    }
-
-    ret
-}
-
-fn index_units_by_location(
-    units: &HashMap<UnitId, UnitModel>,
-) -> HashMap<Located<()>, Vec<(UnitId, FacingDirection, UnitModel)>> {
-    let mut ret = HashMap::new();
-
-    for (unit_id, unit) in units.iter() {
-        if let UnitPlace::OnMap(loc_facing_dir) = unit.place.clone() {
-            let key = Located {
-                x: loc_facing_dir.x,
-                y: loc_facing_dir.y,
-                value: (),
-            };
-
-            let val = || (unit_id.clone(), loc_facing_dir.value, unit.clone());
-
-            let entry = ret.entry(key).or_insert_with(Vec::new);
-
-            entry.push(val());
-        }
-    }
-
-    ret
 }
 
 fn calculate_player_visibility(

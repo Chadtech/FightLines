@@ -1,10 +1,14 @@
+use crate::page::game::action::Action;
 use crate::page::game::group_selected;
+use crate::page::game::view::unit_row;
 use crate::style::Style;
 use crate::view::button::Button;
 use crate::view::cell::Cell;
 use crate::view::text_field::TextField;
-use shared::game::UnitModel;
+use shared::game;
+use shared::game::{Game, UnitModel};
 use shared::unit::UnitId;
+use std::collections::HashMap;
 
 ///////////////////////////////////////////////////////////////
 // Types //
@@ -33,13 +37,20 @@ pub enum Msg {
     UpdatedUnitNameField(String),
     ClickedSetName,
     ClickedBackToGroup,
+    UnitRow(unit_row::Msg),
 }
 
 ///////////////////////////////////////////////////////////////
 // View //
 ///////////////////////////////////////////////////////////////
 
-pub fn sidebar_content(model: &Model, unit_model: &UnitModel) -> Vec<Cell<Msg>> {
+pub fn sidebar_content(
+    model: &Model,
+    transport_index: &game::unit_index::by_transport::Index,
+    unit_model: &UnitModel,
+    moves_index: &HashMap<UnitId, Action>,
+    game: &Game,
+) -> Vec<Cell<Msg>> {
     let back_button_row = match model.from_group {
         None => Cell::none(),
         Some(_) => Button::simple("back to group")
@@ -66,5 +77,37 @@ pub fn sidebar_content(model: &Model, unit_model: &UnitModel) -> Vec<Cell<Msg>> 
         }
     };
 
-    vec![back_button_row, name_view]
+    let maybe_loaded_units = transport_index.get(&model.unit_id);
+
+    let transporting_label = if maybe_loaded_units.is_some() {
+        Cell::from_str(vec![], "deploy")
+    } else {
+        Cell::none()
+    };
+
+    let transporting_view = match maybe_loaded_units {
+        Some(loaded_units) => {
+            let mut unit_rows = Vec::new();
+
+            for (unit_id, _) in loaded_units {
+                if let Some(unit_model) = game.units.get(unit_id) {
+                    unit_rows.push(
+                        unit_row::view(unit_id, unit_model, moves_index).map_msg(Msg::UnitRow),
+                    );
+                }
+            }
+            Cell::group(
+                vec![Style::FlexCol, Style::Inset, Style::BgBackground1],
+                unit_rows,
+            )
+        }
+        None => Cell::none(),
+    };
+
+    vec![
+        back_button_row,
+        name_view,
+        transporting_label,
+        transporting_view,
+    ]
 }

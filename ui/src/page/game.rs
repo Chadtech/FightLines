@@ -1,7 +1,8 @@
-mod action;
+pub mod action;
 mod group_selected;
 mod mode;
 mod unit_selected;
+mod view;
 
 use crate::page::game::action::Action;
 use crate::view::button::Button;
@@ -11,19 +12,20 @@ use crate::web_sys::HtmlCanvasElement;
 use crate::{api, assets, core_ext, global, Row, Style, Toast};
 use seed::app::CmdHandle;
 use seed::prelude::{cmds, el_ref, At, El, ElRef, IndexMap, Node, Orders, St, ToClasses, UpdateEl};
-use seed::{attrs, canvas, log, style, C};
+use seed::{attrs, canvas, style, C};
 use shared::api::endpoint::Endpoint;
 use shared::api::game::submit_turn;
 use shared::arrow::Arrow;
 use shared::direction::Direction;
 use shared::facing_direction::FacingDirection;
 use shared::frame_count::FrameCount;
-use shared::game::{Game, GameId, Turn, UnitPlace};
+use shared::game::{Game, GameId, Turn};
 use shared::id::Id;
 use shared::located::Located;
 use shared::path::Path;
 use shared::point::Point;
 use shared::team_color::TeamColor;
+use shared::unit::place::UnitPlace;
 use shared::unit::{Unit, UnitId};
 use shared::{game, located, tile};
 use std::collections::{HashMap, HashSet};
@@ -49,7 +51,7 @@ fn set_to_moving_unit_mode(global: &mut global::Model, model: &mut Model, unit_i
                 mode: Mode::MovingUnit(mode::moving::Model::init(unit_id, mobility)),
             };
 
-            if let Err((err_title, err_msg)) = draw_mode_from_mouse_event(model) {
+            if let Err((err_title, err_msg)) = draw_mode(model) {
                 global.toast(
                     Toast::init("error", err_title.as_str())
                         .error()
@@ -148,25 +150,22 @@ impl Model {
     fn clear_mode(&mut self) -> Result<(), (String, String)> {
         self.stage = Stage::TakingTurn { mode: Mode::None };
 
-        clear_mode_canvas(self).map_err(|msg| ("clear mode anvas".to_string(), msg))
+        clear_mode_canvas(self).map_err(|msg| ("clear mode canvas".to_string(), msg))
     }
 
     fn all_units_moved(&self, player_id: Id) -> bool {
         let total_moved_units = self.moves_index_by_unit.keys().len();
 
-        let total_moveable_units = self
+        let total_movable_units = self
             .game
             .units_by_player_index
             .get(&player_id)
             .unwrap_or(&vec![])
             .iter()
-            .filter(|(_, unit)| match unit.place {
-                UnitPlace::OnMap(_) => true,
-                UnitPlace::InUnit(_) => false,
-            })
+            .filter(|(_, unit)| unit.place.is_on_map())
             .count();
 
-        total_moved_units == total_moveable_units
+        total_moved_units == total_movable_units
     }
 
     fn is_ready(&self) -> bool {
@@ -310,8 +309,6 @@ pub fn init(
 
         moves_index_ret
     };
-
-    log!(moves_index);
 
     let model = Model {
         game,
@@ -490,11 +487,14 @@ pub fn update(
                             model.sidebar = Sidebar::GroupSelected(group_model);
                         }
                     }
+                    unit_selected::Msg::UnitRow(view::unit_row::Msg::Clicked(unit_id)) => {
+                        set_to_moving_unit_mode(global, model, unit_id);
+                    }
                 }
             }
         }
         Msg::GroupSelectedSidebar(sub_msg) => match sub_msg {
-            group_selected::Msg::ClickedUnitInGroup(unit_id) => {
+            group_selected::Msg::UnitRow(view::unit_row::Msg::Clicked(unit_id)) => {
                 if model.get_units_move(&unit_id).is_none() {
                     if let Sidebar::GroupSelected(sub_model) = &mut model.sidebar {
                         model.sidebar = Sidebar::UnitSelected(unit_selected::Model::init(
@@ -869,7 +869,7 @@ fn handle_mouse_move_for_mode(
                     }
                 }
 
-                draw_mode_from_mouse_event(model)?;
+                draw_mode(model)?;
             }
         },
         Stage::Waiting => {}
@@ -910,7 +910,7 @@ fn clear_mode_canvas(model: &Model) -> Result<(), String> {
     Ok(())
 }
 
-fn draw_mode_from_mouse_event(model: &Model) -> Result<(), (String, String)> {
+fn draw_mode(model: &Model) -> Result<(), (String, String)> {
     let canvas = model.mode_canvas.get().ok_or((
         "draw mode from mouse event".to_string(),
         "could not get mode canvas element".to_string(),
@@ -1451,10 +1451,16 @@ fn sidebar_content(model: &Model) -> Vec<Cell<Msg>> {
             None => {
                 vec![Cell::from_str(vec![], "Error: Could not find unit")]
             }
-            Some(unit_model) => unit_selected::sidebar_content(sub_model, unit_model)
-                .into_iter()
-                .map(|cell| cell.map_msg(Msg::UnitSelectedSidebar))
-                .collect::<Vec<_>>(),
+            Some(unit_model) => unit_selected::sidebar_content(
+                sub_model,
+                &model.game.units_by_transport_index,
+                unit_model,
+                &model.moves_index_by_unit,
+                &model.game,
+            )
+            .into_iter()
+            .map(|cell| cell.map_msg(Msg::UnitSelectedSidebar))
+            .collect::<Vec<_>>(),
         },
     }
 }
