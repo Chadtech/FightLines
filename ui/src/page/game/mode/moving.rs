@@ -67,7 +67,7 @@ impl Model {
                 .arrows
                 .clone()
                 .into_iter()
-                .map(|(dir, _)| dir.clone())
+                .map(|(dir, _)| dir)
                 .collect::<Vec<Direction>>(),
         );
 

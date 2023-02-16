@@ -682,8 +682,6 @@ fn index_units_by_location(
     let mut ret = HashMap::new();
 
     for (unit_id, unit) in units.iter() {
-        dbg!(&unit.place);
-
         if let UnitPlace::OnMap(loc_facing_dir) = unit.place.clone() {
             let key = Located {
                 x: loc_facing_dir.x,

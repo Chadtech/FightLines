@@ -11,7 +11,7 @@ use crate::web_sys::HtmlCanvasElement;
 use crate::{api, assets, core_ext, global, Row, Style, Toast};
 use seed::app::CmdHandle;
 use seed::prelude::{cmds, el_ref, At, El, ElRef, IndexMap, Node, Orders, St, ToClasses, UpdateEl};
-use seed::{attrs, canvas, style, C};
+use seed::{attrs, canvas, log, style, C};
 use shared::api::endpoint::Endpoint;
 use shared::api::game::submit_turn;
 use shared::arrow::Arrow;
@@ -88,7 +88,7 @@ pub struct Model {
     handle_minimum_framerate_timeout: CmdHandle,
     handle_game_reload_timeout: Option<CmdHandle>,
     frame_count: FrameCount,
-    moves_index: HashMap<UnitId, Action>,
+    moves_index_by_unit: HashMap<UnitId, Action>,
     moves: Vec<Action>,
     changes: Vec<Change>,
     mouse_game_position: Option<Point<u32>>,
@@ -127,7 +127,7 @@ impl Model {
             arrows: arrows.to_owned(),
         };
 
-        self.moves_index.insert(unit_id.clone(), action);
+        self.moves_index_by_unit.insert(unit_id.clone(), action);
 
         self.clear_mode()?;
 
@@ -142,7 +142,7 @@ impl Model {
     }
 
     fn get_units_move(&self, unit_id: &UnitId) -> Option<&Action> {
-        self.moves_index.get(unit_id)
+        self.moves_index_by_unit.get(unit_id)
     }
 
     fn clear_mode(&mut self) -> Result<(), (String, String)> {
@@ -152,16 +152,21 @@ impl Model {
     }
 
     fn all_units_moved(&self, player_id: Id) -> bool {
-        let total_moved_units = self.moves_index.keys().len();
+        let total_moved_units = self.moves_index_by_unit.keys().len();
 
-        let total_units = self
+        let total_moveable_units = self
             .game
             .units_by_player_index
             .get(&player_id)
             .unwrap_or(&vec![])
-            .len();
+            .iter()
+            .filter(|(_, unit)| match unit.place {
+                UnitPlace::OnMap(_) => true,
+                UnitPlace::InUnit(_) => false,
+            })
+            .count();
 
-        total_moved_units == total_units
+        total_moved_units == total_moveable_units
     }
 
     fn is_ready(&self) -> bool {
@@ -250,8 +255,8 @@ pub fn init(
             Turn::Turn { moves } => {
                 let mut moves_ret = Vec::new();
 
-                for m in moves {
-                    match m {
+                for action in moves {
+                    match action {
                         game::Action::Traveled { unit_id, path } => {
                             moves_ret.push(Action::TraveledTo {
                                 unit_id: unit_id.clone(),
@@ -306,6 +311,8 @@ pub fn init(
         moves_index_ret
     };
 
+    log!(moves_index);
+
     let model = Model {
         game,
         game_id: flags.game_id,
@@ -324,7 +331,7 @@ pub fn init(
         handle_minimum_framerate_timeout: wait_for_render_timeout(orders),
         handle_game_reload_timeout: None,
         frame_count: FrameCount::F1,
-        moves_index,
+        moves_index_by_unit: moves_index,
         moves,
         changes: Vec::new(),
         mouse_game_position: None,
@@ -407,7 +414,7 @@ pub fn update(
             if model.all_units_moved(global.viewer_id()) {
                 submit_turn(global, model, orders);
             } else {
-                model.dialog = Some(Dialog::ConfirmTurnSubmit)
+                model.dialog = Some(Dialog::ConfirmTurnSubmit);
             }
         }
         Msg::ClickedSubmitTurnConfirm => {
@@ -579,13 +586,13 @@ fn handle_moving_flyout_msg(
                 None => return Ok(()),
             };
 
-            model.moves_index.insert(
+            model.moves_index_by_unit.insert(
                 sub_model.unit_id.clone(),
                 Action::LoadInto {
                     unit_id: unit_id.clone(),
                     load_into: rideable_unit_id,
                     arrows: arrows.clone(),
-                    path: path.clone(),
+                    path,
                 },
             );
 
@@ -611,7 +618,7 @@ fn refetch_game(model: &mut Model, fetched_game: Game, orders: &mut impl Orders<
         model.sidebar = Sidebar::None;
         model.stage = Stage::TakingTurn { mode: Mode::None };
         model.status = Status::Ready;
-        model.moves_index = HashMap::new();
+        model.moves_index_by_unit = HashMap::new();
         model.moves = Vec::new();
     }
 
@@ -622,7 +629,7 @@ fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl 
     model.dialog = None;
 
     let req_moves: Vec<game::Action> = model
-        .moves_index
+        .moves_index_by_unit
         .iter()
         .map(|(unit_id, action)| match action {
             Action::TraveledTo { path, .. } => game::Action::Traveled {
@@ -971,7 +978,7 @@ fn draw_arrows(
     let mut arrow_x = game_pos.x;
     let mut arrow_y = game_pos.y;
     for (dir, arrow) in arrows {
-        draw_arrow(&ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y, true)?;
+        draw_arrow(ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y, true)?;
     }
 
     Ok(())
@@ -1435,7 +1442,7 @@ fn sidebar_content(model: &Model) -> Vec<Cell<Msg>> {
             vec![]
         }
         Sidebar::GroupSelected(sub_model) => {
-            group_selected::sidebar_content(sub_model, &model.moves_index, &model.game)
+            group_selected::sidebar_content(sub_model, &model.moves_index_by_unit, &model.game)
                 .into_iter()
                 .map(|cell| cell.map_msg(Msg::GroupSelectedSidebar))
                 .collect::<Vec<_>>()
