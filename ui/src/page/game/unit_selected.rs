@@ -80,7 +80,7 @@ pub fn sidebar_content(
     let maybe_loaded_units = transport_index.get(&model.unit_id);
 
     let transporting_label = if maybe_loaded_units.is_some() {
-        Cell::from_str(vec![], "deploy")
+        Cell::from_str(vec![], "unload")
     } else {
         Cell::none()
     };

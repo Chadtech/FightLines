@@ -12,7 +12,7 @@ use crate::web_sys::HtmlCanvasElement;
 use crate::{api, assets, core_ext, global, Row, Style, Toast};
 use seed::app::CmdHandle;
 use seed::prelude::{cmds, el_ref, At, El, ElRef, IndexMap, Node, Orders, St, ToClasses, UpdateEl};
-use seed::{attrs, canvas, log, style, C};
+use seed::{attrs, canvas, style, C};
 use shared::api::endpoint::Endpoint;
 use shared::api::game::submit_turn;
 use shared::arrow::Arrow;
@@ -25,6 +25,7 @@ use shared::located::Located;
 use shared::path::Path;
 use shared::point::Point;
 use shared::team_color::TeamColor;
+use shared::unit::place::UnitPlace;
 use shared::unit::{Unit, UnitId};
 use shared::{game, located, tile};
 use std::collections::{HashMap, HashSet};
@@ -688,8 +689,8 @@ fn handle_click_on_screen_during_turn(
     let x = x as u16;
     let y = y as u16;
 
-    match &mut model.stage {
-        Stage::TakingTurn { mode } => match mode {
+    if let Stage::TakingTurn { mode } = &mut model.stage {
+        match mode {
             Mode::None => handle_click_on_screen_when_no_mode(global, model, x, y),
             Mode::MovingUnit(moving_model) => {
                 let x = x as u16;
@@ -715,8 +716,7 @@ fn handle_click_on_screen_during_turn(
                     );
                 }
             }
-        },
-        Stage::Waiting => {}
+        }
     }
 }
 
@@ -729,15 +729,31 @@ fn handle_click_on_screen_when_move_mode(
         mode: Mode::MovingUnit(moving_model),
     } = &mut model.stage
     {
-        log!("B");
+        let error_title = "handle move click".to_string();
+
         let unit_id = moving_model.unit_id.clone();
+
+        let unit = match model.game.units.get(&unit_id) {
+            Some(unit_model) => unit_model,
+            None => return Err((error_title, "could not get unit".to_string())),
+        };
+
+        let unit_pos = match &unit.place {
+            UnitPlace::OnMap(loc) => Some(loc.to_unit()),
+            UnitPlace::InUnit(_) => None,
+        };
+
+        // If the user clicks back on the unit we should
+        // exit out of the move mode
+        if unit_pos == Some(mouse_loc.clone()) {
+            return model.clear_mode();
+        }
+
         let arrows = moving_model.arrows.clone();
 
         let path = moving_model
             .path(&moving_model.unit_id, &model.game)
-            .map_err(|err_msg| ("handle move click".to_string(), err_msg))?;
-
-        log!("B.1");
+            .map_err(|err_msg| (error_title.clone(), err_msg))?;
 
         if let Some(rideable_units) = model
             .game
@@ -758,7 +774,6 @@ fn handle_click_on_screen_when_move_mode(
 
             moving_model.with_options(mouse_loc.x, mouse_loc.y, rideable_unit_options, path);
         } else {
-            log!("C.1");
             model.travel_unit(&unit_id, path, &arrows)?;
         }
     }
@@ -841,8 +856,6 @@ fn handle_mouse_move_for_mode(
                     y: mouse_loc.y as i32 - loc.y as i32,
                 };
 
-                log!("A");
-
                 let arrows = calc_arrows(
                     mouse_point,
                     Some(
@@ -854,8 +867,6 @@ fn handle_mouse_move_for_mode(
                     ),
                     unit_model.unit.get_mobility_range(),
                 );
-
-                log!(&arrows);
 
                 moving_model.arrows = arrows;
             } else {
