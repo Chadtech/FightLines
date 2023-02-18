@@ -1,3 +1,4 @@
+use crate::error::Error;
 use crate::style::Style;
 use crate::view::button::Button;
 use crate::view::card::{Card, Header};
@@ -151,6 +152,10 @@ impl Model {
 
     pub fn toast(&mut self, toast: Toast) {
         self.toasts.push(toast);
+    }
+
+    pub fn toast_error(&mut self, error: Error) {
+        self.toast(Toast::from_error(error));
     }
 
     pub fn toasts(&self) -> &Vec<Toast> {

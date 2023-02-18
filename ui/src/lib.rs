@@ -11,7 +11,7 @@ use shared::lobby::Lobby;
 use style::Style;
 
 use crate::page::lobby::InitError;
-use crate::page::{component_library, error, game, kicked, loading, lobby, not_found, title};
+use crate::page::{component_library, game, kicked, loading, lobby, not_found, title};
 use crate::view::cell::{Cell, Row};
 use crate::view::toast;
 use crate::view::toast::Toast;
@@ -20,6 +20,7 @@ mod api;
 mod assets;
 mod core_ext;
 mod domain;
+mod error;
 mod global;
 mod page;
 mod route;
@@ -40,7 +41,7 @@ enum Msg {
     // Pages
     Title(title::Msg),
     Lobby(lobby::Msg),
-    Error(error::Msg),
+    Error(page::error::Msg),
     Kicked(kicked::Msg),
     Game(game::Msg),
 
@@ -232,9 +233,9 @@ fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders
                         Ok(sub_model) => Page::Game(sub_model),
                         Err(err) => {
                             let flags =
-                                error::Flags::from_title("Failed to load game").with_msg(err);
+                                page::error::Flags::from_title("Failed to load game").with_msg(err);
 
-                            Page::Error(error::init(flags))
+                            Page::Error(page::error::init(flags))
                         }
                     }
                 }
@@ -294,13 +295,13 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                 }
             }
             Err(error) => {
-                let flags = error::Flags::from_title("could not load lobby").with_msg(error);
+                let flags = page::error::Flags::from_title("could not load lobby").with_msg(error);
 
-                model.page = Page::Error(error::init(flags));
+                model.page = Page::Error(page::error::init(flags));
             }
         },
         Msg::Error(sub_msg) => {
-            error::update(sub_msg, &mut orders.proxy(Msg::Error));
+            page::error::update(sub_msg, &mut orders.proxy(Msg::Error));
         }
         Msg::Global(sub_msg) => {
             global::update(sub_msg, &mut model.global, &mut orders.proxy(Msg::Global));
@@ -325,16 +326,17 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                 let new_page =
                     match game::init(&mut model.global, flags, &mut orders.proxy(Msg::Game)) {
                         Ok(sub_model) => Page::Game(sub_model),
-                        Err(err) => Page::Error(error::init(
-                            error::Flags::from_title("Failed to load game page").with_msg(err),
+                        Err(err) => Page::Error(page::error::init(
+                            page::error::Flags::from_title("Failed to load game page")
+                                .with_msg(err),
                         )),
                     };
                 model.page = new_page;
             }
             Err(error) => {
-                let flags = error::Flags::from_title("could not load game").with_msg(error);
+                let flags = page::error::Flags::from_title("could not load game").with_msg(error);
 
-                model.page = Page::Error(error::init(flags));
+                model.page = Page::Error(page::error::init(flags));
             }
         },
     }
@@ -371,7 +373,7 @@ fn view(model: &Model) -> Node<Msg> {
                 Page::NotFound => not_found::view(),
                 Page::Blank => vec![],
                 Page::Loading => loading::view(),
-                Page::Error(sub_model) => error::view(sub_model)
+                Page::Error(sub_model) => page::error::view(sub_model)
                     .into_iter()
                     .map(|row| row.map_msg(Msg::Error))
                     .collect(),
@@ -394,7 +396,7 @@ fn view(model: &Model) -> Node<Msg> {
                 Page::ComponentLibrary(_) => vec![],
                 Page::Blank => vec![],
                 Page::Loading => loading::PARENT_STYLES.to_vec(),
-                Page::Error(_) => error::PARENT_STYLES.to_vec(),
+                Page::Error(_) => page::error::PARENT_STYLES.to_vec(),
                 Page::Kicked => kicked::PARENT_STYLES.to_vec(),
                 Page::Game(_) => vec![],
             };

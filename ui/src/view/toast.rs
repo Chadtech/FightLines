@@ -1,3 +1,4 @@
+use crate::error::Error;
 use crate::style::Style;
 use crate::view::button::Button;
 use crate::view::card::{Card, Header};
@@ -48,6 +49,12 @@ impl Toast {
             variant: Variant::Normal,
             more_info: None,
         }
+    }
+
+    pub fn from_error(error: Error) -> Toast {
+        Toast::init("error", error.title.as_str())
+            .error()
+            .with_more_info(error.msg)
     }
 
     pub fn to_open_toast(&self) -> Option<OpenToast> {

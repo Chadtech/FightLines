@@ -4,6 +4,7 @@ mod mode;
 mod unit_selected;
 mod view;
 
+use crate::error::Error;
 use crate::page::game::action::Action;
 use crate::view::button::Button;
 use crate::view::card::Card;
@@ -51,21 +52,14 @@ fn set_to_moving_unit_mode(global: &mut global::Model, model: &mut Model, unit_i
                 mode: Mode::MovingUnit(mode::moving::Model::init(unit_id, mobility)),
             };
 
-            if let Err((err_title, err_msg)) = draw_mode(model) {
-                global.toast(
-                    Toast::init("error", err_title.as_str())
-                        .error()
-                        .with_more_info(err_msg.as_str()),
-                );
+            if let Err(error) = draw_mode(model) {
+                global.toast_error(error);
             }
         }
-        Err(err_msg) => {
-            global.toast(
-                Toast::init("error", "could not get mobility range of unit")
-                    .error()
-                    .with_more_info(err_msg.as_str()),
-            );
-        }
+        Err(err_msg) => global.toast_error(Error::new(
+            "could not get mobility range of unit".to_string(),
+            err_msg,
+        )),
     }
 }
 
@@ -122,7 +116,7 @@ impl Model {
         unit_id: &UnitId,
         path: Path,
         arrows: &[(Direction, Arrow)],
-    ) -> Result<(), (String, String)> {
+    ) -> Result<(), Error> {
         let action = Action::TraveledTo {
             unit_id: unit_id.clone(),
             path,
@@ -147,10 +141,10 @@ impl Model {
         self.moves_index_by_unit.get(unit_id)
     }
 
-    fn clear_mode(&mut self) -> Result<(), (String, String)> {
+    fn clear_mode(&mut self) -> Result<(), Error> {
         self.stage = Stage::TakingTurn { mode: Mode::None };
 
-        clear_mode_canvas(self).map_err(|msg| ("clear mode canvas".to_string(), msg))
+        clear_mode_canvas(self).map_err(|msg| Error::new("clear mode canvas".to_string(), msg))
     }
 
     fn all_units_moved(&self, player_id: Id) -> bool {
@@ -363,14 +357,8 @@ pub fn update(
 ) {
     match msg {
         Msg::RenderedFirstTime => {
-            if let Err((err_title, err_detail)) =
-                handle_rendered_first_frame(model, global.viewer_id())
-            {
-                global.toast(
-                    Toast::init("error", err_title.as_str())
-                        .error()
-                        .with_more_info(err_detail.as_str()),
-                );
+            if let Err(error) = handle_rendered_first_frame(model, global.viewer_id()) {
+                global.toast_error(error);
             }
         }
         Msg::MouseDownOnScreen(_page_pos) => {}
@@ -384,12 +372,8 @@ pub fn update(
             }
         }
         Msg::MouseMoveOnScreen(page_pos) => {
-            if let Err((err_title, err_msg)) = handle_mouse_move_on_screen(model, page_pos) {
-                global.toast(
-                    Toast::init("error", err_title.as_str())
-                        .error()
-                        .with_more_info(err_msg.as_str()),
-                );
+            if let Err(error) = handle_mouse_move_on_screen(model, page_pos) {
+                global.toast_error(error)
             }
         }
         Msg::MinimumRenderTimeExpired => {
@@ -397,12 +381,8 @@ pub fn update(
 
             let viewer_id = global.viewer_id();
 
-            if let Err((err_title, err_detail)) = draw(&viewer_id, model) {
-                global.toast(
-                    Toast::init("error", err_title.as_str())
-                        .error()
-                        .with_more_info(err_detail.as_str()),
-                );
+            if let Err(error) = draw(&viewer_id, model) {
+                global.toast_error(error)
             }
 
             model.handle_minimum_framerate_timeout = wait_for_render_timeout(orders);
@@ -510,21 +490,14 @@ pub fn update(
             }
         },
         Msg::MovingFlyout(sub_msg) => {
-            if let Err((err_title, err_msg)) = handle_moving_flyout_msg(model, sub_msg) {
-                global.toast(
-                    Toast::init("error", err_title.as_str())
-                        .error()
-                        .with_more_info(err_msg.as_str()),
-                );
+            if let Err(error) = handle_moving_flyout_msg(model, sub_msg) {
+                global.toast_error(error)
             }
         }
     }
 }
 
-fn handle_mouse_move_on_screen(
-    model: &mut Model,
-    page_pos: Point<i16>,
-) -> Result<(), (String, String)> {
+fn handle_mouse_move_on_screen(model: &mut Model, page_pos: Point<i16>) -> Result<(), Error> {
     let Point { x, y } = click_pos_to_game_pos(page_pos, model);
 
     model.mouse_game_position = if x < 0
@@ -544,19 +517,17 @@ fn handle_mouse_move_on_screen(
         })
     };
 
-    draw_cursor(model).map_err(|err_msg| ("could not render cursor".to_string(), err_msg))
+    draw_cursor(model).map_err(|err_msg| Error::new("could not render cursor".to_string(), err_msg))
 }
 
-fn handle_rendered_first_frame(model: &mut Model, viewer_id: Id) -> Result<(), (String, String)> {
-    draw_terrain(model).map_err(|err_msg| ("map rendering problem".to_string(), err_msg))?;
+fn handle_rendered_first_frame(model: &mut Model, viewer_id: Id) -> Result<(), Error> {
+    draw_terrain(model)
+        .map_err(|err_msg| Error::new("map rendering problem".to_string(), err_msg))?;
 
     draw(&viewer_id, model)
 }
 
-fn handle_moving_flyout_msg(
-    model: &mut Model,
-    msg: mode::moving::Msg,
-) -> Result<(), (String, String)> {
+fn handle_moving_flyout_msg(model: &mut Model, msg: mode::moving::Msg) -> Result<(), Error> {
     let sub_model = if let Stage::TakingTurn {
         mode: Mode::MovingUnit(sub_model),
     } = &mut model.stage
@@ -573,7 +544,7 @@ fn handle_moving_flyout_msg(
 
             let path = sub_model
                 .path(unit_id, &model.game)
-                .map_err(|err_msg| ("handle moving flyout msg".to_string(), err_msg))?;
+                .map_err(|err_msg| Error::new("handle moving flyout msg".to_string(), err_msg))?;
 
             model.moves_index_by_unit.insert(
                 sub_model.unit_id.clone(),
@@ -593,7 +564,7 @@ fn handle_moving_flyout_msg(
 
             let path = sub_model
                 .path(unit_id, &model.game)
-                .map_err(|err_msg| ("handle moving flyout msg".to_string(), err_msg))?;
+                .map_err(|err_msg| Error::new("handle moving flyout msg".to_string(), err_msg))?;
 
             model.travel_unit(unit_id, path, arrows)
         }
@@ -699,21 +670,13 @@ fn handle_click_on_screen_during_turn(
                 let mouse_loc = located::unit(x, y);
 
                 if moving_model.mobility.contains(&mouse_loc) {
-                    if let Err((err_title, err_msg)) =
+                    if let Err(error) =
                         handle_click_on_screen_when_move_mode(global.viewer_id(), model, &mouse_loc)
                     {
-                        global.toast(
-                            Toast::init("error", err_title.as_str())
-                                .error()
-                                .with_more_info(err_msg.as_str()),
-                        );
+                        global.toast_error(error)
                     }
-                } else if let Err((err_title, err_msg)) = model.clear_mode() {
-                    global.toast(
-                        Toast::init("error", err_title.as_str())
-                            .error()
-                            .with_more_info(err_msg.as_str()),
-                    );
+                } else if let Err(error) = model.clear_mode() {
+                    global.toast_error(error);
                 }
             }
         }
@@ -724,7 +687,7 @@ fn handle_click_on_screen_when_move_mode(
     viewer_id: Id,
     model: &mut Model,
     mouse_loc: &Located<()>,
-) -> Result<(), (String, String)> {
+) -> Result<(), Error> {
     if let Stage::TakingTurn {
         mode: Mode::MovingUnit(moving_model),
     } = &mut model.stage
@@ -735,7 +698,7 @@ fn handle_click_on_screen_when_move_mode(
 
         let unit = match model.game.units.get(&unit_id) {
             Some(unit_model) => unit_model,
-            None => return Err((error_title, "could not get unit".to_string())),
+            None => return Error::throw(error_title, "could not get unit".to_string()),
         };
 
         let unit_pos = match &unit.place {
@@ -753,7 +716,7 @@ fn handle_click_on_screen_when_move_mode(
 
         let path = moving_model
             .path(&moving_model.unit_id, &model.game)
-            .map_err(|err_msg| (error_title.clone(), err_msg))?;
+            .map_err(|err_msg| Error::new(error_title.clone(), err_msg))?;
 
         if let Some(rideable_units) = model
             .game
@@ -826,10 +789,7 @@ fn handle_click_on_screen_when_no_mode(
     }
 }
 
-fn handle_mouse_move_for_mode(
-    model: &mut Model,
-    mouse_loc: Located<()>,
-) -> Result<(), (String, String)> {
+fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Result<(), Error> {
     let mode = if let Stage::TakingTurn { mode } = &mut model.stage {
         mode
     } else {
@@ -841,15 +801,19 @@ fn handle_mouse_move_for_mode(
         Mode::MovingUnit(moving_model) => {
             if moving_model.mobility.contains(&mouse_loc) {
                 let error_title = "handle mouse move in move mode".to_string();
-                let unit_model = model.game.units.get(&moving_model.unit_id).ok_or((
-                    error_title.clone(),
-                    "could not find unit in moving model".to_string(),
-                ))?;
+                let unit_model = model
+                    .game
+                    .units
+                    .get(&moving_model.unit_id)
+                    .ok_or(Error::new(
+                        error_title.clone(),
+                        "could not find unit in moving model".to_string(),
+                    ))?;
 
                 let loc = model
                     .game
                     .position_of_unit_or_transport(&moving_model.unit_id)
-                    .map_err(|err| (error_title, err))?;
+                    .map_err(|err| Error::new(error_title, err))?;
 
                 let mouse_point = Point {
                     x: mouse_loc.x as i32 - loc.x as i32,
@@ -880,17 +844,17 @@ fn handle_mouse_move_for_mode(
     Ok(())
 }
 
-fn draw(viewer_id: &Id, model: &Model) -> Result<(), (String, String)> {
+fn draw(viewer_id: &Id, model: &Model) -> Result<(), Error> {
     let visibility = model
         .game
         .get_players_visibility(viewer_id)
-        .map_err(|err_msg| ("visibility rendering problem".to_string(), err_msg))?;
+        .map_err(|err_msg| Error::new("visibility rendering problem".to_string(), err_msg))?;
 
     draw_units(visibility, model)
-        .map_err(|err_msg| ("units rendering problem".to_string(), err_msg))?;
+        .map_err(|err_msg| Error::new("units rendering problem".to_string(), err_msg))?;
 
     draw_visibility(visibility, model)
-        .map_err(|err_msg| ("visibility rendering problem".to_string(), err_msg))?;
+        .map_err(|err_msg| Error::new("visibility rendering problem".to_string(), err_msg))?;
 
     Ok(())
 }
@@ -912,8 +876,8 @@ fn clear_mode_canvas(model: &Model) -> Result<(), String> {
     Ok(())
 }
 
-fn draw_mode(model: &Model) -> Result<(), (String, String)> {
-    let canvas = model.mode_canvas.get().ok_or((
+fn draw_mode(model: &Model) -> Result<(), Error> {
+    let canvas = model.mode_canvas.get().ok_or(Error::new(
         "draw mode from mouse event".to_string(),
         "could not get mode canvas element".to_string(),
     ))?;
@@ -944,7 +908,7 @@ fn draw_mode(model: &Model) -> Result<(), (String, String)> {
                         tile::PIXEL_HEIGHT_FL,
                     )
                     .map_err(|_| {
-                        (
+                        Error::new(
                             "rendering mobility range".to_string(),
                             "could not draw mobility image on canvas".to_string(),
                         )
@@ -954,13 +918,13 @@ fn draw_mode(model: &Model) -> Result<(), (String, String)> {
                 let loc = model
                     .game
                     .position_of_unit_or_transport(&moving_model.unit_id)
-                    .map_err(|err| (error_title.clone(), err))?;
+                    .map_err(|err| Error::new(error_title.clone(), err))?;
 
                 let mut arrow_x = loc.x;
                 let mut arrow_y = loc.y;
                 for (dir, arrow) in &moving_model.arrows {
                     draw_arrow(&ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y, false)
-                        .map_err(|err_msg| (error_title.clone(), err_msg))?;
+                        .map_err(|err_msg| Error::new(error_title.clone(), err_msg))?;
                 }
             }
         },
