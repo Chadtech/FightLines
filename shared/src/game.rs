@@ -568,6 +568,21 @@ impl Game {
         ret_guest_visibility
     }
 
+    pub fn position_of_unit_or_transport(
+        &self,
+        unit_id: &UnitId,
+    ) -> Result<Located<FacingDirection>, String> {
+        match self.units.get(unit_id) {
+            None => Err("unit not found when getting units or transports location".to_string()),
+            Some(unit_model) => Ok(match &unit_model.place {
+                UnitPlace::OnMap(loc) => loc.clone(),
+                UnitPlace::InUnit(transport_id) => {
+                    self.position_of_unit_or_transport(transport_id)?
+                }
+            }),
+        }
+    }
+
     pub fn get_units_mobility(&self, unit_id: &UnitId) -> Result<HashSet<Located<()>>, String> {
         let maybe_unit = self.units.get(unit_id);
 
@@ -576,49 +591,49 @@ impl Game {
             Some(unit_model) => {
                 let mut mobility = HashSet::new();
 
-                if let UnitPlace::OnMap(loc_unit) = &unit_model.place {
-                    let x = loc_unit.x;
-                    let y = loc_unit.y;
+                let loc_unit = self.position_of_unit_or_transport(unit_id)?;
 
-                    let mut index = 0;
-                    let unit_range = unit_model.unit.get_mobility_range() - 1;
+                let x = loc_unit.x;
+                let y = loc_unit.y;
 
-                    let mut mobility_pre_filter: HashSet<Point<i16>> = HashSet::new();
+                let mut index = 0;
+                let unit_range = unit_model.unit.get_mobility_range() - 1;
 
-                    let x = x as i16;
-                    let y = y as i16;
+                let mut mobility_pre_filter: HashSet<Point<i16>> = HashSet::new();
 
-                    mobility_pre_filter.insert(Point { x: x + 1, y });
-                    mobility_pre_filter.insert(Point { x: x - 1, y });
-                    mobility_pre_filter.insert(Point { x, y: y + 1 });
-                    mobility_pre_filter.insert(Point { x, y: y - 1 });
+                let x = x as i16;
+                let y = y as i16;
 
-                    while index < unit_range {
-                        let mut new_points = vec![];
-                        for p in mobility_pre_filter.iter() {
-                            new_points.push(Point { x: p.x + 1, y: p.y });
-                            new_points.push(Point { x: p.x - 1, y: p.y });
-                            new_points.push(Point { x: p.x, y: p.y + 1 });
-                            new_points.push(Point { x: p.x, y: p.y - 1 });
-                        }
+                mobility_pre_filter.insert(Point { x: x + 1, y });
+                mobility_pre_filter.insert(Point { x: x - 1, y });
+                mobility_pre_filter.insert(Point { x, y: y + 1 });
+                mobility_pre_filter.insert(Point { x, y: y - 1 });
 
-                        for p in new_points {
-                            mobility_pre_filter.insert(p);
-                        }
-
-                        index += 1;
+                while index < unit_range {
+                    let mut new_points = vec![];
+                    for p in mobility_pre_filter.iter() {
+                        new_points.push(Point { x: p.x + 1, y: p.y });
+                        new_points.push(Point { x: p.x - 1, y: p.y });
+                        new_points.push(Point { x: p.x, y: p.y + 1 });
+                        new_points.push(Point { x: p.x, y: p.y - 1 });
                     }
 
-                    for p in mobility_pre_filter {
-                        if p.x >= 0 && p.y >= 0 {
-                            let loc = Located {
-                                x: p.x as u16,
-                                y: p.y as u16,
-                                value: (),
-                            };
+                    for p in new_points {
+                        mobility_pre_filter.insert(p);
+                    }
 
-                            mobility.insert(loc);
-                        }
+                    index += 1;
+                }
+
+                for p in mobility_pre_filter {
+                    if p.x >= 0 && p.y >= 0 {
+                        let loc = Located {
+                            x: p.x as u16,
+                            y: p.y as u16,
+                            value: (),
+                        };
+
+                        mobility.insert(loc);
                     }
                 }
 

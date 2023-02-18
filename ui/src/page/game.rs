@@ -828,52 +828,50 @@ fn handle_mouse_move_for_mode(
     model: &mut Model,
     mouse_loc: Located<()>,
 ) -> Result<(), (String, String)> {
-    match &mut model.stage {
-        Stage::TakingTurn { mode } => match mode {
-            Mode::None => {}
-            Mode::MovingUnit(moving_model) => {
-                if moving_model.ride_options.is_none() {
-                    if moving_model.mobility.contains(&mouse_loc) {
-                        let unit_model = model.game.units.get(&moving_model.unit_id).ok_or((
-                            "handle mouse move in move mode".to_string(),
-                            "Could not find unit in moving model".to_string(),
-                        ))?;
+    let moving_model = if let Stage::TakingTurn {
+        mode: Mode::MovingUnit(sub_model),
+    } = &mut model.stage
+    {
+        sub_model
+    } else {
+        return Ok(());
+    };
 
-                        let loc = match &unit_model.place {
-                            UnitPlace::OnMap(loc) => loc,
-                            UnitPlace::InUnit(_) => {
-                                return Ok(());
-                            }
-                        };
+    if moving_model.mobility.contains(&mouse_loc) {
+        let error_title = "handle mouse move in move mode".to_string();
+        let unit_model = model.game.units.get(&moving_model.unit_id).ok_or((
+            error_title.clone(),
+            "could not find unit in moving model".to_string(),
+        ))?;
 
-                        let mouse_point = Point {
-                            x: mouse_loc.x as i32 - loc.x as i32,
-                            y: mouse_loc.y as i32 - loc.y as i32,
-                        };
+        let loc = model
+            .game
+            .position_of_unit_or_transport(&moving_model.unit_id)
+            .map_err(|err| (error_title, err))?;
 
-                        let arrows = calc_arrows(
-                            mouse_point,
-                            Some(
-                                &moving_model
-                                    .arrows
-                                    .iter()
-                                    .map(|(dir, _)| dir.clone())
-                                    .collect::<Vec<_>>(),
-                            ),
-                            unit_model.unit.get_mobility_range(),
-                        );
+        let mouse_point = Point {
+            x: mouse_loc.x as i32 - loc.x as i32,
+            y: mouse_loc.y as i32 - loc.y as i32,
+        };
 
-                        moving_model.arrows = arrows;
-                    } else {
-                        moving_model.arrows = vec![];
-                    }
-                }
+        let arrows = calc_arrows(
+            mouse_point,
+            Some(
+                &moving_model
+                    .arrows
+                    .iter()
+                    .map(|(dir, _)| dir.clone())
+                    .collect::<Vec<_>>(),
+            ),
+            unit_model.unit.get_mobility_range(),
+        );
 
-                draw_mode(model)?;
-            }
-        },
-        Stage::Waiting => {}
+        moving_model.arrows = arrows;
+    } else {
+        moving_model.arrows = vec![];
     }
+
+    draw_mode(model)?;
 
     Ok(())
 }

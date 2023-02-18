@@ -30,6 +30,10 @@ impl<T> Located<T> {
     pub fn is_same_pos_as<U>(&self, other: &Located<U>) -> bool {
         self.x == other.x && self.y == other.y
     }
+
+    pub fn to_unit(&self) -> Located<()> {
+        unit(self.x, self.y)
+    }
 }
 
 pub fn unit(x: u16, y: u16) -> Located<()> {
