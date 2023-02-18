@@ -14,8 +14,10 @@ pub enum Style {
     Grow,
     BorderR,
     BorderRContent0,
+    BorderBContent0,
     BorderContent1,
     BorderContent2,
+    BorderLContent2,
     P2,
     P3,
     P4,
@@ -93,8 +95,10 @@ impl Style {
             Style::Grow => vec!["grow"],
             Style::BorderR => vec!["border-r"],
             Style::BorderRContent0 => vec!["border-r-content-0"],
+            Style::BorderBContent0 => vec!["border-b-content-0"],
             Style::BorderContent1 => vec!["border-content-1"],
             Style::BorderContent2 => vec!["border-content-2"],
+            Style::BorderLContent2 => vec!["border-l-content-2"],
             Style::P2 => vec!["p-2"],
             Style::P3 => vec!["p-3"],
             Style::P4 => vec!["p-4"],
@@ -108,7 +112,6 @@ impl Style {
                 .map(|style| style.css_classes())
                 .collect::<Vec<Vec<&'static str>>>()
                 .concat(),
-
             Style::TextImportant4 => vec!["text-important-4"],
             Style::TextContent1 => vec!["text-content-1"],
             Style::TextContent2 => vec!["text-content-2"],

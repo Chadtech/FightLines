@@ -1,6 +1,8 @@
+pub mod day;
 pub mod unit_index;
 
 use crate::facing_direction::FacingDirection;
+use crate::game::day::Time;
 use crate::game::FromLobbyError::CouldNotFindInitialMapMilitary;
 use crate::id::Id;
 use crate::lobby::{Lobby, LobbyId};
@@ -146,6 +148,9 @@ pub enum FromLobbyError {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl Game {
+    pub fn day(&self) -> Result<Time, String> {
+        Time::from_turn(self.turn_number)
+    }
     pub fn get_rideable_units_by_location(
         &self,
         owner_id: Id,

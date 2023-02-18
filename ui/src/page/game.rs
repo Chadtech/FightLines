@@ -801,14 +801,12 @@ fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Resu
         Mode::MovingUnit(moving_model) => {
             if moving_model.mobility.contains(&mouse_loc) {
                 let error_title = "handle mouse move in move mode".to_string();
-                let unit_model = model
-                    .game
-                    .units
-                    .get(&moving_model.unit_id)
-                    .ok_or(Error::new(
+                let unit_model = model.game.units.get(&moving_model.unit_id).ok_or_else(|| {
+                    Error::new(
                         error_title.clone(),
                         "could not find unit in moving model".to_string(),
-                    ))?;
+                    )
+                })?;
 
                 let loc = model
                     .game
@@ -877,10 +875,12 @@ fn clear_mode_canvas(model: &Model) -> Result<(), String> {
 }
 
 fn draw_mode(model: &Model) -> Result<(), Error> {
-    let canvas = model.mode_canvas.get().ok_or(Error::new(
-        "draw mode from mouse event".to_string(),
-        "could not get mode canvas element".to_string(),
-    ))?;
+    let canvas = model.mode_canvas.get().ok_or_else(|| {
+        Error::new(
+            "draw mode from mouse event".to_string(),
+            "could not get mode canvas element".to_string(),
+        )
+    })?;
 
     let ctx = seed::canvas_context_2d(&canvas);
 
@@ -1285,6 +1285,7 @@ pub fn view(global: &global::Model, model: &Model) -> Cell<Msg> {
             flyout_view(model),
             snackbar_view(model),
             sidebar_view(global, model),
+            day_view(model),
             dialog_view(model),
         ],
     )
@@ -1440,6 +1441,27 @@ fn sidebar_content(model: &Model) -> Vec<Cell<Msg>> {
             .collect::<Vec<_>>(),
         },
     }
+}
+
+fn day_view(model: &Model) -> Cell<Msg> {
+    let day_msg = model
+        .game
+        .day()
+        .map(|time| time.to_string())
+        .unwrap_or_else(|err_msg| format!("error : {}", err_msg));
+
+    Cell::from_str(
+        vec![
+            Style::Absolute,
+            Style::Right0,
+            Style::Top0,
+            Style::P4,
+            Style::BgContent1,
+            Style::BorderBContent0,
+            Style::BorderLContent2,
+        ],
+        day_msg.as_str(),
+    )
 }
 
 fn dialog_view(model: &Model) -> Cell<Msg> {

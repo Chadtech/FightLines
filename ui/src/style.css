@@ -199,8 +199,16 @@ a.button {
     border-right: var(--s-1) solid var(--content-2);
 }
 
-.border-r-content-1 {
+.border-r-content-0 {
     border-right: var(--s-1) solid var(--content-0);
+}
+
+.border-b-content-0 {
+    border-bottom: var(--s-1) solid var(--content-0);
+}
+
+.border-l-content-2 {
+    border-left: var(--s-1) solid var(--content-2);
 }
 
 .border-content-1 {
