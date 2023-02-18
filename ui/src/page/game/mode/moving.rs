@@ -4,12 +4,11 @@ use crate::view::cell::Cell;
 use shared::arrow::Arrow;
 use shared::direction::Direction;
 use shared::facing_direction::FacingDirection;
-use shared::game::UnitModel;
+use shared::game::Game;
 use shared::located::Located;
 use shared::path::Path;
 use shared::point::Point;
 use shared::tile;
-use shared::unit::place::UnitPlace;
 use shared::unit::UnitId;
 use std::collections::HashSet;
 
@@ -56,14 +55,11 @@ impl Model {
         self
     }
 
-    pub fn path(&self, unit: &UnitModel) -> Option<Path> {
-        let loc = match &unit.place {
-            UnitPlace::OnMap(loc_facing_dir) => loc_facing_dir,
-            UnitPlace::InUnit(_) => return None,
-        };
+    pub fn path(&self, unit_id: &UnitId, game: &Game) -> Result<Path, String> {
+        let loc = game.position_of_unit_or_transport(unit_id)?;
 
         let path = Path::from_directions::<FacingDirection>(
-            loc,
+            &loc,
             &self
                 .arrows
                 .clone()
@@ -72,7 +68,7 @@ impl Model {
                 .collect::<Vec<Direction>>(),
         );
 
-        Some(path)
+        Ok(path)
     }
 }
 
