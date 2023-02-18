@@ -1711,9 +1711,10 @@ fn path_to_positions(path: &Vec<Direction>) -> Vec<Point<i32>> {
 
 #[cfg(test)]
 mod test_movement_arrow {
-    use crate::game::{calc_movement_path, path_with_arrows, Arrow};
+    use crate::game::{calc_movement_path, Arrow};
     use pretty_assertions::assert_eq;
     use shared::direction::Direction;
+    use shared::path::path_with_arrows;
     use shared::point::Point;
 
     fn path_to_arrows(path: &Vec<Direction>) -> Vec<Arrow> {

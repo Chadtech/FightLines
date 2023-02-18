@@ -69,23 +69,23 @@ mod test_lobbies {
         let host = Player::new(Name::new("host"), TeamColor::Red);
         let host_id = Id::new(&mut rng);
 
-        let lobby_id = lobbies.new_lobby(Lobby::init(host_id.clone(), host.clone()));
+        let lobby_id = lobbies.new_lobby(Lobby::new(host_id.clone(), host.clone()));
 
         let guest = Player::new(Name::new("guest"), TeamColor::Blue);
         let guest_id = Id::new(&mut rng);
 
-        let lobby = lobbies
-            .get_lobby(lobby_id.clone())
-            .unwrap()
-            .add_guest(guest_id.clone(), guest.clone())
-            .unwrap_or_else(|_| panic!("Lobby does not exist"))
-            .clone();
+        let mut lobby: Lobby = lobbies.get_lobby(lobby_id.clone()).unwrap().clone();
 
-        lobbies.upsert(lobby_id.clone(), lobby);
+        lobby
+            .add_guest(guest_id.clone(), guest.clone())
+            .unwrap_or_else(|_| panic!("Lobby does not exist"));
+
+        lobbies.upsert(lobby_id.clone(), lobby.clone());
 
         let mut players: Vec<(Id, Player)> = lobbies
             .get_lobby(lobby_id)
             .unwrap()
+            .clone()
             .players()
             .into_iter()
             .collect();

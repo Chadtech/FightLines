@@ -69,9 +69,9 @@ mod test_create_lobby {
 
         let host_name = Name::from_str("host").map_err(|err| err.to_string())?;
 
-        let response = Response::init(
+        let response = Response::new(
             lobby_id,
-            Lobby::init2(
+            Lobby::new(
                 Id::from_int_test_only(1),
                 Player::new(host_name, TeamColor::Red),
             ),
