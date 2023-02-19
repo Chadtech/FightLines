@@ -34,9 +34,13 @@ pub enum Unit {
 
 impl Unit {
     pub fn get_mobility_range(&self) -> usize {
+        self.get_mobility_budget()
+    }
+
+    fn get_mobility_budget(&self) -> usize {
         match self {
             Unit::Infantry => 2,
-            Unit::Tank => 6,
+            Unit::Tank => 5,
             Unit::Truck => 7,
         }
     }

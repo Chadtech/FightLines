@@ -48,9 +48,8 @@ fn wait_for_game_reload_timeout(orders: &mut impl Orders<Msg>) -> CmdHandle {
 fn set_to_moving_unit_mode(global: &mut global::Model, model: &mut Model, unit_id: UnitId) {
     match model.game.get_units_mobility(&unit_id.clone()) {
         Ok(mobility) => {
-            model.stage = Stage::TakingTurn {
-                mode: Mode::MovingUnit(mode::moving::Model::init(unit_id, mobility)),
-            };
+            let mode = Mode::MovingUnit(mode::moving::Model::init(unit_id, mobility));
+            model.stage = Stage::TakingTurn { mode: mode.clone() };
 
             if let Err(error) = draw_mode(model) {
                 global.toast_error(error);
@@ -152,8 +151,7 @@ impl Model {
 
         let total_movable_units = self
             .game
-            .units_by_player_index
-            .get(&player_id)
+            .get_units_by_player_id(&player_id)
             .unwrap_or(&vec![])
             .iter()
             .filter(|(_, unit)| unit.place.is_on_map())
@@ -175,9 +173,10 @@ impl Model {
 enum Stage {
     TakingTurn { mode: Mode },
     Waiting,
+    AnimatingMoves,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Mode {
     None,
     MovingUnit(mode::moving::Model),
@@ -696,7 +695,7 @@ fn handle_click_on_screen_when_move_mode(
 
         let unit_id = moving_model.unit_id.clone();
 
-        let unit = match model.game.units.get(&unit_id) {
+        let unit = match model.game.get_unit(&unit_id) {
             Some(unit_model) => unit_model,
             None => return Error::throw(error_title, "could not get unit".to_string()),
         };
@@ -801,7 +800,7 @@ fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Resu
         Mode::MovingUnit(moving_model) => {
             if moving_model.mobility.contains(&mouse_loc) {
                 let error_title = "handle mouse move in move mode".to_string();
-                let unit_model = model.game.units.get(&moving_model.unit_id).ok_or_else(|| {
+                let unit_model = model.game.get_unit(&moving_model.unit_id).ok_or_else(|| {
                     Error::new(
                         error_title.clone(),
                         "could not find unit in moving model".to_string(),
@@ -875,6 +874,11 @@ fn clear_mode_canvas(model: &Model) -> Result<(), String> {
 }
 
 fn draw_mode(model: &Model) -> Result<(), Error> {
+    let mode = if let Stage::TakingTurn { mode } = &model.stage {
+        mode
+    } else {
+        return Ok(());
+    };
     let canvas = model.mode_canvas.get().ok_or_else(|| {
         Error::new(
             "draw mode from mouse event".to_string(),
@@ -890,45 +894,42 @@ fn draw_mode(model: &Model) -> Result<(), Error> {
     ctx.begin_path();
     ctx.clear_rect(0., 0., width, height);
 
-    match &model.stage {
-        Stage::TakingTurn { mode } => match mode {
-            Mode::None => {}
-            Mode::MovingUnit(moving_model) => {
-                let error_title = "rendering mobility range".to_string();
-                for mobility_space in moving_model.mobility.iter() {
-                    ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                        &model.assets.sheet,
-                        MISC_SPRITE_SHEET_COLUMN,
-                        48.0,
-                        tile::PIXEL_WIDTH_FL,
-                        tile::PIXEL_HEIGHT_FL,
-                        mobility_space.x as f64 * tile::PIXEL_WIDTH_FL,
-                        mobility_space.y as f64 * tile::PIXEL_HEIGHT_FL,
-                        tile::PIXEL_WIDTH_FL,
-                        tile::PIXEL_HEIGHT_FL,
+    match &mode {
+        Mode::None => {}
+        Mode::MovingUnit(moving_model) => {
+            let error_title = "rendering mobility range".to_string();
+            for mobility_space in moving_model.mobility.iter() {
+                ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+                    &model.assets.sheet,
+                    MISC_SPRITE_SHEET_COLUMN,
+                    48.0,
+                    tile::PIXEL_WIDTH_FL,
+                    tile::PIXEL_HEIGHT_FL,
+                    mobility_space.x as f64 * tile::PIXEL_WIDTH_FL,
+                    mobility_space.y as f64 * tile::PIXEL_HEIGHT_FL,
+                    tile::PIXEL_WIDTH_FL,
+                    tile::PIXEL_HEIGHT_FL,
+                )
+                .map_err(|_| {
+                    Error::new(
+                        "rendering mobility range".to_string(),
+                        "could not draw mobility image on canvas".to_string(),
                     )
-                    .map_err(|_| {
-                        Error::new(
-                            "rendering mobility range".to_string(),
-                            "could not draw mobility image on canvas".to_string(),
-                        )
-                    })?;
-                }
-
-                let loc = model
-                    .game
-                    .position_of_unit_or_transport(&moving_model.unit_id)
-                    .map_err(|err| Error::new(error_title.clone(), err))?;
-
-                let mut arrow_x = loc.x;
-                let mut arrow_y = loc.y;
-                for (dir, arrow) in &moving_model.arrows {
-                    draw_arrow(&ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y, false)
-                        .map_err(|err_msg| Error::new(error_title.clone(), err_msg))?;
-                }
+                })?;
             }
-        },
-        Stage::Waiting => {}
+
+            let loc = model
+                .game
+                .position_of_unit_or_transport(&moving_model.unit_id)
+                .map_err(|err| Error::new(error_title.clone(), err))?;
+
+            let mut arrow_x = loc.x;
+            let mut arrow_y = loc.y;
+            for (dir, arrow) in &moving_model.arrows {
+                draw_arrow(&ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y, false)
+                    .map_err(|err_msg| Error::new(error_title.clone(), err_msg))?;
+            }
+        }
     }
 
     Ok(())
@@ -1085,7 +1086,7 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
     ctx.begin_path();
     ctx.clear_rect(0., 0., width, height);
 
-    for (game_pos, units) in model.game.units_by_location_index.iter() {
+    for (game_pos, units) in model.game.units_by_location() {
         let location = located::unit(game_pos.x, game_pos.y);
 
         let draw_units_move = |maybe_units_move: Option<&Action>| -> Result<(), String> {
@@ -1104,7 +1105,7 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
         };
 
         let draw_passender_units_moves = |unit_id: &UnitId| -> Result<(), String> {
-            if let Some(loaded_units) = model.game.units_by_transport_index.get(unit_id) {
+            if let Some(loaded_units) = model.game.get_units_by_transport(unit_id) {
                 for (loaded_unit_id, _) in loaded_units {
                     draw_units_move(model.get_units_move(loaded_unit_id))?;
                 }
@@ -1425,13 +1426,13 @@ fn sidebar_content(model: &Model) -> Vec<Cell<Msg>> {
                 .map(|cell| cell.map_msg(Msg::GroupSelectedSidebar))
                 .collect::<Vec<_>>()
         }
-        Sidebar::UnitSelected(sub_model) => match model.game.units.get(&sub_model.unit_id) {
+        Sidebar::UnitSelected(sub_model) => match model.game.get_unit(&sub_model.unit_id) {
             None => {
                 vec![Cell::from_str(vec![], "Error: Could not find unit")]
             }
             Some(unit_model) => unit_selected::sidebar_content(
                 sub_model,
-                &model.game.units_by_transport_index,
+                &model.game.transport_index(),
                 unit_model,
                 &model.moves_index_by_unit,
                 &model.game,

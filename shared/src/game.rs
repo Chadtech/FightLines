@@ -17,6 +17,7 @@ use crate::team_color::TeamColor;
 use crate::unit::place::UnitPlace;
 use crate::unit::{Unit, UnitId};
 use serde::{Deserialize, Serialize};
+use std::collections::hash_map::Iter;
 use std::collections::{HashMap, HashSet};
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -56,15 +57,20 @@ pub struct Game {
     pub first_guests_turn: Turn,
     // remaining guests
     pub remaining_guests: Vec<(Id, Guest)>,
-    //
-    pub units: HashMap<UnitId, UnitModel>,
-    pub units_by_location_index: unit_index::by_location::Index,
-    pub units_by_player_index: unit_index::by_player::Index,
-    pub units_by_transport_index: unit_index::by_transport::Index,
+    pub indices: Indices,
+    prev_indices: Indices,
     pub map: Map,
     pub turn_number: u32,
     pub prev_outcomes: Vec<Outcome>,
     pub turns_changes: Vec<Change>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct Indices {
+    pub by_unit_id: HashMap<UnitId, UnitModel>,
+    pub by_location_index: unit_index::by_location::Index,
+    pub by_player_index: unit_index::by_player::Index,
+    pub by_transport_index: unit_index::by_transport::Index,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -148,6 +154,30 @@ pub enum FromLobbyError {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl Game {
+    pub fn get_mut_unit(&mut self, unit_id: &UnitId) -> Option<&mut UnitModel> {
+        self.indices.by_unit_id.get_mut(unit_id)
+    }
+    pub fn units_by_id(&mut self) -> &mut HashMap<UnitId, UnitModel> {
+        &mut self.indices.by_unit_id
+    }
+    pub fn get_unit(&self, unit_id: &UnitId) -> Option<&UnitModel> {
+        self.indices.by_unit_id.get(unit_id)
+    }
+    pub fn units_by_location(
+        &self,
+    ) -> Iter<'_, Located<()>, Vec<(UnitId, FacingDirection, UnitModel)>> {
+        self.indices.by_location_index.iter()
+    }
+    pub fn get_units_by_transport(&self, unit_id: &UnitId) -> Option<&Vec<(UnitId, UnitModel)>> {
+        self.indices.by_transport_index.get(unit_id)
+    }
+    pub fn get_units_by_player_id(&self, player_id: &Id) -> Option<&Vec<(UnitId, UnitModel)>> {
+        self.indices.by_player_index.get(player_id)
+    }
+    pub fn transport_index(&self) -> &unit_index::by_transport::Index {
+        &self.indices.by_transport_index
+    }
+
     pub fn day(&self) -> Result<Time, String> {
         Time::from_turn(self.turn_number)
     }
@@ -156,7 +186,7 @@ impl Game {
         owner_id: Id,
         mouse_loc: &Located<()>,
     ) -> Option<Vec<(UnitId, UnitModel)>> {
-        match self.units_by_location_index.get(mouse_loc) {
+        match self.indices.by_location_index.get(mouse_loc) {
             Some(units) => {
                 let rideable_units = units
                     .iter()
@@ -282,17 +312,20 @@ impl Game {
         self.consume_changes();
         self.consume_outcomes(outcomes.clone());
         self.prev_outcomes = outcomes.clone();
-        self.units_by_location_index = unit_index::by_location::make(&self.units);
-        self.units_by_player_index = unit_index::by_player::make(&self.units);
-        self.units_by_transport_index = unit_index::by_transport::make(&self.units);
-        self.host_visibility = calculate_player_visibility(&self.host_id, &self.map, &self.units);
+        self.prev_indices = self.indices.clone();
+        self.indices.by_location_index = unit_index::by_location::make(&self.indices.by_unit_id);
+        self.indices.by_player_index = unit_index::by_player::make(&self.indices.by_unit_id);
+        self.indices.by_transport_index = unit_index::by_transport::make(&self.indices.by_unit_id);
+        self.host_visibility =
+            calculate_player_visibility(&self.host_id, &self.map, &self.indices.by_unit_id);
         self.first_guest_visibility =
-            calculate_player_visibility(&self.first_guest_id, &self.map, &self.units);
+            calculate_player_visibility(&self.first_guest_id, &self.map, &self.indices.by_unit_id);
         self.hosts_turn = Turn::Waiting;
         self.first_guests_turn = Turn::Waiting;
 
         for (guest_id, guest) in &mut self.remaining_guests {
-            guest.visibility = calculate_player_visibility(guest_id, &self.map, &self.units);
+            guest.visibility =
+                calculate_player_visibility(guest_id, &self.map, &self.indices.by_unit_id);
             guest.turn = Turn::Waiting;
         }
 
@@ -300,10 +333,10 @@ impl Game {
     }
 
     fn consume_changes(&mut self) {
-        for change in &self.turns_changes {
+        for change in &mut self.turns_changes {
             match change {
                 Change::NameUnit { unit_id, name } => {
-                    if let Some(unit_model) = self.units.get_mut(unit_id) {
+                    if let Some(unit_model) = self.indices.by_unit_id.get_mut(unit_id) {
                         if unit_model.name.is_none() {
                             unit_model.name = Some(name.clone());
                         }
@@ -318,7 +351,7 @@ impl Game {
             match outcome {
                 Outcome::Traveled { unit_id, path } => {
                     if let Some(loc_dir) = path.last() {
-                        if let Some(unit) = self.units.get_mut(&unit_id) {
+                        if let Some(unit) = self.get_mut_unit(&unit_id) {
                             let new_facing_dir =
                                 FacingDirection::from_directions(path.clone().to_directions())
                                     .unwrap_or_else(|| {
@@ -345,7 +378,7 @@ impl Game {
                     }
                 }
                 Outcome::NamedUnit { unit_id, name } => {
-                    if let Some(unit) = self.units.get_mut(&unit_id) {
+                    if let Some(unit) = self.get_mut_unit(&unit_id) {
                         unit.name = Some(name);
                     }
                 }
@@ -353,7 +386,7 @@ impl Game {
                     unit_id,
                     loaded_into,
                 } => {
-                    if let Some(unit) = self.units.get_mut(&unit_id) {
+                    if let Some(unit) = self.get_mut_unit(&unit_id) {
                         unit.place = UnitPlace::InUnit(loaded_into.clone());
                     }
                 }
@@ -519,24 +552,34 @@ impl Game {
                     })
                     .collect();
 
+                let by_location_index = unit_index::by_location::make(&unit_hashmap);
+                let by_player_index = unit_index::by_player::make(&unit_hashmap);
+                let by_transport_index = unit_index::by_transport::make(&unit_hashmap);
+
+                let host_visibility = calculate_player_visibility(&host_id, &map, &unit_hashmap);
+
+                let first_guest_visibility =
+                    calculate_player_visibility(first_guest_id, &map, &unit_hashmap);
+
+                let indices = Indices {
+                    by_unit_id: unit_hashmap,
+                    by_location_index,
+                    by_player_index,
+                    by_transport_index,
+                };
+
                 let game = Game {
                     host: lobby.host,
                     host_id: host_id.clone(),
-                    host_visibility: calculate_player_visibility(&host_id, &map, &unit_hashmap),
+                    host_visibility,
                     hosts_turn: Turn::Waiting,
                     first_guest: first_guest.clone(),
                     first_guest_id: first_guest_id.clone(),
-                    first_guest_visibility: calculate_player_visibility(
-                        first_guest_id,
-                        &map,
-                        &unit_hashmap,
-                    ),
+                    first_guest_visibility,
                     first_guests_turn: Turn::Waiting,
                     remaining_guests,
-                    units_by_location_index: unit_index::by_location::make(&unit_hashmap),
-                    units_by_player_index: unit_index::by_player::make(&unit_hashmap),
-                    units_by_transport_index: unit_index::by_transport::make(&unit_hashmap),
-                    units: unit_hashmap,
+                    indices: indices.clone(),
+                    prev_indices: indices,
                     map,
                     turn_number: 0,
                     prev_outcomes: Vec::new(),
@@ -577,7 +620,7 @@ impl Game {
         &self,
         unit_id: &UnitId,
     ) -> Result<Located<FacingDirection>, String> {
-        match self.units.get(unit_id) {
+        match self.get_unit(unit_id) {
             None => Err("unit not found when getting units or transports location".to_string()),
             Some(unit_model) => Ok(match &unit_model.place {
                 UnitPlace::OnMap(loc) => loc.clone(),
@@ -589,7 +632,7 @@ impl Game {
     }
 
     pub fn get_units_mobility(&self, unit_id: &UnitId) -> Result<HashSet<Located<()>>, String> {
-        let maybe_unit = self.units.get(unit_id);
+        let maybe_unit = self.get_unit(unit_id);
 
         match maybe_unit {
             None => Err("unit not found when getting units mobility".to_string()),
@@ -669,7 +712,7 @@ impl Game {
         &self,
         key: &Located<()>,
     ) -> Option<&Vec<(UnitId, FacingDirection, UnitModel)>> {
-        self.units_by_location_index.get(key)
+        self.indices.by_location_index.get(key)
     }
 
     pub fn num_players(&self) -> usize {

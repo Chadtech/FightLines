@@ -16,7 +16,7 @@ use std::collections::HashSet;
 // Types
 ///////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Model {
     pub unit_id: UnitId,
     pub mobility: HashSet<Located<()>>,
@@ -72,13 +72,13 @@ impl Model {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RideOptionsModel {
     pub ride_options: Vec<RideOption>,
     pub path: Path,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RideOption {
     unit_id: UnitId,
     label: String,

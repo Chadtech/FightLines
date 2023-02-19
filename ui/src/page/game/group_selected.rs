@@ -38,7 +38,7 @@ pub fn sidebar_content(
     let mut unit_rows = vec![];
 
     for unit_id in &model.units {
-        if let Some(unit_model) = game.units.get(unit_id) {
+        if let Some(unit_model) = game.get_unit(unit_id) {
             unit_rows.push(unit_row::view(unit_id, unit_model, moves_index).map_msg(Msg::UnitRow));
         }
     }
