@@ -14,9 +14,9 @@ pub mod title;
 pub enum Page {
     Title(title::Model),
     ComponentLibrary(component_library::Model),
-    Lobby(lobby::Model),
+    Lobby(Box<lobby::Model>),
     Kicked,
-    Game(game::Model),
+    Game(Box<game::Model>),
     Loading,
     Error(error::Model),
     NotFound,

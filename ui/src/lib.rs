@@ -168,7 +168,7 @@ fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders
                             InitError::PlayerIsKicked => Page::Kicked,
                         },
 
-                        Ok(sub_model) => Page::Lobby(sub_model),
+                        Ok(sub_model) => Page::Lobby(Box::new(sub_model)),
                     }
                 }
                 None => Page::Loading,
@@ -230,7 +230,7 @@ fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders
                     );
 
                     match sub_model_result {
-                        Ok(sub_model) => Page::Game(sub_model),
+                        Ok(sub_model) => Page::Game(Box::new(sub_model)),
                         Err(err) => {
                             let flags =
                                 page::error::Flags::from_title("Failed to load game").with_msg(err);
@@ -285,7 +285,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
             Ok(flags) => {
                 match lobby::Model::init(&model.global, flags, &mut orders.proxy(Msg::Lobby)) {
                     Ok(sub_model) => {
-                        model.page = Page::Lobby(sub_model);
+                        model.page = Page::Lobby(Box::new(sub_model));
                     }
                     Err(error) => match error {
                         InitError::PlayerIsKicked => {
@@ -325,7 +325,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
             Ok(flags) => {
                 let new_page =
                     match game::init(&mut model.global, flags, &mut orders.proxy(Msg::Game)) {
-                        Ok(sub_model) => Page::Game(sub_model),
+                        Ok(sub_model) => Page::Game(Box::new(sub_model)),
                         Err(err) => Page::Error(page::error::init(
                             page::error::Flags::from_title("Failed to load game page")
                                 .with_msg(err),

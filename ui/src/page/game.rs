@@ -1,11 +1,14 @@
 pub mod action;
+mod animation;
 mod group_selected;
 mod mode;
+mod stage;
 mod unit_selected;
 mod view;
 
 use crate::error::Error;
 use crate::page::game::action::Action;
+use crate::page::game::animation::Animation;
 use crate::view::button::Button;
 use crate::view::card::Card;
 use crate::view::cell::Cell;
@@ -20,7 +23,7 @@ use shared::arrow::Arrow;
 use shared::direction::Direction;
 use shared::facing_direction::FacingDirection;
 use shared::frame_count::FrameCount;
-use shared::game::{Game, GameId, Turn};
+use shared::game::{calculate_player_visibility, Game, GameId, Indices, Turn};
 use shared::id::Id;
 use shared::located::Located;
 use shared::path::Path;
@@ -49,7 +52,7 @@ fn set_to_moving_unit_mode(global: &mut global::Model, model: &mut Model, unit_i
     match model.game.get_units_mobility(&unit_id.clone()) {
         Ok(mobility) => {
             let mode = Mode::MovingUnit(mode::moving::Model::init(unit_id, mobility));
-            model.stage = Stage::TakingTurn { mode: mode.clone() };
+            model.stage = Stage::TakingTurn { mode };
 
             if let Err(error) = draw_mode(model) {
                 global.toast_error(error);
@@ -165,15 +168,15 @@ impl Model {
     }
 
     fn is_waiting_stage(&self) -> bool {
-        matches!(self.stage, Stage::Waiting)
+        matches!(self.stage, Stage::Waiting { .. })
     }
 }
 
 #[derive(Debug)]
 enum Stage {
     TakingTurn { mode: Mode },
-    Waiting,
-    AnimatingMoves,
+    Waiting { indices: Indices },
+    AnimatingMoves(stage::animating_moves::Model),
 }
 
 #[derive(Debug, Clone)]
@@ -238,7 +241,9 @@ pub fn init(
     let stage = if game.waiting_on_player(&global.viewer_id()) {
         Stage::TakingTurn { mode: Mode::None }
     } else {
-        Stage::Waiting
+        Stage::Waiting {
+            indices: game.indices.clone(),
+        }
     };
 
     let moves: Vec<Action> = match game.get_turn(global.viewer_id()) {
@@ -378,6 +383,20 @@ pub fn update(
         Msg::MinimumRenderTimeExpired => {
             model.frame_count = model.frame_count.succ();
 
+            if let Stage::AnimatingMoves(sub_model) = &mut model.stage {
+                match sub_model
+                    .progress_animation(&global.viewer_id(), &model.game.map)
+                    .map_err(|err_msg| Error::new("progressing animation".to_string(), err_msg))
+                {
+                    Ok(finished) => {
+                        if finished {
+                            model.stage = Stage::TakingTurn { mode: Mode::None };
+                        };
+                    }
+                    Err(error) => global.toast_error(error),
+                }
+            }
+
             let viewer_id = global.viewer_id();
 
             if let Err(error) = draw(&viewer_id, model) {
@@ -401,10 +420,12 @@ pub fn update(
         }
         Msg::GotTurnSubmitResponse(result) => match *result {
             Ok(res) => {
-                model.stage = Stage::Waiting;
+                model.stage = Stage::Waiting {
+                    indices: model.game.indices.clone(),
+                };
                 model.status = Status::Ready;
 
-                refetch_game(model, res.game, orders);
+                refetch_game(&global.viewer_id(), model, res.game, orders);
             }
             Err(err) => {
                 global.toast(
@@ -416,7 +437,7 @@ pub fn update(
         },
         Msg::GotGame(result) => match *result {
             Ok(res) => {
-                refetch_game(model, res.get_game(), orders);
+                refetch_game(&global.viewer_id(), model, res.get_game(), orders);
             }
             Err(err) => {
                 global.toast(
@@ -529,6 +550,7 @@ fn handle_rendered_first_frame(model: &mut Model, viewer_id: Id) -> Result<(), E
 fn handle_moving_flyout_msg(model: &mut Model, msg: mode::moving::Msg) -> Result<(), Error> {
     let sub_model = if let Stage::TakingTurn {
         mode: Mode::MovingUnit(sub_model),
+        ..
     } = &mut model.stage
     {
         sub_model
@@ -570,12 +592,35 @@ fn handle_moving_flyout_msg(model: &mut Model, msg: mode::moving::Msg) -> Result
     }
 }
 
-fn refetch_game(model: &mut Model, fetched_game: Game, orders: &mut impl Orders<Msg>) {
+fn refetch_game(
+    viewer_id: &Id,
+    model: &mut Model,
+    fetched_game: Game,
+    orders: &mut impl Orders<Msg>,
+) {
     if model.game.turn_number == fetched_game.turn_number {
         model.handle_game_reload_timeout = Some(wait_for_game_reload_timeout(orders));
     } else {
         model.sidebar = Sidebar::None;
-        model.stage = Stage::TakingTurn { mode: Mode::None };
+        model.stage = match &model.stage {
+            Stage::Waiting { indices } => {
+                let animations = fetched_game
+                    .clone()
+                    .prev_outcomes
+                    .into_iter()
+                    .filter_map(Animation::from_outcome)
+                    .collect::<Vec<Animation>>();
+
+                let visibility =
+                    calculate_player_visibility(viewer_id, &model.game.map, &indices.by_id);
+
+                let sub_model =
+                    stage::animating_moves::Model::init(indices.clone(), animations, visibility);
+
+                Stage::AnimatingMoves(sub_model)
+            }
+            _ => Stage::TakingTurn { mode: Mode::None },
+        };
         model.status = Status::Ready;
         model.moves_index_by_unit = HashMap::new();
         model.moves = Vec::new();
@@ -659,7 +704,7 @@ fn handle_click_on_screen_during_turn(
     let x = x as u16;
     let y = y as u16;
 
-    if let Stage::TakingTurn { mode } = &mut model.stage {
+    if let Stage::TakingTurn { mode, .. } = &mut model.stage {
         match mode {
             Mode::None => handle_click_on_screen_when_no_mode(global, model, x, y),
             Mode::MovingUnit(moving_model) => {
@@ -689,6 +734,7 @@ fn handle_click_on_screen_when_move_mode(
 ) -> Result<(), Error> {
     if let Stage::TakingTurn {
         mode: Mode::MovingUnit(moving_model),
+        ..
     } = &mut model.stage
     {
         let error_title = "handle move click".to_string();
@@ -789,7 +835,7 @@ fn handle_click_on_screen_when_no_mode(
 }
 
 fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Result<(), Error> {
-    let mode = if let Stage::TakingTurn { mode } = &mut model.stage {
+    let mode = if let Stage::TakingTurn { mode, .. } = &mut model.stage {
         mode
     } else {
         return Ok(());
@@ -842,10 +888,13 @@ fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Resu
 }
 
 fn draw(viewer_id: &Id, model: &Model) -> Result<(), Error> {
-    let visibility = model
-        .game
-        .get_players_visibility(viewer_id)
-        .map_err(|err_msg| Error::new("visibility rendering problem".to_string(), err_msg))?;
+    let visibility = match &model.stage {
+        Stage::AnimatingMoves(sub_model) => &sub_model.visibility,
+        _ => model
+            .game
+            .get_players_visibility(viewer_id)
+            .map_err(|err_msg| Error::new("visibility rendering problem".to_string(), err_msg))?,
+    };
 
     draw_units(visibility, model)
         .map_err(|err_msg| Error::new("units rendering problem".to_string(), err_msg))?;
@@ -874,7 +923,7 @@ fn clear_mode_canvas(model: &Model) -> Result<(), String> {
 }
 
 fn draw_mode(model: &Model) -> Result<(), Error> {
-    let mode = if let Stage::TakingTurn { mode } = &model.stage {
+    let mode = if let Stage::TakingTurn { mode, .. } = &model.stage {
         mode
     } else {
         return Ok(());
@@ -1086,7 +1135,12 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
     ctx.begin_path();
     ctx.clear_rect(0., 0., width, height);
 
-    for (game_pos, units) in model.game.units_by_location() {
+    let indices = match &model.stage {
+        Stage::AnimatingMoves(sub_model) => &sub_model.indices,
+        _ => &model.game.indices,
+    };
+
+    for (game_pos, units) in indices.by_location.iter() {
         let location = located::unit(game_pos.x, game_pos.y);
 
         let draw_units_move = |maybe_units_move: Option<&Action>| -> Result<(), String> {
@@ -1105,7 +1159,7 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
         };
 
         let draw_passender_units_moves = |unit_id: &UnitId| -> Result<(), String> {
-            if let Some(loaded_units) = model.game.get_units_by_transport(unit_id) {
+            if let Some(loaded_units) = indices.by_transport.get(unit_id) {
                 for (loaded_unit_id, _) in loaded_units {
                     draw_units_move(model.get_units_move(loaded_unit_id))?;
                 }
@@ -1432,7 +1486,7 @@ fn sidebar_content(model: &Model) -> Vec<Cell<Msg>> {
             }
             Some(unit_model) => unit_selected::sidebar_content(
                 sub_model,
-                &model.game.transport_index(),
+                model.game.transport_index(),
                 unit_model,
                 &model.moves_index_by_unit,
                 &model.game,
@@ -1513,6 +1567,7 @@ fn dialog_view(model: &Model) -> Cell<Msg> {
 fn flyout_view(model: &Model) -> Cell<Msg> {
     if let Stage::TakingTurn {
         mode: Mode::MovingUnit(moving_model),
+        ..
     } = &model.stage
     {
         mode::moving::flyout_view(moving_model, &model.game_pos).map_msg(Msg::MovingFlyout)

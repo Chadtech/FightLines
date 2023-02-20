@@ -9,6 +9,13 @@ pub struct Path {
 }
 
 impl Path {
+    pub fn shift_first(&mut self) -> Option<Located<Direction>> {
+        if !self.steps.is_empty() {
+            Some(self.steps.remove(0))
+        } else {
+            None
+        }
+    }
     pub fn last(&self) -> Option<&Located<Direction>> {
         self.steps.last()
     }
