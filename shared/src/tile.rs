@@ -1,17 +1,9 @@
-use crate::sprite::Sprite;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum Tile {
     GrassPlain,
-}
-
-impl Tile {
-    pub fn to_sprite(&self) -> Sprite {
-        match self {
-            Tile::GrassPlain => Sprite::GrassTile,
-        }
-    }
+    Hills,
 }
 
 pub const PIXEL_WIDTH: u16 = 16;

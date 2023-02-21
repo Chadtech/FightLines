@@ -178,7 +178,7 @@ impl Game {
         &self.indices.by_transport
     }
 
-    pub fn day(&self) -> Result<Time, String> {
+    pub fn day(&self) -> Time {
         Time::from_turn(self.turn_number)
     }
     pub fn get_rideable_units_by_location(
@@ -189,7 +189,7 @@ impl Game {
         match self.indices.by_location.get(mouse_loc) {
             Some(units) => {
                 let rideable_units = units
-                    .into_iter()
+                    .iter()
                     .filter_map(|(rideable_unit_id, _, possibly_rideable_unit)| {
                         if possibly_rideable_unit.unit.is_rideable()
                             && possibly_rideable_unit.owner == owner_id
@@ -459,7 +459,8 @@ impl Game {
         let num_players = lobby.num_players();
         let guests: Vec<(Id, Player)> = lobby.guests.into_iter().collect();
 
-        let map_choice = MapOpt::GrassSquare;
+        let map_choice = MapOpt::TerrainTest;
+        // let map_choice = MapOpt::GrassSquare;
         let map = map_choice.to_map();
         let initial_militaries = map_choice.initial_militaries();
 
@@ -639,7 +640,7 @@ impl Game {
                 let y = loc_unit.y;
 
                 let mut index = 0;
-                let unit_range = unit_model.unit.get_mobility_range() - 1;
+                let unit_range = unit_model.unit.mobility_range() - 1;
 
                 let mut mobility_pre_filter: HashSet<Point<i16>> = HashSet::new();
 

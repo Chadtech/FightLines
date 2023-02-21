@@ -9,6 +9,8 @@ mod view;
 use crate::error::Error;
 use crate::page::game::action::Action;
 use crate::page::game::animation::Animation;
+use crate::page::game::mode::Mode;
+use crate::page::game::stage::taking_turn::Sidebar;
 use crate::view::button::Button;
 use crate::view::card::Card;
 use crate::view::cell::Cell;
@@ -16,7 +18,7 @@ use crate::web_sys::HtmlCanvasElement;
 use crate::{api, assets, core_ext, global, Row, Style, Toast};
 use seed::app::CmdHandle;
 use seed::prelude::{cmds, el_ref, At, El, ElRef, IndexMap, Node, Orders, St, ToClasses, UpdateEl};
-use seed::{attrs, canvas, style, C};
+use seed::{attrs, canvas, log, style, C};
 use shared::api::endpoint::Endpoint;
 use shared::api::game::submit_turn;
 use shared::arrow::Arrow;
@@ -29,6 +31,7 @@ use shared::located::Located;
 use shared::path::Path;
 use shared::point::Point;
 use shared::team_color::TeamColor;
+use shared::tile::Tile;
 use shared::unit::place::UnitPlace;
 use shared::unit::{Unit, UnitId};
 use shared::{game, located, tile};
@@ -49,19 +52,20 @@ fn wait_for_game_reload_timeout(orders: &mut impl Orders<Msg>) -> CmdHandle {
 }
 
 fn set_to_moving_unit_mode(global: &mut global::Model, model: &mut Model, unit_id: UnitId) {
-    match model.game.get_units_mobility(&unit_id.clone()) {
-        Ok(mobility) => {
-            let mode = Mode::MovingUnit(mode::moving::Model::init(unit_id, mobility));
-            model.stage = Stage::TakingTurn { mode };
+    if let Stage::TakingTurn(sub_model) = &mut model.stage {
+        match model.game.get_units_mobility(&unit_id.clone()) {
+            Ok(mobility) => {
+                sub_model.mode = Mode::MovingUnit(mode::moving::Model::init(unit_id, mobility));
 
-            if let Err(error) = draw_mode(model) {
-                global.toast_error(error);
+                if let Err(error) = draw_mode(model) {
+                    global.toast_error(error);
+                }
             }
+            Err(err_msg) => global.toast_error(Error::new(
+                "could not get mobility range of unit".to_string(),
+                err_msg,
+            )),
         }
-        Err(err_msg) => global.toast_error(Error::new(
-            "could not get mobility range of unit".to_string(),
-            err_msg,
-        )),
     }
 }
 
@@ -80,8 +84,7 @@ pub struct Model {
     mode_canvas: ElRef<HtmlCanvasElement>,
     cursor_canvas: ElRef<HtmlCanvasElement>,
     assets: assets::Model,
-    game_pixel_width: u16,
-    game_pixel_height: u16,
+    game_pixel_size: GamePixelSize,
     game_pos: Point<i16>,
     handle_minimum_framerate_timeout: CmdHandle,
     handle_game_reload_timeout: Option<CmdHandle>,
@@ -93,13 +96,14 @@ pub struct Model {
     stage: Stage,
     dialog: Option<Dialog>,
     status: Status,
-    sidebar: Sidebar,
 }
 
-enum Sidebar {
-    None,
-    UnitSelected(unit_selected::Model),
-    GroupSelected(group_selected::Model),
+#[derive(Debug)]
+struct GamePixelSize {
+    width: u16,
+    height: u16,
+    width_fl: f64,
+    height_fl: f64,
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -119,6 +123,12 @@ impl Model {
         path: Path,
         arrows: &[(Direction, Arrow)],
     ) -> Result<(), Error> {
+        let taking_turn_model = match &mut self.stage {
+            Stage::TakingTurn(m) => m,
+            _ => {
+                return Ok(());
+            }
+        };
         let action = Action::TraveledTo {
             unit_id: unit_id.clone(),
             path,
@@ -127,10 +137,13 @@ impl Model {
 
         self.moves_index_by_unit.insert(unit_id.clone(), action);
 
-        self.clear_mode()?;
+        taking_turn_model.clear_mode();
 
-        if let Sidebar::UnitSelected(unit_selected_model) = &self.sidebar {
-            self.sidebar = match &unit_selected_model.from_group {
+        clear_canvas(&self.mode_canvas, &self.game_pixel_size)
+            .map_err(|msg| Error::new("clear mode canvas".to_string(), msg))?;
+
+        if let Sidebar::UnitSelected(unit_selected_model) = &mut taking_turn_model.sidebar {
+            taking_turn_model.sidebar = match &unit_selected_model.from_group {
                 None => Sidebar::None,
                 Some(group_selected_model) => Sidebar::GroupSelected(group_selected_model.clone()),
             };
@@ -144,9 +157,14 @@ impl Model {
     }
 
     fn clear_mode(&mut self) -> Result<(), Error> {
-        self.stage = Stage::TakingTurn { mode: Mode::None };
+        if let Stage::TakingTurn(sub_model) = &mut self.stage {
+            sub_model.clear_mode();
 
-        clear_mode_canvas(self).map_err(|msg| Error::new("clear mode canvas".to_string(), msg))
+            clear_canvas(&self.mode_canvas, &self.game_pixel_size)
+                .map_err(|msg| Error::new("clear mode canvas".to_string(), msg))?
+        }
+
+        Ok(())
     }
 
     fn all_units_moved(&self, player_id: Id) -> bool {
@@ -174,15 +192,9 @@ impl Model {
 
 #[derive(Debug)]
 enum Stage {
-    TakingTurn { mode: Mode },
+    TakingTurn(stage::taking_turn::Model),
     Waiting { indices: Indices },
     AnimatingMoves(stage::animating_moves::Model),
-}
-
-#[derive(Debug, Clone)]
-enum Mode {
-    None,
-    MovingUnit(mode::moving::Model),
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -228,6 +240,15 @@ pub fn init(
     let game_pixel_width = (flags.game.map.width as u16) * tile::PIXEL_WIDTH;
     let game_pixel_height = (flags.game.map.height as u16) * tile::PIXEL_HEIGHT;
 
+    let game_pixel_size = GamePixelSize {
+        width: game_pixel_width,
+        height: game_pixel_height,
+        width_fl: game_pixel_width as f64,
+        height_fl: game_pixel_height as f64,
+    };
+
+    log!(&game_pixel_size);
+
     let game_x = (window_size.width / 2.0) - (game_pixel_width as f64) + 192.0;
 
     let game_y = (window_size.height / 2.0) - (game_pixel_height as f64);
@@ -239,7 +260,7 @@ pub fn init(
     let game = flags.game;
 
     let stage = if game.waiting_on_player(&global.viewer_id()) {
-        Stage::TakingTurn { mode: Mode::None }
+        Stage::TakingTurn(stage::taking_turn::Model::init())
     } else {
         Stage::Waiting {
             indices: game.indices.clone(),
@@ -311,14 +332,13 @@ pub fn init(
     let model = Model {
         game,
         game_id: flags.game_id,
+        game_pixel_size,
         map_canvas: ElRef::<HtmlCanvasElement>::default(),
         units_canvas: ElRef::<HtmlCanvasElement>::default(),
         visibility_canvas: ElRef::<HtmlCanvasElement>::default(),
         mode_canvas: ElRef::<HtmlCanvasElement>::default(),
         cursor_canvas: ElRef::<HtmlCanvasElement>::default(),
         assets,
-        game_pixel_width,
-        game_pixel_height,
         game_pos: Point {
             x: game_x as i16,
             y: game_y as i16,
@@ -333,7 +353,6 @@ pub fn init(
         stage,
         dialog: None,
         status: Status::Ready,
-        sidebar: Sidebar::None,
     };
 
     Ok(model)
@@ -390,7 +409,7 @@ pub fn update(
                 {
                     Ok(finished) => {
                         if finished {
-                            model.stage = Stage::TakingTurn { mode: Mode::None };
+                            model.stage = Stage::TakingTurn(stage::taking_turn::Model::init());
                         };
                     }
                     Err(error) => global.toast_error(error),
@@ -468,51 +487,91 @@ pub fn update(
             });
         }
         Msg::UnitSelectedSidebar(sub_msg) => {
-            if let Sidebar::UnitSelected(sub_model) = &mut model.sidebar {
-                match sub_msg {
-                    unit_selected::Msg::UpdatedUnitNameField(new_field) => {
-                        sub_model.name_field = new_field;
-                    }
-                    unit_selected::Msg::ClickedSetName => {
-                        if !sub_model.name_submitted {
-                            sub_model.name_submitted = true;
-                            model.changes.push(Change::NameUnit {
-                                name: sub_model.name_field.clone(),
-                                unit_id: sub_model.unit_id.clone(),
-                            })
-                        }
-                    }
-                    unit_selected::Msg::ClickedBackToGroup => {
-                        if let Some(group_model) = sub_model.from_group.clone() {
-                            model.sidebar = Sidebar::GroupSelected(group_model);
-                        }
-                    }
-                    unit_selected::Msg::UnitRow(view::unit_row::Msg::Clicked(unit_id)) => {
-                        set_to_moving_unit_mode(global, model, unit_id);
-                    }
-                }
-            }
+            handle_unit_selected_sidebar_msg(global, model, sub_msg);
         }
-        Msg::GroupSelectedSidebar(sub_msg) => match sub_msg {
-            group_selected::Msg::UnitRow(view::unit_row::Msg::Clicked(unit_id)) => {
-                if model.get_units_move(&unit_id).is_none() {
-                    if let Sidebar::GroupSelected(sub_model) = &mut model.sidebar {
-                        model.sidebar = Sidebar::UnitSelected(unit_selected::Model::init(
-                            unit_id.clone(),
-                            Some(sub_model.clone()),
-                        ));
-
-                        if let Stage::TakingTurn { .. } = &mut model.stage {
-                            set_to_moving_unit_mode(global, model, unit_id)
-                        }
-                    }
-                }
-            }
-        },
+        Msg::GroupSelectedSidebar(sub_msg) => {
+            handle_group_selected_sidebar_msg(global, model, sub_msg)
+        }
         Msg::MovingFlyout(sub_msg) => {
             if let Err(error) = handle_moving_flyout_msg(model, sub_msg) {
                 global.toast_error(error)
             }
+        }
+    }
+}
+
+fn handle_group_selected_sidebar_msg(
+    global: &mut global::Model,
+    model: &mut Model,
+    msg: group_selected::Msg,
+) {
+    match msg {
+        group_selected::Msg::UnitRow(view::unit_row::Msg::Clicked(unit_id)) => {
+            if model.get_units_move(&unit_id).is_some() {
+                return;
+            }
+
+            let taking_turn_model = if let Stage::TakingTurn(m) = &mut model.stage {
+                m
+            } else {
+                return;
+            };
+
+            let sub_model = if let Sidebar::GroupSelected(m) = &mut taking_turn_model.sidebar {
+                m
+            } else {
+                return;
+            };
+
+            taking_turn_model.sidebar = Sidebar::UnitSelected(unit_selected::Model::init(
+                unit_id.clone(),
+                Some(sub_model.clone()),
+            ));
+
+            if let Stage::TakingTurn { .. } = &mut model.stage {
+                set_to_moving_unit_mode(global, model, unit_id)
+            }
+        }
+    }
+}
+
+fn handle_unit_selected_sidebar_msg(
+    global: &mut global::Model,
+    model: &mut Model,
+    msg: unit_selected::Msg,
+) {
+    let taking_turn_model = if let Stage::TakingTurn(m) = &mut model.stage {
+        m
+    } else {
+        return;
+    };
+
+    let sub_model = if let Sidebar::UnitSelected(m) = &mut taking_turn_model.sidebar {
+        m
+    } else {
+        return;
+    };
+
+    match msg {
+        unit_selected::Msg::UpdatedUnitNameField(new_field) => {
+            sub_model.name_field = new_field;
+        }
+        unit_selected::Msg::ClickedSetName => {
+            if !sub_model.name_submitted {
+                sub_model.name_submitted = true;
+                model.changes.push(Change::NameUnit {
+                    name: sub_model.name_field.clone(),
+                    unit_id: sub_model.unit_id.clone(),
+                })
+            }
+        }
+        unit_selected::Msg::ClickedBackToGroup => {
+            if let Some(group_model) = sub_model.from_group.clone() {
+                taking_turn_model.sidebar = Sidebar::GroupSelected(group_model);
+            }
+        }
+        unit_selected::Msg::UnitRow(view::unit_row::Msg::Clicked(unit_id)) => {
+            set_to_moving_unit_mode(global, model, unit_id);
         }
     }
 }
@@ -548,10 +607,10 @@ fn handle_rendered_first_frame(model: &mut Model, viewer_id: Id) -> Result<(), E
 }
 
 fn handle_moving_flyout_msg(model: &mut Model, msg: mode::moving::Msg) -> Result<(), Error> {
-    let sub_model = if let Stage::TakingTurn {
+    let sub_model = if let Stage::TakingTurn(stage::taking_turn::Model {
         mode: Mode::MovingUnit(sub_model),
         ..
-    } = &mut model.stage
+    }) = &mut model.stage
     {
         sub_model
     } else {
@@ -601,7 +660,6 @@ fn refetch_game(
     if model.game.turn_number == fetched_game.turn_number {
         model.handle_game_reload_timeout = Some(wait_for_game_reload_timeout(orders));
     } else {
-        model.sidebar = Sidebar::None;
         model.stage = match &model.stage {
             Stage::Waiting { indices } => {
                 let animations = fetched_game
@@ -614,12 +672,16 @@ fn refetch_game(
                 let visibility =
                     calculate_player_visibility(viewer_id, &model.game.map, &indices.by_id);
 
-                let sub_model =
-                    stage::animating_moves::Model::init(indices.clone(), animations, visibility);
+                let sub_model = stage::animating_moves::Model::init(
+                    indices.clone(),
+                    animations,
+                    visibility,
+                    model.game.day(),
+                );
 
                 Stage::AnimatingMoves(sub_model)
             }
-            _ => Stage::TakingTurn { mode: Mode::None },
+            _ => Stage::TakingTurn(stage::taking_turn::Model::init()),
         };
         model.status = Status::Ready;
         model.moves_index_by_unit = HashMap::new();
@@ -704,7 +766,7 @@ fn handle_click_on_screen_during_turn(
     let x = x as u16;
     let y = y as u16;
 
-    if let Stage::TakingTurn { mode, .. } = &mut model.stage {
+    if let Stage::TakingTurn(stage::taking_turn::Model { mode, .. }) = &mut model.stage {
         match mode {
             Mode::None => handle_click_on_screen_when_no_mode(global, model, x, y),
             Mode::MovingUnit(moving_model) => {
@@ -732,10 +794,10 @@ fn handle_click_on_screen_when_move_mode(
     model: &mut Model,
     mouse_loc: &Located<()>,
 ) -> Result<(), Error> {
-    if let Stage::TakingTurn {
+    if let Stage::TakingTurn(stage::taking_turn::Model {
         mode: Mode::MovingUnit(moving_model),
         ..
-    } = &mut model.stage
+    }) = &mut model.stage
     {
         let error_title = "handle move click".to_string();
 
@@ -795,6 +857,13 @@ fn handle_click_on_screen_when_no_mode(
     x: u16,
     y: u16,
 ) {
+    let taking_turn_model = match &mut model.stage {
+        Stage::TakingTurn(m) => m,
+        _ => {
+            return;
+        }
+    };
+
     let units_at_pos = match model.game.get_units_by_location(&located::unit(x, y)) {
         Some(units) => units,
         None => {
@@ -815,7 +884,7 @@ fn handle_click_on_screen_when_no_mode(
     }
 
     if rest.is_empty() {
-        model.sidebar = Sidebar::UnitSelected(unit_selected::Model::init(
+        taking_turn_model.sidebar = Sidebar::UnitSelected(unit_selected::Model::init(
             first_unit_id.clone(),
             None::<group_selected::Model>,
         ));
@@ -830,12 +899,12 @@ fn handle_click_on_screen_when_no_mode(
             units.push(unit_id.clone());
         }
 
-        model.sidebar = Sidebar::GroupSelected(group_selected::Model::init(units));
+        taking_turn_model.sidebar = Sidebar::GroupSelected(group_selected::Model::init(units));
     }
 }
 
 fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Result<(), Error> {
-    let mode = if let Stage::TakingTurn { mode, .. } = &mut model.stage {
+    let mode = if let Stage::TakingTurn(stage::taking_turn::Model { mode, .. }) = &mut model.stage {
         mode
     } else {
         return Ok(());
@@ -872,7 +941,7 @@ fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Resu
                             .map(|(dir, _)| dir.clone())
                             .collect::<Vec<_>>(),
                     ),
-                    unit_model.unit.get_mobility_range(),
+                    unit_model.unit.mobility_range(),
                 );
 
                 moving_model.arrows = arrows;
@@ -905,25 +974,24 @@ fn draw(viewer_id: &Id, model: &Model) -> Result<(), Error> {
     Ok(())
 }
 
-fn clear_mode_canvas(model: &Model) -> Result<(), String> {
-    let canvas = model
-        .mode_canvas
+fn clear_canvas(
+    canvas_ref: &ElRef<HtmlCanvasElement>,
+    game_pixel_size: &GamePixelSize,
+) -> Result<(), String> {
+    let html_canvas = canvas_ref
         .get()
-        .ok_or_else(|| "could not get mode canvas element to clear".to_string())?;
+        .ok_or_else(|| "could not get canvas element to clear".to_string())?;
 
-    let ctx = seed::canvas_context_2d(&canvas);
-
-    let width = model.game_pixel_width as f64;
-    let height = model.game_pixel_height as f64;
+    let ctx = seed::canvas_context_2d(&html_canvas);
 
     ctx.begin_path();
-    ctx.clear_rect(0., 0., width, height);
+    ctx.clear_rect(0., 0., game_pixel_size.width_fl, game_pixel_size.height_fl);
 
     Ok(())
 }
 
 fn draw_mode(model: &Model) -> Result<(), Error> {
-    let mode = if let Stage::TakingTurn { mode, .. } = &model.stage {
+    let mode = if let Stage::TakingTurn(stage::taking_turn::Model { mode, .. }) = &model.stage {
         mode
     } else {
         return Ok(());
@@ -937,11 +1005,13 @@ fn draw_mode(model: &Model) -> Result<(), Error> {
 
     let ctx = seed::canvas_context_2d(&canvas);
 
-    let width = model.game_pixel_width as f64;
-    let height = model.game_pixel_height as f64;
-
     ctx.begin_path();
-    ctx.clear_rect(0., 0., width, height);
+    ctx.clear_rect(
+        0.,
+        0.,
+        model.game_pixel_size.width_fl,
+        model.game_pixel_size.height_fl,
+    );
 
     match &mode {
         Mode::None => {}
@@ -1050,11 +1120,13 @@ fn draw_cursor(model: &Model) -> Result<(), String> {
         .ok_or_else(|| "could not get cursor canvas element".to_string())?;
     let ctx = seed::canvas_context_2d(&canvas);
 
-    let width = model.game_pixel_width as f64;
-    let height = model.game_pixel_height as f64;
-
     ctx.begin_path();
-    ctx.clear_rect(0., 0., width, height);
+    ctx.clear_rect(
+        0.,
+        0.,
+        model.game_pixel_size.width_fl,
+        model.game_pixel_size.height_fl,
+    );
 
     if let Some(mouse_game_pos) = &model.mouse_game_position {
         ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
@@ -1081,11 +1153,13 @@ fn draw_visibility(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(
         .ok_or_else(|| "could not get visibility canvas element".to_string())?;
     let ctx = seed::canvas_context_2d(&canvas);
 
-    let width = model.game_pixel_width as f64;
-    let height = model.game_pixel_height as f64;
-
     ctx.begin_path();
-    ctx.clear_rect(0., 0., width, height);
+    ctx.clear_rect(
+        0.,
+        0.,
+        model.game_pixel_size.width_fl,
+        model.game_pixel_size.height_fl,
+    );
 
     for x in 0..model.game.map.width {
         for y in 0..model.game.map.height {
@@ -1129,11 +1203,13 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
         .ok_or("could not get units canvas element")?;
     let ctx = seed::canvas_context_2d(&canvas);
 
-    let width = model.game_pixel_width as f64;
-    let height = model.game_pixel_height as f64;
-
     ctx.begin_path();
-    ctx.clear_rect(0., 0., width, height);
+    ctx.clear_rect(
+        0.,
+        0.,
+        model.game_pixel_size.width_fl,
+        model.game_pixel_size.height_fl,
+    );
 
     let indices = match &model.stage {
         Stage::AnimatingMoves(sub_model) => &sub_model.indices,
@@ -1291,24 +1367,30 @@ fn draw_terrain(model: &Model) -> Result<(), String> {
         .ok_or("could not get map canvas element")?;
     let ctx = seed::canvas_context_2d(&canvas);
 
-    let width = model.game_pixel_width as f64;
-    let height = model.game_pixel_height as f64;
-
-    // clear canvas
     ctx.begin_path();
-    ctx.clear_rect(0., 0., width, height);
+    ctx.clear_rect(
+        0.,
+        0.,
+        model.game_pixel_size.width_fl,
+        model.game_pixel_size.height_fl,
+    );
 
     let grid = &model.game.map.grid;
 
     for row in grid {
-        for located_tile in row {
-            let x = (located_tile.x * tile::PIXEL_WIDTH) as f64;
-            let y = (located_tile.y * tile::PIXEL_HEIGHT) as f64;
+        for loc_tile in row {
+            let x = (loc_tile.x * tile::PIXEL_WIDTH) as f64;
+            let y = (loc_tile.y * tile::PIXEL_HEIGHT) as f64;
+
+            let sheet_row = match loc_tile.value {
+                Tile::GrassPlain => 0.0,
+                Tile::Hills => 24.0,
+            };
 
             ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
                 &model.assets.sheet,
                 MISC_SPRITE_SHEET_COLUMN,
-                0.0,
+                sheet_row * tile::PIXEL_HEIGHT_FL,
                 tile::PIXEL_WIDTH_FL,
                 tile::PIXEL_HEIGHT_FL,
                 x,
@@ -1347,39 +1429,65 @@ pub fn view(global: &global::Model, model: &Model) -> Cell<Msg> {
 }
 
 fn mode_canvas_cell(model: &Model) -> Cell<Msg> {
-    Cell::from_html(vec![], vec![game_canvas(model, &model.mode_canvas)])
+    Cell::from_html(
+        vec![],
+        vec![game_canvas(model, &model.mode_canvas, "mode".to_string())],
+    )
 }
 
 fn cursor_canvas_cell(model: &Model) -> Cell<Msg> {
-    Cell::from_html(vec![], vec![game_canvas(model, &model.cursor_canvas)])
+    Cell::from_html(
+        vec![],
+        vec![game_canvas(
+            model,
+            &model.cursor_canvas,
+            "cursor".to_string(),
+        )],
+    )
 }
 
 fn visibility_canvas_cell(model: &Model) -> Cell<Msg> {
-    Cell::from_html(vec![], vec![game_canvas(model, &model.visibility_canvas)])
+    Cell::from_html(
+        vec![],
+        vec![game_canvas(
+            model,
+            &model.visibility_canvas,
+            "visibility".to_string(),
+        )],
+    )
 }
 
 fn units_canvas_cell(model: &Model) -> Cell<Msg> {
-    Cell::from_html(vec![], vec![game_canvas(model, &model.units_canvas)])
+    Cell::from_html(
+        vec![],
+        vec![game_canvas(model, &model.units_canvas, "units".to_string())],
+    )
 }
 
 fn map_canvas_cell(model: &Model) -> Cell<Msg> {
-    Cell::from_html(vec![], vec![game_canvas(model, &model.map_canvas)])
+    Cell::from_html(
+        vec![],
+        vec![game_canvas(model, &model.map_canvas, "map".to_string())],
+    )
 }
 
-fn game_canvas(model: &Model, r: &ElRef<HtmlCanvasElement>) -> Node<Msg> {
+fn game_canvas(model: &Model, r: &ElRef<HtmlCanvasElement>, html_id: String) -> Node<Msg> {
     canvas![
         C![
             Style::Absolute.css_classes().concat(),
-            Style::W512px.css_classes().concat(),
-            Style::H512px.css_classes().concat()
+            // Style::W512px.css_classes().concat(),
+            // Style::H512px.css_classes().concat()
         ],
         attrs! {
-            At::Width => px_u16(model.game_pixel_width).as_str(),
-            At::Height => px_u16(model.game_pixel_height).as_str()
+            At::Width => px_u16(model.game_pixel_size.width).as_str(),
+            At::Height => px_u16(model.game_pixel_size.height).as_str()
+            At::Id => html_id.as_str()
         },
         style! {
             St::Left => px_i16(model.game_pos.x).as_str(),
-            St::Top => px_i16(model.game_pos.y).as_str()
+            St::Top => px_i16(model.game_pos.y).as_str(),
+            St::Width => px_u16(model.game_pixel_size.width * 2).as_str(),
+            St::Height => px_u16(model.game_pixel_size.height * 2).as_str()
         },
         el_ref(r)
     ]
@@ -1470,40 +1578,47 @@ fn sidebar_view(global: &global::Model, model: &Model) -> Cell<Msg> {
 }
 
 fn sidebar_content(model: &Model) -> Vec<Cell<Msg>> {
-    match &model.sidebar {
-        Sidebar::None => {
+    match &model.stage {
+        Stage::TakingTurn(taking_turn_model) => match &taking_turn_model.sidebar {
+            Sidebar::None => {
+                vec![]
+            }
+            Sidebar::GroupSelected(sub_model) => {
+                group_selected::sidebar_content(sub_model, &model.moves_index_by_unit, &model.game)
+                    .into_iter()
+                    .map(|cell| cell.map_msg(Msg::GroupSelectedSidebar))
+                    .collect::<Vec<_>>()
+            }
+            Sidebar::UnitSelected(sub_model) => match model.game.get_unit(&sub_model.unit_id) {
+                None => {
+                    vec![Cell::from_str(vec![], "Error: Could not find unit")]
+                }
+                Some(unit_model) => unit_selected::sidebar_content(
+                    sub_model,
+                    model.game.transport_index(),
+                    unit_model,
+                    &model.moves_index_by_unit,
+                    &model.game,
+                )
+                .into_iter()
+                .map(|cell| cell.map_msg(Msg::UnitSelectedSidebar))
+                .collect::<Vec<_>>(),
+            },
+        },
+        Stage::Waiting { .. } => {
             vec![]
         }
-        Sidebar::GroupSelected(sub_model) => {
-            group_selected::sidebar_content(sub_model, &model.moves_index_by_unit, &model.game)
-                .into_iter()
-                .map(|cell| cell.map_msg(Msg::GroupSelectedSidebar))
-                .collect::<Vec<_>>()
+        Stage::AnimatingMoves(_) => {
+            vec![]
         }
-        Sidebar::UnitSelected(sub_model) => match model.game.get_unit(&sub_model.unit_id) {
-            None => {
-                vec![Cell::from_str(vec![], "Error: Could not find unit")]
-            }
-            Some(unit_model) => unit_selected::sidebar_content(
-                sub_model,
-                model.game.transport_index(),
-                unit_model,
-                &model.moves_index_by_unit,
-                &model.game,
-            )
-            .into_iter()
-            .map(|cell| cell.map_msg(Msg::UnitSelectedSidebar))
-            .collect::<Vec<_>>(),
-        },
     }
 }
 
 fn day_view(model: &Model) -> Cell<Msg> {
-    let day_msg = model
-        .game
-        .day()
-        .map(|time| time.to_string())
-        .unwrap_or_else(|err_msg| format!("error : {}", err_msg));
+    let day = match &model.stage {
+        Stage::AnimatingMoves(sub_model) => sub_model.day.clone(),
+        _ => model.game.day(),
+    };
 
     Cell::from_str(
         vec![
@@ -1515,7 +1630,7 @@ fn day_view(model: &Model) -> Cell<Msg> {
             Style::BorderBContent0,
             Style::BorderLContent2,
         ],
-        day_msg.as_str(),
+        day.to_string().as_str(),
     )
 }
 
@@ -1565,10 +1680,10 @@ fn dialog_view(model: &Model) -> Cell<Msg> {
 }
 
 fn flyout_view(model: &Model) -> Cell<Msg> {
-    if let Stage::TakingTurn {
+    if let Stage::TakingTurn(stage::taking_turn::Model {
         mode: Mode::MovingUnit(moving_model),
         ..
-    } = &model.stage
+    }) = &model.stage
     {
         mode::moving::flyout_view(moving_model, &model.game_pos).map_msg(Msg::MovingFlyout)
     } else {

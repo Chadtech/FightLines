@@ -1,10 +1,11 @@
+#[derive(Debug, Clone)]
 pub struct Time {
     pub day_num: u32,
     pub day_part: TimeOfDay,
 }
 
 impl Time {
-    pub fn from_turn(turn: u32) -> Result<Time, String> {
+    pub fn from_turn(turn: u32) -> Time {
         // We want games to start in the morning but also at turn 0.
         // So when it comes to representing the time we shift the turn
         // by 2.
@@ -17,15 +18,15 @@ impl Time {
             3 => TimeOfDay::Midday,
             4 => TimeOfDay::Evening,
             5 => TimeOfDay::Midnight,
-            _ => {
-                return Err("turn mod 6 is somehow not less than 6".to_string());
+            n => {
+                unreachable!("{} turn mod 6 is {}", shifted_number, n);
             }
         };
 
-        Ok(Time {
+        Time {
             day_num: shifted_number / 6,
             day_part,
-        })
+        }
     }
 }
 
@@ -39,6 +40,7 @@ impl ToString for Time {
     }
 }
 
+#[derive(Debug, Clone)]
 pub enum TimeOfDay {
     Morning,
     Midday,

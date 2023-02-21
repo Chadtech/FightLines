@@ -10,7 +10,7 @@ use std::collections::HashMap;
 // Types //
 ///////////////////////////////////////////////////////////////
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Model {
     pub units: Vec<UnitId>,
 }

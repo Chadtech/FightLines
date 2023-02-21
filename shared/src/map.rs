@@ -28,6 +28,29 @@ impl Map {
         .sync_grid()
     }
 
+    pub fn terrain_test() -> Map {
+        let mut features = HashMap::new();
+
+        let size: u8 = 32;
+
+        for x in 0..size {
+            for y in 0..size {
+                if x % 3 != 0 && y % 3 != 0 {
+                    features.insert(Spot { x, y }, Tile::Hills);
+                }
+            }
+        }
+
+        Map {
+            base_tile: Tile::GrassPlain,
+            features,
+            grid: Vec::new(),
+            width: size,
+            height: size,
+        }
+        .sync_grid()
+    }
+
     fn sync_grid(mut self) -> Map {
         let mut grid = Vec::with_capacity(self.height as usize);
 
@@ -71,6 +94,7 @@ pub struct Spot {
 
 pub enum MapOpt {
     GrassSquare,
+    TerrainTest,
 }
 
 pub struct Militaries {
@@ -120,6 +144,43 @@ impl MapOpt {
                 ],
                 rest_players_miliatries: vec![],
             },
+            MapOpt::TerrainTest => Militaries {
+                first_player_military: vec![
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Right, Unit::Infantry),
+                        x: 2,
+                        y: 2,
+                    },
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Right, Unit::Tank),
+                        x: 3,
+                        y: 4,
+                    },
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Right, Unit::Truck),
+                        x: 4,
+                        y: 2,
+                    },
+                ],
+                second_player_military: vec![
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Left, Unit::Infantry),
+                        x: (map.width as u16) - 3,
+                        y: (map.height as u16) - 3,
+                    },
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Left, Unit::Tank),
+                        x: (map.width as u16) - 4,
+                        y: (map.height as u16) - 5,
+                    },
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Left, Unit::Truck),
+                        x: (map.width as u16) - 5,
+                        y: (map.height as u16) - 3,
+                    },
+                ],
+                rest_players_miliatries: vec![],
+            },
         }
     }
 
@@ -130,6 +191,7 @@ impl MapOpt {
     pub fn to_map(&self) -> Map {
         match self {
             MapOpt::GrassSquare => Map::grass_square(),
+            MapOpt::TerrainTest => Map::terrain_test(),
         }
     }
 }

@@ -1,7 +1,6 @@
 use crate::game::GameId;
 use crate::id::Id;
 use crate::lobby::LobbyId;
-use crate::sprite::Sprite;
 use crate::team_color::TeamColor;
 use crate::unit::Unit;
 
@@ -17,7 +16,6 @@ pub enum Endpoint {
     UpdateLobby,
     StartGame,
     GetGame(Param<GameId>),
-    SpriteAsset(Sprite),
     SubmitTurn(Param<GameId>, Param<Id>),
     ThumbnailAsset(Unit, TeamColor),
 }
@@ -85,9 +83,6 @@ impl Endpoint {
             }
             Endpoint::GetGame(param) => {
                 vec!["game".to_string(), "get".to_string(), param.to_string()]
-            }
-            Endpoint::SpriteAsset(sprite) => {
-                vec![sprite.to_file_name()]
             }
             Endpoint::SubmitTurn(game_id, player_id) => {
                 vec![

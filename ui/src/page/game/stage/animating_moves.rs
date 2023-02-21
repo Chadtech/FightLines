@@ -1,6 +1,7 @@
 use crate::page::game::animation::Animation;
 use shared::direction::Direction;
 use shared::facing_direction::FacingDirection;
+use shared::game::day::Time;
 use shared::game::{calculate_player_visibility, unit_index, Indices};
 use shared::id::Id;
 use shared::located::Located;
@@ -13,6 +14,7 @@ pub struct Model {
     pub indices: Indices,
     animations: Vec<Animation>,
     pub visibility: HashSet<Located<()>>,
+    pub day: Time,
 }
 
 impl Model {
@@ -20,11 +22,13 @@ impl Model {
         indices: Indices,
         animations: Vec<Animation>,
         visibility: HashSet<Located<()>>,
+        day: Time,
     ) -> Model {
         Model {
             indices,
             animations,
             visibility,
+            day,
         }
     }
     pub fn progress_animation(&mut self, viewer_id: &Id, map: &Map) -> Result<bool, String> {
