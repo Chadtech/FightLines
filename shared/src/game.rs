@@ -625,73 +625,34 @@ impl Game {
             Some(unit_model) => {
                 let mut mobility = HashSet::new();
 
-                if let UnitPlace::OnMap(loc) = &unit_model.place {
-                    let budget = unit_model.unit.mobility_budget();
+                let loc = self.position_of_unit_or_transport(unit_id)?;
+                let budget = unit_model.unit.mobility_budget();
 
-                    let mut search: HashMap<Located<()>, f32> = HashMap::new();
+                let mut search: HashMap<Located<()>, f32> = HashMap::new();
 
-                    search.insert(located::unit(loc.x, loc.y), budget);
+                search.insert(located::unit(loc.x, loc.y), budget);
 
-                    let map = &self.map;
+                let map = &self.map;
 
-                    while !search.is_empty() {
-                        for (search_loc, spot_budget) in search.clone().into_iter() {
-                            mobility.insert(search_loc.clone());
-                            search.remove(&search_loc);
+                while !search.is_empty() {
+                    for (search_loc, spot_budget) in search.clone().into_iter() {
+                        mobility.insert(search_loc.clone());
+                        search.remove(&search_loc);
 
-                            let x = search_loc.x;
-                            let y = search_loc.y;
+                        let x = search_loc.x;
+                        let y = search_loc.y;
 
-                            if y > 0 {
-                                let north_loc = located::unit(x, y - 1);
-                                let north_tile = map.get_tile(&north_loc);
+                        if y > 0 {
+                            let north_loc = located::unit(x, y - 1);
+                            let north_tile = map.get_tile(&north_loc);
 
-                                let cost = north_tile.mobility_cost(&unit_model.unit);
-
-                                let budget_at_tile = spot_budget - cost;
-
-                                if budget_at_tile > 0.0 {
-                                    search
-                                        .entry(north_loc)
-                                        .and_modify(|existing_budget| {
-                                            if budget_at_tile > *existing_budget {
-                                                *existing_budget = budget_at_tile;
-                                            }
-                                        })
-                                        .or_insert(budget_at_tile);
-                                }
-                            }
-
-                            if x > 0 {
-                                let west_loc = located::unit(x - 1, y);
-                                let west_tile = map.get_tile(&west_loc);
-
-                                let cost = west_tile.mobility_cost(&unit_model.unit);
-
-                                let budget_at_tile = spot_budget - cost;
-
-                                if budget_at_tile > 0.0 {
-                                    search
-                                        .entry(west_loc)
-                                        .and_modify(|existing_budget| {
-                                            if budget_at_tile > *existing_budget {
-                                                *existing_budget = budget_at_tile;
-                                            }
-                                        })
-                                        .or_insert(budget_at_tile);
-                                }
-                            }
-
-                            let south_loc = located::unit(x, y + 1);
-                            let south_tile = map.get_tile(&south_loc);
-
-                            let cost = south_tile.mobility_cost(&unit_model.unit);
+                            let cost = north_tile.mobility_cost(&unit_model.unit);
 
                             let budget_at_tile = spot_budget - cost;
 
                             if budget_at_tile > 0.0 {
                                 search
-                                    .entry(south_loc)
+                                    .entry(north_loc)
                                     .and_modify(|existing_budget| {
                                         if budget_at_tile > *existing_budget {
                                             *existing_budget = budget_at_tile;
@@ -699,17 +660,19 @@ impl Game {
                                     })
                                     .or_insert(budget_at_tile);
                             }
+                        }
 
-                            let east_loc = located::unit(x + 1, y);
-                            let east_tile = map.get_tile(&east_loc);
+                        if x > 0 {
+                            let west_loc = located::unit(x - 1, y);
+                            let west_tile = map.get_tile(&west_loc);
 
-                            let cost = east_tile.mobility_cost(&unit_model.unit);
+                            let cost = west_tile.mobility_cost(&unit_model.unit);
 
                             let budget_at_tile = spot_budget - cost;
 
                             if budget_at_tile > 0.0 {
                                 search
-                                    .entry(east_loc)
+                                    .entry(west_loc)
                                     .and_modify(|existing_budget| {
                                         if budget_at_tile > *existing_budget {
                                             *existing_budget = budget_at_tile;
@@ -717,6 +680,42 @@ impl Game {
                                     })
                                     .or_insert(budget_at_tile);
                             }
+                        }
+
+                        let south_loc = located::unit(x, y + 1);
+                        let south_tile = map.get_tile(&south_loc);
+
+                        let cost = south_tile.mobility_cost(&unit_model.unit);
+
+                        let budget_at_tile = spot_budget - cost;
+
+                        if budget_at_tile > 0.0 {
+                            search
+                                .entry(south_loc)
+                                .and_modify(|existing_budget| {
+                                    if budget_at_tile > *existing_budget {
+                                        *existing_budget = budget_at_tile;
+                                    }
+                                })
+                                .or_insert(budget_at_tile);
+                        }
+
+                        let east_loc = located::unit(x + 1, y);
+                        let east_tile = map.get_tile(&east_loc);
+
+                        let cost = east_tile.mobility_cost(&unit_model.unit);
+
+                        let budget_at_tile = spot_budget - cost;
+
+                        if budget_at_tile > 0.0 {
+                            search
+                                .entry(east_loc)
+                                .and_modify(|existing_budget| {
+                                    if budget_at_tile > *existing_budget {
+                                        *existing_budget = budget_at_tile;
+                                    }
+                                })
+                                .or_insert(budget_at_tile);
                         }
                     }
                 }

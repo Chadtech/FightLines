@@ -168,17 +168,27 @@ impl Model {
     }
 
     fn all_units_moved(&self, player_id: Id) -> bool {
-        let total_moved_units = self.moves_index_by_unit.keys().len();
+        let moved_units = self
+            .moves_index_by_unit
+            .keys()
+            .cloned()
+            .collect::<HashSet<UnitId>>();
 
-        let total_movable_units = self
-            .game
-            .get_units_by_player_id(&player_id)
+        let movable_units = self.game.get_units_by_player_id(&player_id);
+
+        let movable_units: HashSet<UnitId> = movable_units
             .unwrap_or(&vec![])
             .iter()
-            .filter(|(_, unit)| unit.place.is_on_map())
-            .count();
+            .filter_map(|(unit_id, unit)| {
+                if unit.place.is_on_map() {
+                    Some(unit_id.clone())
+                } else {
+                    None
+                }
+            })
+            .collect::<HashSet<UnitId>>();
 
-        total_moved_units == total_movable_units
+        movable_units.is_subset(&moved_units)
     }
 
     fn is_ready(&self) -> bool {
@@ -991,6 +1001,7 @@ fn draw_mode(model: &Model) -> Result<(), Error> {
     } else {
         return Ok(());
     };
+
     let canvas = match model.mode_canvas.get() {
         Some(c) => c,
         None => {
