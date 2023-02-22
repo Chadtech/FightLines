@@ -6,12 +6,12 @@ use crate::game::day::Time;
 use crate::game::FromLobbyError::CouldNotFindInitialMapMilitary;
 use crate::id::Id;
 use crate::lobby::{Lobby, LobbyId};
+use crate::located;
 use crate::located::Located;
 use crate::map::{Map, MapOpt};
 use crate::owner::Owned;
 use crate::path::Path;
 use crate::player::Player;
-use crate::point::Point;
 use crate::rng::{RandGen, RandSeed};
 use crate::team_color::TeamColor;
 use crate::unit::place::UnitPlace;
@@ -313,7 +313,7 @@ impl Game {
 
         self.turn_number += 1;
         self.consume_changes();
-        self.consume_outcomes(outcomes.clone());
+        self.consume_outcomes(outcomes.clone())?;
         self.prev_outcomes = outcomes;
         self.indices.by_location = unit_index::by_location::make(&self.indices.by_id);
         self.indices.by_player = unit_index::by_player::make(&self.indices.by_id);
@@ -348,28 +348,21 @@ impl Game {
         }
     }
 
-    pub fn consume_outcomes(&mut self, outcomes: Vec<Outcome>) {
+    pub fn consume_outcomes(&mut self, outcomes: Vec<Outcome>) -> Result<(), String> {
         for outcome in outcomes {
             match outcome {
                 Outcome::Traveled { unit_id, path } => {
                     if let Some(loc_dir) = path.last() {
+                        let facing_dir = match self.indices.position_of_unit_or_transport(&unit_id)
+                        {
+                            Ok(facing_dir_loc) => facing_dir_loc.value,
+                            Err(msg) => return Err(msg),
+                        };
+
                         if let Some(unit) = self.get_mut_unit(&unit_id) {
                             let new_facing_dir =
                                 FacingDirection::from_directions(path.clone().to_directions())
-                                    .unwrap_or_else(|| {
-                                        match unit.place.clone() {
-                                            UnitPlace::OnMap(loc_facing_dir) => {
-                                                loc_facing_dir.value
-                                            }
-                                            UnitPlace::InUnit(_) => {
-                                                // This is a value of last resort after we have
-                                                // exhausted all other information. This
-                                                // code may be unreachable
-                                                // - Chad Jan 8 2023
-                                                FacingDirection::Right
-                                            }
-                                        }
-                                    });
+                                    .unwrap_or(facing_dir);
 
                             unit.place = UnitPlace::OnMap(Located {
                                 x: loc_dir.x,
@@ -395,6 +388,8 @@ impl Game {
                 }
             }
         }
+
+        Ok(())
     }
 
     pub fn get_turn(&self, player_id: Id) -> Result<Turn, String> {
@@ -594,10 +589,6 @@ impl Game {
         }
     }
 
-    pub fn dimensions(&self) -> (u8, u8) {
-        self.map.dimensions()
-    }
-
     pub fn get_players_visibility(&self, player_id: &Id) -> Result<&HashSet<Located<()>>, String> {
         if &self.host_id == player_id {
             return Ok(&self.host_visibility);
@@ -634,49 +625,99 @@ impl Game {
             Some(unit_model) => {
                 let mut mobility = HashSet::new();
 
-                let loc_unit = self.position_of_unit_or_transport(unit_id)?;
+                if let UnitPlace::OnMap(loc) = &unit_model.place {
+                    let budget = unit_model.unit.mobility_budget();
 
-                let x = loc_unit.x;
-                let y = loc_unit.y;
+                    let mut search: HashMap<Located<()>, f32> = HashMap::new();
 
-                let mut index = 0;
-                let unit_range = unit_model.unit.mobility_range() - 1;
+                    search.insert(located::unit(loc.x, loc.y), budget);
 
-                let mut mobility_pre_filter: HashSet<Point<i16>> = HashSet::new();
+                    let map = &self.map;
 
-                let x = x as i16;
-                let y = y as i16;
+                    while !search.is_empty() {
+                        for (search_loc, spot_budget) in search.clone().into_iter() {
+                            mobility.insert(search_loc.clone());
+                            search.remove(&search_loc);
 
-                mobility_pre_filter.insert(Point { x: x + 1, y });
-                mobility_pre_filter.insert(Point { x: x - 1, y });
-                mobility_pre_filter.insert(Point { x, y: y + 1 });
-                mobility_pre_filter.insert(Point { x, y: y - 1 });
+                            let x = search_loc.x;
+                            let y = search_loc.y;
 
-                while index < unit_range {
-                    let mut new_points = vec![];
-                    for p in mobility_pre_filter.iter() {
-                        new_points.push(Point { x: p.x + 1, y: p.y });
-                        new_points.push(Point { x: p.x - 1, y: p.y });
-                        new_points.push(Point { x: p.x, y: p.y + 1 });
-                        new_points.push(Point { x: p.x, y: p.y - 1 });
-                    }
+                            if y > 0 {
+                                let north_loc = located::unit(x, y - 1);
+                                let north_tile = map.get_tile(&north_loc);
 
-                    for p in new_points {
-                        mobility_pre_filter.insert(p);
-                    }
+                                let cost = north_tile.mobility_cost(&unit_model.unit);
 
-                    index += 1;
-                }
+                                let budget_at_tile = spot_budget - cost;
 
-                for p in mobility_pre_filter {
-                    if p.x >= 0 && p.y >= 0 {
-                        let loc = Located {
-                            x: p.x as u16,
-                            y: p.y as u16,
-                            value: (),
-                        };
+                                if budget_at_tile > 0.0 {
+                                    search
+                                        .entry(north_loc)
+                                        .and_modify(|existing_budget| {
+                                            if budget_at_tile > *existing_budget {
+                                                *existing_budget = budget_at_tile;
+                                            }
+                                        })
+                                        .or_insert(budget_at_tile);
+                                }
+                            }
 
-                        mobility.insert(loc);
+                            if x > 0 {
+                                let west_loc = located::unit(x - 1, y);
+                                let west_tile = map.get_tile(&west_loc);
+
+                                let cost = west_tile.mobility_cost(&unit_model.unit);
+
+                                let budget_at_tile = spot_budget - cost;
+
+                                if budget_at_tile > 0.0 {
+                                    search
+                                        .entry(west_loc)
+                                        .and_modify(|existing_budget| {
+                                            if budget_at_tile > *existing_budget {
+                                                *existing_budget = budget_at_tile;
+                                            }
+                                        })
+                                        .or_insert(budget_at_tile);
+                                }
+                            }
+
+                            let south_loc = located::unit(x, y + 1);
+                            let south_tile = map.get_tile(&south_loc);
+
+                            let cost = south_tile.mobility_cost(&unit_model.unit);
+
+                            let budget_at_tile = spot_budget - cost;
+
+                            if budget_at_tile > 0.0 {
+                                search
+                                    .entry(south_loc)
+                                    .and_modify(|existing_budget| {
+                                        if budget_at_tile > *existing_budget {
+                                            *existing_budget = budget_at_tile;
+                                        }
+                                    })
+                                    .or_insert(budget_at_tile);
+                            }
+
+                            let east_loc = located::unit(x + 1, y);
+                            let east_tile = map.get_tile(&east_loc);
+
+                            let cost = east_tile.mobility_cost(&unit_model.unit);
+
+                            let budget_at_tile = spot_budget - cost;
+
+                            if budget_at_tile > 0.0 {
+                                search
+                                    .entry(east_loc)
+                                    .and_modify(|existing_budget| {
+                                        if budget_at_tile > *existing_budget {
+                                            *existing_budget = budget_at_tile;
+                                        }
+                                    })
+                                    .or_insert(budget_at_tile);
+                            }
+                        }
                     }
                 }
 
@@ -717,47 +758,105 @@ impl Game {
 
 pub fn calculate_player_visibility(
     player_id: &Id,
-    _map: &Map,
+    map: &Map,
     units: &HashMap<UnitId, UnitModel>,
 ) -> HashSet<Located<()>> {
     let mut visible_spots = HashSet::new();
 
     for unit in units.values() {
-        if let UnitPlace::OnMap(loc) = &unit.place {
-            if &unit.owner == player_id {
-                if loc.x > 0 {
-                    visible_spots.insert(Located {
-                        value: (),
-                        x: loc.x - 1,
-                        y: loc.y,
-                    });
+        if &unit.owner == player_id {
+            if let UnitPlace::OnMap(loc) = &unit.place {
+                let budget = unit.unit.visibility_budget();
+
+                let mut search: HashMap<Located<()>, f32> = HashMap::new();
+
+                search.insert(located::unit(loc.x, loc.y), budget);
+
+                while !search.is_empty() {
+                    for (search_loc, spot_budget) in search.clone().into_iter() {
+                        visible_spots.insert(search_loc.clone());
+                        search.remove(&search_loc);
+
+                        let x = search_loc.x;
+                        let y = search_loc.y;
+
+                        if y > 0 {
+                            let north_loc = located::unit(x, y - 1);
+                            let north_tile = map.get_tile(&north_loc);
+
+                            let cost = north_tile.visibility_cost();
+
+                            let budget_at_tile = spot_budget - cost;
+
+                            if budget_at_tile > 0.0 {
+                                search
+                                    .entry(north_loc)
+                                    .and_modify(|existing_budget| {
+                                        if budget_at_tile > *existing_budget {
+                                            *existing_budget = budget_at_tile;
+                                        }
+                                    })
+                                    .or_insert(budget_at_tile);
+                            }
+                        }
+
+                        if x > 0 {
+                            let west_loc = located::unit(x - 1, y);
+                            let west_tile = map.get_tile(&west_loc);
+
+                            let cost = west_tile.visibility_cost();
+
+                            let budget_at_tile = spot_budget - cost;
+
+                            if budget_at_tile > 0.0 {
+                                search
+                                    .entry(west_loc)
+                                    .and_modify(|existing_budget| {
+                                        if budget_at_tile > *existing_budget {
+                                            *existing_budget = budget_at_tile;
+                                        }
+                                    })
+                                    .or_insert(budget_at_tile);
+                            }
+                        }
+
+                        let south_loc = located::unit(x, y + 1);
+                        let south_tile = map.get_tile(&south_loc);
+
+                        let cost = south_tile.visibility_cost();
+
+                        let budget_at_tile = spot_budget - cost;
+
+                        if budget_at_tile > 0.0 {
+                            search
+                                .entry(south_loc)
+                                .and_modify(|existing_budget| {
+                                    if budget_at_tile > *existing_budget {
+                                        *existing_budget = budget_at_tile;
+                                    }
+                                })
+                                .or_insert(budget_at_tile);
+                        }
+
+                        let east_loc = located::unit(x + 1, y);
+                        let east_tile = map.get_tile(&east_loc);
+
+                        let cost = east_tile.visibility_cost();
+
+                        let budget_at_tile = spot_budget - cost;
+
+                        if budget_at_tile > 0.0 {
+                            search
+                                .entry(east_loc)
+                                .and_modify(|existing_budget| {
+                                    if budget_at_tile > *existing_budget {
+                                        *existing_budget = budget_at_tile;
+                                    }
+                                })
+                                .or_insert(budget_at_tile);
+                        }
+                    }
                 }
-
-                visible_spots.insert(Located {
-                    value: (),
-                    x: loc.x + 1,
-                    y: loc.y,
-                });
-
-                if loc.y > 0 {
-                    visible_spots.insert(Located {
-                        value: (),
-                        x: loc.x,
-                        y: loc.y - 1,
-                    });
-                }
-
-                visible_spots.insert(Located {
-                    value: (),
-                    x: loc.x,
-                    y: loc.y + 1,
-                });
-
-                visible_spots.insert(Located {
-                    value: (),
-                    x: loc.x,
-                    y: loc.y,
-                });
             }
         }
     }

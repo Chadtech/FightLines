@@ -1,4 +1,5 @@
 use crate::facing_direction::FacingDirection;
+use crate::located;
 use crate::located::Located;
 use crate::tile::Tile;
 use crate::unit::Unit;
@@ -8,10 +9,10 @@ use std::collections::HashMap;
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct Map {
     base_tile: Tile,
-    features: HashMap<Spot, Tile>,
+    pub features: HashMap<Located<()>, Tile>,
     pub grid: Vec<Vec<Located<Tile>>>,
-    pub width: u8,
-    pub height: u8,
+    pub width: u16,
+    pub height: u16,
 }
 
 impl Map {
@@ -31,12 +32,16 @@ impl Map {
     pub fn terrain_test() -> Map {
         let mut features = HashMap::new();
 
-        let size: u8 = 32;
+        let size: u16 = 32;
 
         for x in 0..size {
             for y in 0..size {
                 if x % 3 != 0 && y % 3 != 0 {
-                    features.insert(Spot { x, y }, Tile::Hills);
+                    features.insert(Located { x, y, value: () }, Tile::Hills);
+                }
+
+                if (x + y) % 5 > 2 && y % 7 > 2 {
+                    features.insert(Located { x, y, value: () }, Tile::Forest);
                 }
             }
         }
@@ -58,11 +63,7 @@ impl Map {
             let mut row = Vec::with_capacity(self.width as usize);
 
             for x in 0..self.width {
-                let feature = self
-                    .features
-                    .get(&Spot { x, y })
-                    .cloned()
-                    .unwrap_or_else(|| self.base_tile.clone());
+                let feature = self.get_tile(&located::unit(x, y));
 
                 let loc_tile = Located::<Tile> {
                     value: feature,
@@ -81,15 +82,12 @@ impl Map {
         self
     }
 
-    pub fn dimensions(&self) -> (u8, u8) {
-        (self.width, self.height)
+    pub fn get_tile(&self, loc: &Located<()>) -> Tile {
+        self.features
+            .get(loc)
+            .cloned()
+            .unwrap_or_else(|| self.base_tile.clone())
     }
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Debug)]
-pub struct Spot {
-    x: u8,
-    y: u8,
 }
 
 pub enum MapOpt {

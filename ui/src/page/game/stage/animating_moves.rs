@@ -1,5 +1,4 @@
 use crate::page::game::animation::Animation;
-use shared::direction::Direction;
 use shared::facing_direction::FacingDirection;
 use shared::game::day::Time;
 use shared::game::{calculate_player_visibility, unit_index, Indices};
@@ -52,14 +51,13 @@ impl Model {
 
                     match path.shift_first() {
                         Some(step) => {
+                            let facing_dir = FacingDirection::from_directions(path.to_directions())
+                                .unwrap_or(facing_dir);
+
                             let loc = Located {
                                 x: step.x,
                                 y: step.y,
-                                value: match step.value {
-                                    Direction::West => FacingDirection::Left,
-                                    Direction::East => FacingDirection::Right,
-                                    _ => facing_dir,
-                                },
+                                value: facing_dir,
                             };
                             unit.place = UnitPlace::OnMap(loc);
 
@@ -67,6 +65,16 @@ impl Model {
                                 unit_index::by_location::make(&self.indices.by_id);
                         }
                         None => {
+                            if let Some(transport_id) = loads_into {
+                                unit.place = UnitPlace::InUnit(transport_id.clone());
+                            }
+
+                            self.indices.by_location =
+                                unit_index::by_location::make(&self.indices.by_id);
+
+                            self.indices.by_transport =
+                                unit_index::by_transport::make(&self.indices.by_id);
+
                             self.animations.remove(0);
                         }
                     }

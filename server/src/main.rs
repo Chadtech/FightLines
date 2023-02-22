@@ -38,7 +38,9 @@ async fn main() -> Result<(), String> {
 
             if setting.is_dev() {
                 thread::spawn(move || {
-                    build_frontend().unwrap();
+                    if let Err(error) = build_frontend() {
+                        panic!("Failed to build frontend: {}", error);
+                    };
                     watch_and_recompile_ui();
                 });
             };

@@ -33,15 +33,11 @@ pub enum Unit {
 }
 
 impl Unit {
-    pub fn mobility_range(&self) -> usize {
-        self.mobility_budget()
-    }
-
-    fn mobility_budget(&self) -> usize {
+    pub fn mobility_budget(&self) -> f32 {
         match self {
-            Unit::Infantry => 2,
-            Unit::Tank => 5,
-            Unit::Truck => 7,
+            Unit::Infantry => 3.0,
+            Unit::Tank => 6.0,
+            Unit::Truck => 8.0,
         }
     }
 
@@ -53,11 +49,11 @@ impl Unit {
         }
     }
 
-    pub fn visibility_budget(&self) -> usize {
+    pub fn visibility_budget(&self) -> f32 {
         match self {
-            Unit::Infantry => 2,
-            Unit::Tank => 1,
-            Unit::Truck => 2,
+            Unit::Infantry => 3.5,
+            Unit::Tank => 2.0,
+            Unit::Truck => 3.0,
         }
     }
 }

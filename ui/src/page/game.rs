@@ -18,7 +18,7 @@ use crate::web_sys::HtmlCanvasElement;
 use crate::{api, assets, core_ext, global, Row, Style, Toast};
 use seed::app::CmdHandle;
 use seed::prelude::{cmds, el_ref, At, El, ElRef, IndexMap, Node, Orders, St, ToClasses, UpdateEl};
-use seed::{attrs, canvas, log, style, C};
+use seed::{attrs, canvas, style, C};
 use shared::api::endpoint::Endpoint;
 use shared::api::game::submit_turn;
 use shared::arrow::Arrow;
@@ -246,8 +246,6 @@ pub fn init(
         width_fl: game_pixel_width as f64,
         height_fl: game_pixel_height as f64,
     };
-
-    log!(&game_pixel_size);
 
     let game_x = (window_size.width / 2.0) - (game_pixel_width as f64) + 192.0;
 
@@ -600,8 +598,7 @@ fn handle_mouse_move_on_screen(model: &mut Model, page_pos: Point<i16>) -> Resul
 }
 
 fn handle_rendered_first_frame(model: &mut Model, viewer_id: Id) -> Result<(), Error> {
-    draw_terrain(model)
-        .map_err(|err_msg| Error::new("map rendering problem".to_string(), err_msg))?;
+    draw_terrain(model);
 
     draw(&viewer_id, model)
 }
@@ -662,9 +659,9 @@ fn refetch_game(
     } else {
         model.stage = match &model.stage {
             Stage::Waiting { indices } => {
-                let animations = fetched_game
-                    .clone()
-                    .prev_outcomes
+                let prev_outcomes = fetched_game.clone().prev_outcomes;
+
+                let animations = prev_outcomes
                     .into_iter()
                     .filter_map(Animation::from_outcome)
                     .collect::<Vec<Animation>>();
@@ -941,7 +938,7 @@ fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Resu
                             .map(|(dir, _)| dir.clone())
                             .collect::<Vec<_>>(),
                     ),
-                    unit_model.unit.mobility_range(),
+                    unit_model.unit.mobility_budget() as usize,
                 );
 
                 moving_model.arrows = arrows;
@@ -965,11 +962,9 @@ fn draw(viewer_id: &Id, model: &Model) -> Result<(), Error> {
             .map_err(|err_msg| Error::new("visibility rendering problem".to_string(), err_msg))?,
     };
 
-    draw_units(visibility, model)
-        .map_err(|err_msg| Error::new("units rendering problem".to_string(), err_msg))?;
+    draw_units(visibility, model);
 
-    draw_visibility(visibility, model)
-        .map_err(|err_msg| Error::new("visibility rendering problem".to_string(), err_msg))?;
+    draw_visibility(visibility, model);
 
     Ok(())
 }
@@ -996,12 +991,12 @@ fn draw_mode(model: &Model) -> Result<(), Error> {
     } else {
         return Ok(());
     };
-    let canvas = model.mode_canvas.get().ok_or_else(|| {
-        Error::new(
-            "draw mode from mouse event".to_string(),
-            "could not get mode canvas element".to_string(),
-        )
-    })?;
+    let canvas = match model.mode_canvas.get() {
+        Some(c) => c,
+        None => {
+            return Ok(());
+        }
+    };
 
     let ctx = seed::canvas_context_2d(&canvas);
 
@@ -1018,23 +1013,18 @@ fn draw_mode(model: &Model) -> Result<(), Error> {
         Mode::MovingUnit(moving_model) => {
             let error_title = "rendering mobility range".to_string();
             for mobility_space in moving_model.mobility.iter() {
-                ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                    &model.assets.sheet,
-                    MISC_SPRITE_SHEET_COLUMN,
-                    48.0,
-                    tile::PIXEL_WIDTH_FL,
-                    tile::PIXEL_HEIGHT_FL,
-                    mobility_space.x as f64 * tile::PIXEL_WIDTH_FL,
-                    mobility_space.y as f64 * tile::PIXEL_HEIGHT_FL,
-                    tile::PIXEL_WIDTH_FL,
-                    tile::PIXEL_HEIGHT_FL,
-                )
-                .map_err(|_| {
-                    Error::new(
-                        "rendering mobility range".to_string(),
-                        "could not draw mobility image on canvas".to_string(),
-                    )
-                })?;
+                let _ = ctx
+                    .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+                        &model.assets.sheet,
+                        MISC_SPRITE_SHEET_COLUMN,
+                        48.0,
+                        tile::PIXEL_WIDTH_FL,
+                        tile::PIXEL_HEIGHT_FL,
+                        mobility_space.x as f64 * tile::PIXEL_WIDTH_FL,
+                        mobility_space.y as f64 * tile::PIXEL_HEIGHT_FL,
+                        tile::PIXEL_WIDTH_FL,
+                        tile::PIXEL_HEIGHT_FL,
+                    );
             }
 
             let loc = model
@@ -1045,8 +1035,7 @@ fn draw_mode(model: &Model) -> Result<(), Error> {
             let mut arrow_x = loc.x;
             let mut arrow_y = loc.y;
             for (dir, arrow) in &moving_model.arrows {
-                draw_arrow(&ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y, false)
-                    .map_err(|err_msg| Error::new(error_title.clone(), err_msg))?;
+                draw_arrow(&ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y, false);
             }
         }
     }
@@ -1059,14 +1048,12 @@ fn draw_arrows(
     model: &Model,
     game_pos: &Located<()>,
     arrows: &Vec<(Direction, Arrow)>,
-) -> Result<(), String> {
+) {
     let mut arrow_x = game_pos.x;
     let mut arrow_y = game_pos.y;
     for (dir, arrow) in arrows {
-        draw_arrow(ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y, true)?;
+        draw_arrow(ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y, true);
     }
-
-    Ok(())
 }
 
 fn draw_arrow(
@@ -1077,7 +1064,7 @@ fn draw_arrow(
     arrow_x: &mut u16,
     arrow_y: &mut u16,
     moved: bool,
-) -> Result<(), String> {
+) {
     dir.adjust_coord(arrow_x, arrow_y);
 
     let mut sheet_row = match arrow {
@@ -1097,7 +1084,7 @@ fn draw_arrow(
         sheet_row += 160.0;
     }
 
-    ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+    let _ = ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
         &model.assets.sheet,
         MISC_SPRITE_SHEET_COLUMN,
         sheet_row,
@@ -1107,10 +1094,7 @@ fn draw_arrow(
         *arrow_y as f64 * tile::PIXEL_HEIGHT_FL,
         tile::PIXEL_WIDTH_FL,
         tile::PIXEL_HEIGHT_FL,
-    )
-    .map_err(|_| "could not draw arrow image on canvas".to_string())?;
-
-    Ok(())
+    );
 }
 
 fn draw_cursor(model: &Model) -> Result<(), String> {
@@ -1146,11 +1130,14 @@ fn draw_cursor(model: &Model) -> Result<(), String> {
     Ok(())
 }
 
-fn draw_visibility(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), String> {
-    let canvas = model
-        .visibility_canvas
-        .get()
-        .ok_or_else(|| "could not get visibility canvas element".to_string())?;
+fn draw_visibility(visibility: &HashSet<Located<()>>, model: &Model) {
+    let canvas = match model.visibility_canvas.get() {
+        Some(c) => c,
+        None => {
+            return;
+        }
+    };
+
     let ctx = seed::canvas_context_2d(&canvas);
 
     ctx.begin_path();
@@ -1177,30 +1164,30 @@ fn draw_visibility(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(
                 let x_fl = (x_u16 * tile::PIXEL_WIDTH) as f64;
                 let y_fl = (y_u16 * tile::PIXEL_HEIGHT) as f64;
 
-                ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                    sheet,
-                    sx,
-                    sy,
-                    tile::PIXEL_WIDTH_FL,
-                    tile::PIXEL_HEIGHT_FL,
-                    x_fl,
-                    y_fl,
-                    tile::PIXEL_WIDTH_FL,
-                    tile::PIXEL_HEIGHT_FL,
-                )
-                .map_err(|_| "Could not draw unit image on canvas".to_string())?;
+                let _ = ctx
+                    .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+                        sheet,
+                        sx,
+                        sy,
+                        tile::PIXEL_WIDTH_FL,
+                        tile::PIXEL_HEIGHT_FL,
+                        x_fl,
+                        y_fl,
+                        tile::PIXEL_WIDTH_FL,
+                        tile::PIXEL_HEIGHT_FL,
+                    );
             }
         }
     }
-
-    Ok(())
 }
 
-fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), String> {
-    let canvas = model
-        .units_canvas
-        .get()
-        .ok_or("could not get units canvas element")?;
+fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
+    let canvas = match model.units_canvas.get() {
+        Some(c) => c,
+        None => {
+            return;
+        }
+    };
     let ctx = seed::canvas_context_2d(&canvas);
 
     ctx.begin_path();
@@ -1219,29 +1206,25 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
     for (game_pos, units) in indices.by_location.iter() {
         let location = located::unit(game_pos.x, game_pos.y);
 
-        let draw_units_move = |maybe_units_move: Option<&Action>| -> Result<(), String> {
+        let draw_units_move = |maybe_units_move: Option<&Action>| {
             if let Some(units_move) = maybe_units_move {
                 match units_move {
                     Action::TraveledTo { arrows, .. } => {
-                        draw_arrows(&ctx, model, game_pos, arrows)?;
+                        draw_arrows(&ctx, model, game_pos, arrows);
                     }
                     Action::LoadInto { arrows, .. } => {
-                        draw_arrows(&ctx, model, game_pos, arrows)?;
+                        draw_arrows(&ctx, model, game_pos, arrows);
                     }
                 };
             }
-
-            Ok(())
         };
 
-        let draw_passender_units_moves = |unit_id: &UnitId| -> Result<(), String> {
+        let draw_passender_units_moves = |unit_id: &UnitId| {
             if let Some(loaded_units) = indices.by_transport.get(unit_id) {
                 for (loaded_unit_id, _) in loaded_units {
-                    draw_units_move(model.get_units_move(loaded_unit_id))?;
+                    draw_units_move(model.get_units_move(loaded_unit_id));
                 }
             };
-
-            Ok(())
         };
 
         if visibility.contains(&location) {
@@ -1299,21 +1282,21 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
                     (sx_px, sy_px)
                 };
 
-                ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                    sheet,
-                    sx,
-                    sy,
-                    tile::PIXEL_WIDTH_FL,
-                    tile::PIXEL_HEIGHT_FL,
-                    x,
-                    y,
-                    tile::PIXEL_WIDTH_FL,
-                    tile::PIXEL_HEIGHT_FL,
-                )
-                .map_err(|_| "Could not draw unit image on canvas".to_string())?;
+                let _ = ctx
+                    .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+                        sheet,
+                        sx,
+                        sy,
+                        tile::PIXEL_WIDTH_FL,
+                        tile::PIXEL_HEIGHT_FL,
+                        x,
+                        y,
+                        tile::PIXEL_WIDTH_FL,
+                        tile::PIXEL_HEIGHT_FL,
+                    );
 
-                draw_units_move(maybe_units_move)?;
-                draw_passender_units_moves(unit_id)?;
+                draw_units_move(maybe_units_move);
+                draw_passender_units_moves(unit_id);
             } else {
                 let mut colors = HashSet::new();
 
@@ -1336,35 +1319,35 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) -> Result<(), St
                     todo!("Sprite for game pos with multiple teams on it")
                 };
 
-                ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                    &model.assets.sheet,
-                    9.0 * tile::PIXEL_WIDTH_FL,
-                    sy,
-                    tile::PIXEL_WIDTH_FL,
-                    tile::PIXEL_HEIGHT_FL,
-                    x,
-                    y,
-                    tile::PIXEL_WIDTH_FL,
-                    tile::PIXEL_HEIGHT_FL,
-                )
-                .map_err(|_| "Could not draw unit outline image on canvas".to_string())?;
+                let _ = ctx
+                    .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+                        &model.assets.sheet,
+                        9.0 * tile::PIXEL_WIDTH_FL,
+                        sy,
+                        tile::PIXEL_WIDTH_FL,
+                        tile::PIXEL_HEIGHT_FL,
+                        x,
+                        y,
+                        tile::PIXEL_WIDTH_FL,
+                        tile::PIXEL_HEIGHT_FL,
+                    );
 
                 for (unit_id, _, _) in units {
-                    draw_units_move(model.get_units_move(unit_id))?;
-                    draw_passender_units_moves(unit_id)?;
+                    draw_units_move(model.get_units_move(unit_id));
+                    draw_passender_units_moves(unit_id);
                 }
             }
         }
     }
-
-    Ok(())
 }
 
-fn draw_terrain(model: &Model) -> Result<(), String> {
-    let canvas = model
-        .map_canvas
-        .get()
-        .ok_or("could not get map canvas element")?;
+fn draw_terrain(model: &Model) {
+    let canvas = match model.map_canvas.get() {
+        Some(c) => c,
+        None => {
+            return;
+        }
+    };
     let ctx = seed::canvas_context_2d(&canvas);
 
     ctx.begin_path();
@@ -1385,24 +1368,23 @@ fn draw_terrain(model: &Model) -> Result<(), String> {
             let sheet_row = match loc_tile.value {
                 Tile::GrassPlain => 0.0,
                 Tile::Hills => 24.0,
+                Tile::Forest => 25.0,
             };
 
-            ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                &model.assets.sheet,
-                MISC_SPRITE_SHEET_COLUMN,
-                sheet_row * tile::PIXEL_HEIGHT_FL,
-                tile::PIXEL_WIDTH_FL,
-                tile::PIXEL_HEIGHT_FL,
-                x,
-                y,
-                tile::PIXEL_WIDTH_FL,
-                tile::PIXEL_HEIGHT_FL,
-            )
-            .map_err(|_| "Could not draw tile image on canvas".to_string())?;
+            let _ = ctx
+                .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+                    &model.assets.sheet,
+                    MISC_SPRITE_SHEET_COLUMN,
+                    sheet_row * tile::PIXEL_HEIGHT_FL,
+                    tile::PIXEL_WIDTH_FL,
+                    tile::PIXEL_HEIGHT_FL,
+                    x,
+                    y,
+                    tile::PIXEL_WIDTH_FL,
+                    tile::PIXEL_HEIGHT_FL,
+                );
         }
     }
-
-    Ok(())
 }
 
 ///////////////////////////////////////////////////////////////
@@ -1591,7 +1573,7 @@ fn sidebar_content(model: &Model) -> Vec<Cell<Msg>> {
             }
             Sidebar::UnitSelected(sub_model) => match model.game.get_unit(&sub_model.unit_id) {
                 None => {
-                    vec![Cell::from_str(vec![], "Error: Could not find unit")]
+                    vec![Cell::from_str(vec![], "error: could not find unit")]
                 }
                 Some(unit_model) => unit_selected::sidebar_content(
                     sub_model,
