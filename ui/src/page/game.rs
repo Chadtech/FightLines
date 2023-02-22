@@ -834,7 +834,7 @@ fn handle_click_on_screen_when_move_mode(
 
         if let Some(rideable_units) = model
             .game
-            .get_rideable_units_by_location(viewer_id, mouse_loc)
+            .get_rideable_units_by_location(viewer_id, &unit.unit, mouse_loc)
         {
             let rideable_unit_options = rideable_units
                 .iter()

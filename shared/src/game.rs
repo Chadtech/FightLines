@@ -184,6 +184,7 @@ impl Game {
     pub fn get_rideable_units_by_location(
         &self,
         owner_id: Id,
+        carrying_unit: &Unit,
         mouse_loc: &Located<()>,
     ) -> Option<Vec<(UnitId, UnitModel)>> {
         match self.indices.by_location.get(mouse_loc) {
@@ -191,7 +192,7 @@ impl Game {
                 let rideable_units = units
                     .iter()
                     .filter_map(|(rideable_unit_id, _, possibly_rideable_unit)| {
-                        if possibly_rideable_unit.unit.is_rideable()
+                        if possibly_rideable_unit.unit.can_carry(carrying_unit)
                             && possibly_rideable_unit.owner == owner_id
                         {
                             Some((rideable_unit_id.clone(), possibly_rideable_unit.clone()))

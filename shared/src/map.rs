@@ -159,11 +159,26 @@ impl MapOpt {
                         x: 4,
                         y: 2,
                     },
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Right, Unit::Truck),
+                        x: 5,
+                        y: 3,
+                    },
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Right, Unit::Infantry),
+                        x: 3,
+                        y: 3,
+                    },
                 ],
                 second_player_military: vec![
                     Located::<(FacingDirection, Unit)> {
                         value: (FacingDirection::Left, Unit::Infantry),
                         x: (map.width as u16) - 3,
+                        y: (map.height as u16) - 3,
+                    },
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Left, Unit::Infantry),
+                        x: (map.width as u16) - 2,
                         y: (map.height as u16) - 3,
                     },
                     Located::<(FacingDirection, Unit)> {
@@ -174,6 +189,11 @@ impl MapOpt {
                     Located::<(FacingDirection, Unit)> {
                         value: (FacingDirection::Left, Unit::Truck),
                         x: (map.width as u16) - 5,
+                        y: (map.height as u16) - 3,
+                    },
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Left, Unit::Truck),
+                        x: (map.width as u16) - 6,
                         y: (map.height as u16) - 3,
                     },
                 ],

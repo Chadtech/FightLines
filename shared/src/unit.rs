@@ -49,6 +49,17 @@ impl Unit {
         }
     }
 
+    pub fn can_carry(&self, carry_unit: &Unit) -> bool {
+        match self {
+            Unit::Infantry => false,
+            Unit::Tank => false,
+            Unit::Truck => match carry_unit {
+                Unit::Infantry => true,
+                _ => false,
+            },
+        }
+    }
+
     pub fn visibility_budget(&self) -> f32 {
         match self {
             Unit::Infantry => 3.5,
