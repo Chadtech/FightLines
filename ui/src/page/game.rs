@@ -28,7 +28,8 @@ use shared::arrow::Arrow;
 use shared::direction::Direction;
 use shared::facing_direction::FacingDirection;
 use shared::frame_count::FrameCount;
-use shared::game::{calculate_player_visibility, Game, GameId, Indices, Turn};
+use shared::game::unit_index::Indices;
+use shared::game::{calculate_player_visibility, Game, GameId, Outcome, Turn};
 use shared::id::Id;
 use shared::located::Located;
 use shared::path::Path;
@@ -294,33 +295,7 @@ pub fn init(
     let moves: Vec<Action> = match game.get_turn(global.viewer_id()) {
         Ok(turn) => match turn {
             Turn::Waiting => Vec::new(),
-            Turn::Turn { moves } => {
-                let mut moves_ret = Vec::new();
-
-                for action in moves {
-                    match action {
-                        game::Action::Traveled { unit_id, path } => {
-                            moves_ret.push(Action::TraveledTo {
-                                unit_id: unit_id.clone(),
-                                path: path.clone(),
-                                arrows: path.with_arrows(),
-                            });
-                        }
-                        game::Action::LoadInto {
-                            unit_id,
-                            load_into,
-                            path,
-                        } => moves_ret.push(Action::LoadInto {
-                            unit_id: unit_id.clone(),
-                            load_into: load_into.clone(),
-                            arrows: path.with_arrows(),
-                            path: path.clone(),
-                        }),
-                    }
-                }
-
-                moves_ret
-            }
+            Turn::Turn { moves } => game_moves_to_page_actions(moves),
         },
         Err(error) => {
             global.toast(
@@ -726,10 +701,9 @@ fn refetch_game(
             Stage::Waiting { indices } => {
                 let prev_outcomes = fetched_game.clone().prev_outcomes;
 
-                let animations = prev_outcomes
-                    .into_iter()
-                    .filter_map(Animation::from_outcome)
-                    .collect::<Vec<Animation>>();
+                log!(prev_outcomes);
+
+                let animations = outcomes_to_animations(prev_outcomes);
 
                 let visibility =
                     calculate_player_visibility(viewer_id, &model.game.map, &indices.by_id);
@@ -756,23 +730,25 @@ fn refetch_game(
 fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl Orders<Msg>) {
     model.dialog = None;
 
-    let req_moves: Vec<game::Action> = model
+    let mut req_moves: Vec<game::action::Action> = model
         .moves_index_by_unit
         .iter()
         .map(|(unit_id, action)| match action {
-            Action::TraveledTo { path, .. } => game::Action::Traveled {
+            Action::TraveledTo { path, .. } => game::action::Action::Traveled {
                 unit_id: unit_id.clone(),
                 path: path.clone(),
             },
             Action::LoadInto {
                 load_into, path, ..
-            } => game::Action::LoadInto {
+            } => game::action::Action::LoadInto {
                 unit_id: unit_id.clone(),
                 load_into: load_into.clone(),
                 path: path.clone(),
             },
         })
         .collect();
+
+    game::action::order(&mut req_moves);
 
     let req_changes: Vec<game::Change> = model
         .changes
@@ -1769,6 +1745,13 @@ fn calc_arrows(
     shared::path::path_with_arrows(&directions)
 }
 
+fn outcomes_to_animations(outcomes: Vec<Outcome>) -> Vec<Animation> {
+    outcomes
+        .into_iter()
+        .filter_map(Animation::from_outcome)
+        .collect::<Vec<Animation>>()
+}
+
 fn calc_movement_path(
     mouse_pos: Point<i32>,
     maybe_existing_path: Option<&Vec<Direction>>,
@@ -1912,6 +1895,38 @@ fn path_to_positions(path: &Vec<Direction>) -> Vec<Point<i32>> {
     }
 
     ret
+}
+
+fn game_moves_to_page_actions(moves: Vec<game::action::Action>) -> Vec<Action> {
+    let mut moves_ret = Vec::new();
+
+    for action in moves {
+        match action {
+            game::action::Action::Traveled { unit_id, path } => {
+                moves_ret.push(Action::TraveledTo {
+                    unit_id: unit_id.clone(),
+                    path: path.clone(),
+                    arrows: path.with_arrows(),
+                });
+            }
+            game::action::Action::LoadInto {
+                unit_id,
+                load_into,
+                path,
+            } => moves_ret.push(Action::LoadInto {
+                unit_id: unit_id.clone(),
+                load_into: load_into.clone(),
+                arrows: path.with_arrows(),
+                path: path.clone(),
+            }),
+            game::action::Action::Batch(more_moves) => {
+                let mut more_moves_ret = game_moves_to_page_actions(more_moves);
+                moves_ret.append(&mut more_moves_ret);
+            }
+        }
+    }
+
+    moves_ret
 }
 
 #[cfg(test)]

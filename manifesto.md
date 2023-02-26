@@ -1,3 +1,4 @@
+
 # FightLines Game Manifesto
 
 Throughout history, transportation has been a large factor in warfare. This is obvious to the extent that troops have moved into combat and resupplied via transportation, but what has been more interesting is that transportation technology has been a factor on the battlefield as well. Tactics like flanking or exploiting openings rely on some degree of speed, and without sufficient speed they cannot be performed at all. For a long time, calvary were the fastest units on the battlefield. When calvary became obsolete in World War 1, so too did the speed dependent tactics calvary were used for. World War 1, as a consequence, was a war that happened in one place geographically, in a stalemate, as neither side could outmanoeuvre the other. For them, as their fasted combat transportation digressed from being on horseback to being on foot, the nature of combat changed in turn. Combat evolved again with the invention of the tank and the use of armored vehicles in World War 2. Armored trucks that could drive around close to the battle field could relocate infantry quickly to areas where the enemy was vulnerable. A fact about World War 2 most people find astonishing, was that Nazi Germany invaded the Soviet Union largely on horseback. They used horses to move people and supplies into Russia. They just didn't possess enough automobiles. In combat, most Nazi soldiers had to walk into combat, while ~16% arrived in armored trucks. These transportation factors mattered a lot. To the Nazis, they had to plan their operations around the fact that 16% of their army was vastly faster than the rest. 
@@ -27,7 +28,7 @@ Ground combat is also unique in that it relies on logistics units like trucks to
 
 ### Ground logistics units
 - **Trucks** can be loaded up with ground attack units or supplies, whereafter they can relocate their cargo quickly and efficiently
-- **Semi-Truck** is just like a truck, except it can carry more cargo, but it can travel on roads.
+- **Semi-Truck** is just like a truck, except it can carry more cargo, but it can only travel on roads.
 
 
 ## Air Units

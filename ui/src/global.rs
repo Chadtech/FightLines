@@ -8,13 +8,11 @@ use crate::view::toast;
 use crate::view::toast::{OpenToast, Toast};
 use rand::Rng;
 use seed::browser::web_storage::{LocalStorage, WebStorage, WebStorageError};
-use seed::log;
 use seed::prelude::{cmds, streams, CmdHandle, Ev, JsValue, Orders, StreamHandle};
 use shared::id::Id;
 use shared::name::Name;
 use shared::rng::{RandGen, RandSeed};
 use std::str::FromStr;
-use web_sys::KeyboardEvent;
 
 ///////////////////////////////////////////////////////////////
 // Types //
@@ -118,10 +116,8 @@ impl Model {
     pub fn init(orders: &mut impl Orders<Msg>) -> Result<Model, String> {
         let (inner_width, inner_height) = get_window_size()?;
 
-        let window_resize_stream = orders
-            .stream_with_handle(streams::window_event(Ev::Resize, |event| {
-                Msg::WindowResized
-            }));
+        let window_resize_stream =
+            orders.stream_with_handle(streams::window_event(Ev::Resize, |_| Msg::WindowResized));
 
         let mut rng = rand::thread_rng();
         let seed: RandSeed = rng.gen();

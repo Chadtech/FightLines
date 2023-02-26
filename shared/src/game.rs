@@ -1,8 +1,11 @@
+pub mod action;
 pub mod day;
 pub mod unit_index;
 
 use crate::facing_direction::FacingDirection;
+use crate::game::action::Action;
 use crate::game::day::Time;
+use crate::game::unit_index::Indices;
 use crate::game::FromLobbyError::CouldNotFindInitialMapMilitary;
 use crate::id::Id;
 use crate::lobby::{Lobby, LobbyId};
@@ -65,14 +68,6 @@ pub struct Game {
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct Indices {
-    pub by_id: HashMap<UnitId, UnitModel>,
-    pub by_location: unit_index::by_location::Index,
-    pub by_player: unit_index::by_player::Index,
-    pub by_transport: unit_index::by_transport::Index,
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum Turn {
     Waiting,
     Turn { moves: Vec<Action> },
@@ -85,19 +80,6 @@ impl Turn {
             Turn::Turn { .. } => false,
         }
     }
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub enum Action {
-    Traveled {
-        unit_id: UnitId,
-        path: Path,
-    },
-    LoadInto {
-        unit_id: UnitId,
-        load_into: UnitId,
-        path: Path,
-    },
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -252,8 +234,8 @@ impl Game {
         let mut rng = RandGen::from_seed(seed);
         let mut player_moves: Vec<(Id, Vec<Action>)> = match &mut self.all_players_turns() {
             Ok(moves) => {
-                let mut src_moves = moves.clone();
-                let mut ret_moves = Vec::new();
+                let mut src_moves: Vec<(Id, Vec<Action>)> = moves.clone();
+                let mut ret_moves: Vec<(Id, Vec<Action>)> = Vec::new();
 
                 while !src_moves.is_empty() {
                     let max_index = src_moves.len() - 1;
@@ -277,40 +259,7 @@ impl Game {
             }
         };
 
-        let mut outcomes = Vec::new();
-
-        let mut player_index = 0;
-        let mut cont = true;
-
-        while cont {
-            if let Some((_, actions)) = player_moves.get_mut(player_index) {
-                if let Some(first) = actions.first() {
-                    match first {
-                        Action::Traveled { unit_id, path, .. } => {
-                            outcomes.push(Outcome::Traveled {
-                                unit_id: unit_id.clone(),
-                                path: path.clone(),
-                            });
-                        }
-                        Action::LoadInto {
-                            unit_id,
-                            load_into,
-                            path,
-                        } => outcomes.push(Outcome::LoadedInto {
-                            unit_id: unit_id.clone(),
-                            loaded_into: load_into.clone(),
-                            path: path.clone(),
-                        }),
-                    }
-
-                    actions.remove(0);
-                }
-            }
-
-            player_index = (player_index + 1) % player_moves.len();
-
-            cont = !player_moves.iter().all(|(_, m)| m.is_empty());
-        }
+        let outcomes = outcomes_from_actions(&mut player_moves);
 
         self.turn_number += 1;
         self.consume_changes();
@@ -864,19 +813,42 @@ pub fn calculate_player_visibility(
     visible_spots
 }
 
-impl Indices {
-    pub fn position_of_unit_or_transport(
-        &self,
-        unit_id: &UnitId,
-    ) -> Result<Located<FacingDirection>, String> {
-        match self.by_id.get(unit_id) {
-            None => Err("unit not found when getting units or transports location".to_string()),
-            Some(unit_model) => Ok(match &unit_model.place {
-                UnitPlace::OnMap(loc) => loc.clone(),
-                UnitPlace::InUnit(transport_id) => {
-                    self.position_of_unit_or_transport(transport_id)?
+fn outcomes_from_actions(player_moves: &mut Vec<(Id, Vec<Action>)>) -> Vec<Outcome> {
+    let mut outcomes = Vec::new();
+
+    let mut player_index = 0;
+    let mut cont = true;
+
+    while cont {
+        if let Some((_, actions)) = player_moves.get_mut(player_index) {
+            if let Some(first) = actions.first() {
+                match first {
+                    Action::Traveled { unit_id, path, .. } => {
+                        outcomes.push(Outcome::Traveled {
+                            unit_id: unit_id.clone(),
+                            path: path.clone(),
+                        });
+                    }
+                    Action::LoadInto {
+                        unit_id,
+                        load_into,
+                        path,
+                    } => outcomes.push(Outcome::LoadedInto {
+                        unit_id: unit_id.clone(),
+                        loaded_into: load_into.clone(),
+                        path: path.clone(),
+                    }),
+                    Action::Batch(_) => {}
                 }
-            }),
+
+                actions.remove(0);
+            }
         }
+
+        player_index = (player_index + 1) % player_moves.len();
+
+        cont = !player_moves.iter().all(|(_, m)| m.is_empty());
     }
+
+    outcomes
 }

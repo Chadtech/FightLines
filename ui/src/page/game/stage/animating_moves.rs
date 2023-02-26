@@ -1,7 +1,8 @@
 use crate::page::game::animation::Animation;
 use shared::facing_direction::FacingDirection;
 use shared::game::day::Time;
-use shared::game::{calculate_player_visibility, unit_index, Indices};
+use shared::game::unit_index::Indices;
+use shared::game::{calculate_player_visibility, unit_index};
 use shared::id::Id;
 use shared::located::Located;
 use shared::map::Map;
