@@ -125,9 +125,9 @@ const RANDOM_NAMES: [&str; 64] = [
     "Baude",
     "Caplan",
     "Hansen",
-    "Jones",
     "Huemer",
     "Friedman",
     "Cowen",
     "Tabarrok",
+    "Hsu",
 ];

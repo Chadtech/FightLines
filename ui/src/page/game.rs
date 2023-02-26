@@ -17,8 +17,11 @@ use crate::view::cell::Cell;
 use crate::web_sys::HtmlCanvasElement;
 use crate::{api, assets, core_ext, global, Row, Style, Toast};
 use seed::app::CmdHandle;
-use seed::prelude::{cmds, el_ref, At, El, ElRef, IndexMap, Node, Orders, St, ToClasses, UpdateEl};
-use seed::{attrs, canvas, style, C};
+use seed::prelude::{
+    cmds, el_ref, streams, At, El, ElRef, Ev, IndexMap, JsCast, Node, Orders, St, StreamHandle,
+    ToClasses, UpdateEl,
+};
+use seed::{attrs, canvas, log, style, C};
 use shared::api::endpoint::Endpoint;
 use shared::api::game::submit_turn;
 use shared::arrow::Arrow;
@@ -36,6 +39,7 @@ use shared::unit::place::UnitPlace;
 use shared::unit::{Unit, UnitId};
 use shared::{game, located, tile};
 use std::collections::{HashMap, HashSet};
+use web_sys::KeyboardEvent;
 
 ///////////////////////////////////////////////////////////////
 // Helpers //
@@ -96,6 +100,7 @@ pub struct Model {
     stage: Stage,
     dialog: Option<Dialog>,
     status: Status,
+    key_press_stream: StreamHandle,
 }
 
 #[derive(Debug)]
@@ -228,6 +233,8 @@ pub enum Msg {
     GroupSelectedSidebar(group_selected::Msg),
     UnitSelectedSidebar(unit_selected::Msg),
     MovingFlyout(mode::moving::Msg),
+    EnterPressed,
+    EscapePressed,
 }
 
 ///////////////////////////////////////////////////////////////
@@ -262,6 +269,15 @@ pub fn init(
     let game_y = (window_size.height / 2.0) - (game_pixel_height as f64);
 
     orders.after_next_render(|_| Msg::RenderedFirstTime);
+    let key_press_stream = orders.stream_with_handle(streams::window_event(Ev::KeyUp, |event| {
+        let keyboard_event: KeyboardEvent = event.unchecked_into();
+        let key = keyboard_event.key();
+        match key.as_str() {
+            "Enter" => Some(Msg::EnterPressed),
+            "Escape" => Some(Msg::EscapePressed),
+            _ => None,
+        }
+    }));
 
     let assets = assets::init()?;
 
@@ -361,6 +377,7 @@ pub fn init(
         stage,
         dialog: None,
         status: Status::Ready,
+        key_press_stream,
     };
 
     Ok(model)
@@ -503,6 +520,44 @@ pub fn update(
         Msg::MovingFlyout(sub_msg) => {
             if let Err(error) = handle_moving_flyout_msg(model, sub_msg) {
                 global.toast_error(error)
+            }
+        }
+        Msg::EnterPressed => match &model.dialog {
+            None => {}
+            Some(dialog) => match dialog {
+                Dialog::ConfirmTurnSubmit => {
+                    submit_turn(global, model, orders);
+                }
+            },
+        },
+        Msg::EscapePressed => {
+            model.dialog = None;
+            match &mut model.stage {
+                Stage::TakingTurn(sub_model) => {
+                    sub_model.mode = Mode::None;
+
+                    match &mut sub_model.sidebar {
+                        Sidebar::None => {}
+                        Sidebar::UnitSelected(unit_selected_model) => {
+                            sub_model.sidebar = if let Some(group_selected_model) =
+                                &unit_selected_model.from_group
+                            {
+                                Sidebar::GroupSelected(group_selected_model.clone())
+                            } else {
+                                Sidebar::None
+                            };
+                        }
+                        Sidebar::GroupSelected(_) => {
+                            sub_model.sidebar = Sidebar::None;
+                        }
+                    }
+
+                    if let Err(error) = draw_mode(model) {
+                        global.toast_error(error);
+                    };
+                }
+                Stage::Waiting { .. } => {}
+                Stage::AnimatingMoves(_) => {}
             }
         }
     }

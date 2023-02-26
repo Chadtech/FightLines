@@ -8,11 +8,13 @@ use crate::view::toast;
 use crate::view::toast::{OpenToast, Toast};
 use rand::Rng;
 use seed::browser::web_storage::{LocalStorage, WebStorage, WebStorageError};
-use seed::prelude::{cmds, CmdHandle, JsValue, Orders};
+use seed::log;
+use seed::prelude::{cmds, streams, CmdHandle, Ev, JsValue, Orders, StreamHandle};
 use shared::id::Id;
 use shared::name::Name;
 use shared::rng::{RandGen, RandSeed};
 use std::str::FromStr;
+use web_sys::KeyboardEvent;
 
 ///////////////////////////////////////////////////////////////
 // Types //
@@ -39,6 +41,9 @@ pub struct Model {
     handle_remove_toast_timeout: Option<CmdHandle>,
     handle_toast_check_timeout: CmdHandle,
     handle_localstorage_save_timeout: CmdHandle,
+
+    // Streams
+    window_resize_stream: StreamHandle,
 }
 
 pub struct WindowSize {
@@ -53,6 +58,7 @@ pub enum Msg {
     CheckToastTimeoutExpired,
     SaveLocalStorageTimeoutExpired,
     ClickedGoBack,
+    WindowResized,
 }
 
 ///////////////////////////////////////////////////////////////
@@ -84,6 +90,22 @@ fn save_viewer_id(viewer_id: &Id) {
     LocalStorage::insert(VIEWER_ID_KEY, &viewer_id).expect("save viewer id to LocalStorage");
 }
 
+fn get_window_size() -> Result<(f64, f64), String> {
+    let inner_width_json: JsValue = seed::window().inner_width().map_err(|err| {
+        err.as_string()
+            .unwrap_or_else(|| "cannot unwrap inner width error".to_string())
+    })?;
+    let inner_height_json: JsValue = seed::window().inner_height().map_err(|err| {
+        err.as_string()
+            .unwrap_or_else(|| "cannot unwrap inner height error".to_string())
+    })?;
+
+    let inner_width = inner_width_json.as_f64().ok_or("no inner width")?;
+    let inner_height = inner_height_json.as_f64().ok_or("no inner height")?;
+
+    Ok((inner_width, inner_height))
+}
+
 ///////////////////////////////////////////////////////////////
 // Api //
 ///////////////////////////////////////////////////////////////
@@ -94,17 +116,12 @@ const VIEWER_NAME_KEY: &str = "fightlines-viewer-name";
 
 impl Model {
     pub fn init(orders: &mut impl Orders<Msg>) -> Result<Model, String> {
-        let inner_width_json: JsValue = seed::window().inner_width().map_err(|err| {
-            err.as_string()
-                .unwrap_or_else(|| "cannot unwrap inner width error".to_string())
-        })?;
-        let inner_height_json: JsValue = seed::window().inner_height().map_err(|err| {
-            err.as_string()
-                .unwrap_or_else(|| "cannot unwrap inner height error".to_string())
-        })?;
+        let (inner_width, inner_height) = get_window_size()?;
 
-        let inner_width = inner_width_json.as_f64().ok_or("no inner width")?;
-        let inner_height = inner_height_json.as_f64().ok_or("no inner height")?;
+        let window_resize_stream = orders
+            .stream_with_handle(streams::window_event(Ev::Resize, |event| {
+                Msg::WindowResized
+            }));
 
         let mut rng = rand::thread_rng();
         let seed: RandSeed = rng.gen();
@@ -132,6 +149,7 @@ impl Model {
             handle_localstorage_save_timeout: wait_to_save_localstorage(orders),
             window_width: inner_width,
             window_height: inner_height,
+            window_resize_stream,
         };
 
         Ok(model)
@@ -248,6 +266,12 @@ pub fn update(msg: Msg, global: &mut Model, orders: &mut impl Orders<Msg>) {
             save_viewer_id(&global.viewer_id);
             save_viewer_name(&global.viewer_name);
             global.handle_localstorage_save_timeout = wait_to_save_localstorage(orders);
+        }
+        Msg::WindowResized => {
+            if let Ok((inner_width, inner_height)) = get_window_size() {
+                global.window_width = inner_width;
+                global.window_height = inner_height;
+            }
         }
     }
 }

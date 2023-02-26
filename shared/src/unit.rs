@@ -55,7 +55,8 @@ impl Unit {
             Unit::Tank => false,
             Unit::Truck => match carry_unit {
                 Unit::Infantry => true,
-                _ => false,
+                Unit::Tank => false,
+                Unit::Truck => false,
             },
         }
     }
