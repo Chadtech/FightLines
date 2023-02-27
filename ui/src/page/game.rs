@@ -10,6 +10,7 @@ use crate::error::Error;
 use crate::page::game::action::Action;
 use crate::page::game::animation::Animation;
 use crate::page::game::mode::Mode;
+use crate::page::game::stage::animating_moves;
 use crate::page::game::stage::taking_turn::Sidebar;
 use crate::view::button::Button;
 use crate::view::card::Card;
@@ -21,7 +22,7 @@ use seed::prelude::{
     cmds, el_ref, streams, At, El, ElRef, Ev, IndexMap, JsCast, Node, Orders, St, StreamHandle,
     ToClasses, UpdateEl,
 };
-use seed::{attrs, canvas, log, style, C};
+use seed::{attrs, canvas, style, C};
 use shared::api::endpoint::Endpoint;
 use shared::api::game::submit_turn;
 use shared::arrow::Arrow;
@@ -701,8 +702,6 @@ fn refetch_game(
             Stage::Waiting { indices } => {
                 let prev_outcomes = fetched_game.clone().prev_outcomes;
 
-                log!(prev_outcomes);
-
                 let animations = outcomes_to_animations(prev_outcomes);
 
                 let visibility =
@@ -748,7 +747,8 @@ fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl 
         })
         .collect();
 
-    game::action::order(&mut req_moves);
+    let mut rng = global.new_rand_gen();
+    game::action::order(&mut rng, &mut req_moves);
 
     let req_changes: Vec<game::Change> = model
         .changes
@@ -1632,8 +1632,8 @@ fn sidebar_content(model: &Model) -> Vec<Cell<Msg>> {
         Stage::Waiting { .. } => {
             vec![]
         }
-        Stage::AnimatingMoves(_) => {
-            vec![]
+        Stage::AnimatingMoves(sub_model) => {
+            animating_moves::sidebar_view(&model.game.indices.by_id, sub_model)
         }
     }
 }
