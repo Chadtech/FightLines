@@ -9,6 +9,7 @@ pub enum Action {
         unit_id: UnitId,
         path: Path,
         arrows: Vec<(Direction, Arrow)>,
+        dismounted_from: Option<UnitId>,
     },
     LoadInto {
         unit_id: UnitId,

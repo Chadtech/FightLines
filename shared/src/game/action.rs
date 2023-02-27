@@ -8,6 +8,7 @@ pub enum Action {
     Traveled {
         unit_id: UnitId,
         path: Path,
+        dismounted_from: Option<UnitId>,
     },
     LoadInto {
         unit_id: UnitId,
@@ -24,7 +25,45 @@ pub fn order(rng: &mut RandGen, actions: &mut Vec<Action>) {
         let action = actions[i].clone();
 
         match action {
-            Action::Traveled { .. } => {}
+            Action::Traveled {
+                ref dismounted_from,
+                ..
+            } => {
+                // A unit that travels out of a transport should travel
+                // before its transport does
+                if let Some(ref dismounted_from_unit_id) = dismounted_from {
+                    let mut j = 0;
+                    let mut continue_finding_transport = true;
+                    while j < actions.len() && continue_finding_transport {
+                        let possibly_travel_action = actions.get(j).unwrap().clone();
+
+                        match possibly_travel_action {
+                            Action::Traveled {
+                                unit_id: ref possible_transport_id,
+                                ..
+                            } => {
+                                if possible_transport_id == dismounted_from_unit_id {
+                                    continue_finding_transport = false;
+
+                                    let new_action = Action::Batch(vec![
+                                        action.clone(),
+                                        possibly_travel_action.clone(),
+                                    ]);
+                                    actions[i] = new_action;
+                                    actions.remove(j);
+                                    i = 0;
+                                }
+                            }
+                            Action::LoadInto { .. } => {}
+                            Action::Batch(_) => {}
+                        }
+
+                        j += 1;
+                    }
+                }
+            }
+            // A unit that loads into a transport, should load into
+            // it before it travels away
             Action::LoadInto { ref load_into, .. } => {
                 let mut j = 0;
                 let mut continue_finding_transport = true;
@@ -85,7 +124,7 @@ mod test_game_actions {
     use pretty_assertions::assert_eq;
 
     #[test]
-    fn can_be_sorted() {
+    fn units_loaded_into_trucks_load_before_truck_moves() {
         let mut rand_gen = RandGen::test();
 
         let truck_id = UnitId::new(&mut rand_gen);
@@ -98,6 +137,7 @@ mod test_game_actions {
                     &located::unit(5, 5),
                     &vec![Direction::East, Direction::East, Direction::East],
                 ),
+                dismounted_from: None,
             },
             Action::LoadInto {
                 unit_id: infantry_id.clone(),
@@ -128,13 +168,14 @@ mod test_game_actions {
                         &located::unit(5, 5),
                         &vec![Direction::East, Direction::East, Direction::East],
                     ),
+                    dismounted_from: None
                 },
             ])]
         )
     }
 
     #[test]
-    fn multiple_can_be_sorted() {
+    fn multiple_units_loaded_into_multiple_trucks_load_before_trucks_moves() {
         let mut rand_gen = RandGen::test();
 
         let truck_1_id = UnitId::new(&mut rand_gen);
@@ -150,6 +191,7 @@ mod test_game_actions {
                     &located::unit(10, 10),
                     &vec![Direction::East, Direction::East, Direction::East],
                 ),
+                dismounted_from: None,
             },
             Action::Traveled {
                 unit_id: truck_1_id.clone(),
@@ -157,6 +199,7 @@ mod test_game_actions {
                     &located::unit(5, 5),
                     &vec![Direction::East, Direction::East, Direction::East],
                 ),
+                dismounted_from: None,
             },
             Action::LoadInto {
                 unit_id: infantry_1_id.clone(),
@@ -196,6 +239,7 @@ mod test_game_actions {
                             &located::unit(5, 5),
                             &vec![Direction::East, Direction::East, Direction::East],
                         ),
+                        dismounted_from: None
                     },
                 ]),
                 Action::Batch(vec![
@@ -213,9 +257,61 @@ mod test_game_actions {
                             &located::unit(10, 10),
                             &vec![Direction::East, Direction::East, Direction::East],
                         ),
+                        dismounted_from: None
                     },
                 ])
             ]
+        )
+    }
+
+    #[test]
+    fn units_dismounting_from_trucks_dismount_before_truck_moves() {
+        let mut rand_gen = RandGen::test();
+
+        let truck_id = UnitId::new(&mut rand_gen);
+        let infantry_id = UnitId::new(&mut rand_gen);
+
+        let mut actions = vec![
+            Action::Traveled {
+                unit_id: truck_id.clone(),
+                path: Path::from_directions(
+                    &located::unit(5, 5),
+                    &vec![Direction::East, Direction::East, Direction::East],
+                ),
+                dismounted_from: None,
+            },
+            Action::Traveled {
+                unit_id: infantry_id.clone(),
+                path: Path::from_directions(
+                    &located::unit(5, 5),
+                    &vec![Direction::East, Direction::East],
+                ),
+                dismounted_from: Some(truck_id.clone()),
+            },
+        ];
+
+        order(&mut rand_gen, &mut actions);
+
+        assert_eq!(
+            actions,
+            vec![Action::Batch(vec![
+                Action::Traveled {
+                    unit_id: infantry_id.clone(),
+                    path: Path::from_directions(
+                        &located::unit(5, 5),
+                        &vec![Direction::East, Direction::East],
+                    ),
+                    dismounted_from: Some(truck_id.clone()),
+                },
+                Action::Traveled {
+                    unit_id: truck_id.clone(),
+                    path: Path::from_directions(
+                        &located::unit(5, 5),
+                        &vec![Direction::East, Direction::East, Direction::East],
+                    ),
+                    dismounted_from: None,
+                },
+            ])]
         )
     }
 }

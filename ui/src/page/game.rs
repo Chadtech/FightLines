@@ -22,7 +22,7 @@ use seed::prelude::{
     cmds, el_ref, streams, At, El, ElRef, Ev, IndexMap, JsCast, Node, Orders, St, StreamHandle,
     ToClasses, UpdateEl,
 };
-use seed::{attrs, canvas, style, C};
+use seed::{attrs, canvas, log, style, C};
 use shared::api::endpoint::Endpoint;
 use shared::api::game::submit_turn;
 use shared::arrow::Arrow;
@@ -136,10 +136,25 @@ impl Model {
                 return Ok(());
             }
         };
+
+        let unit = match self.game.indices.by_id.get(unit_id) {
+            Some(m) => m,
+            None => {
+                return Err(Error::new(
+                    "travel unit".to_string(),
+                    "could not find unit".to_string(),
+                ));
+            }
+        };
+
         let action = Action::TraveledTo {
             unit_id: unit_id.clone(),
             path,
             arrows: arrows.to_owned(),
+            dismounted_from: match &unit.place {
+                UnitPlace::OnMap(_) => None,
+                UnitPlace::InUnit(transport_id) => Some(transport_id.clone()),
+            },
         };
 
         self.moves_index_by_unit.insert(unit_id.clone(), action);
@@ -733,9 +748,14 @@ fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl 
         .moves_index_by_unit
         .iter()
         .map(|(unit_id, action)| match action {
-            Action::TraveledTo { path, .. } => game::action::Action::Traveled {
+            Action::TraveledTo {
+                path,
+                dismounted_from,
+                ..
+            } => game::action::Action::Traveled {
                 unit_id: unit_id.clone(),
                 path: path.clone(),
+                dismounted_from: dismounted_from.clone(),
             },
             Action::LoadInto {
                 load_into, path, ..
@@ -748,6 +768,7 @@ fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl 
         .collect();
 
     let mut rng = global.new_rand_gen();
+    log!(req_moves);
     game::action::order(&mut rng, &mut req_moves);
 
     let req_changes: Vec<game::Change> = model
@@ -1902,11 +1923,16 @@ fn game_moves_to_page_actions(moves: Vec<game::action::Action>) -> Vec<Action> {
 
     for action in moves {
         match action {
-            game::action::Action::Traveled { unit_id, path } => {
+            game::action::Action::Traveled {
+                unit_id,
+                path,
+                dismounted_from,
+            } => {
                 moves_ret.push(Action::TraveledTo {
                     unit_id: unit_id.clone(),
                     path: path.clone(),
                     arrows: path.with_arrows(),
+                    dismounted_from: dismounted_from.clone(),
                 });
             }
             game::action::Action::LoadInto {

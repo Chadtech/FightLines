@@ -855,7 +855,7 @@ fn outcomes_from_action(action: &Action) -> Vec<Outcome> {
             path: path.clone(),
         }],
         Action::Batch(actions) => actions
-            .into_iter()
+            .iter()
             .map(outcomes_from_action)
             .collect::<Vec<Vec<Outcome>>>()
             .concat(),
