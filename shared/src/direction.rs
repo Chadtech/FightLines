@@ -1,3 +1,4 @@
+use crate::facing_direction::FacingDirection;
 use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -41,6 +42,15 @@ impl Direction {
                 }
             }
         };
+    }
+
+    pub fn to_facing_dir(&self) -> Option<FacingDirection> {
+        match self {
+            Direction::North => None,
+            Direction::South => None,
+            Direction::East => Some(FacingDirection::Right),
+            Direction::West => Some(FacingDirection::Left),
+        }
     }
 }
 

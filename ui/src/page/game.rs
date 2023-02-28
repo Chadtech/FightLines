@@ -1454,9 +1454,16 @@ fn draw_terrain(model: &Model) {
 // View
 ///////////////////////////////////////////////////////////////
 
-pub fn view(global: &global::Model, model: &Model) -> Cell<Msg> {
-    Cell::group(
-        vec![],
+pub fn view(global: &global::Model, model: &Model) -> Vec<Cell<Msg>> {
+    let canvases = Cell::group(
+        vec![
+            Style::Absolute,
+            Style::Scroll,
+            Style::Top0,
+            Style::Bottom0,
+            Style::Right0,
+            Style::Left8P5,
+        ],
         vec![
             map_canvas_cell(model),
             units_canvas_cell(model),
@@ -1465,12 +1472,16 @@ pub fn view(global: &global::Model, model: &Model) -> Cell<Msg> {
             cursor_canvas_cell(model),
             click_screen(model),
             flyout_view(model),
-            snackbar_view(model),
-            sidebar_view(global, model),
-            day_view(model),
-            dialog_view(model),
         ],
-    )
+    );
+
+    vec![
+        sidebar_view(global, model),
+        canvases,
+        snackbar_view(model),
+        day_view(model),
+        dialog_view(model),
+    ]
 }
 
 fn mode_canvas_cell(model: &Model) -> Cell<Msg> {

@@ -379,6 +379,10 @@ canvas {
     left: 50%;
 }
 
+.left-8p5 {
+    left: var(--s-8p5);
+}
+
 .top-50-pct {
     top: 50%;
 }
@@ -401,6 +405,10 @@ canvas {
 
 .overflow-hidden {
     overflow: hidden;
+}
+
+.scroll {
+    overflow: auto;
 }
 
 spinner {

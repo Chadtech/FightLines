@@ -60,7 +60,7 @@ impl Model {
                             let loc = Located {
                                 x: step.x,
                                 y: step.y,
-                                value: facing_dir,
+                                value: step.value.to_facing_dir().unwrap_or(facing_dir),
                             };
                             unit.place = UnitPlace::OnMap(loc);
 
