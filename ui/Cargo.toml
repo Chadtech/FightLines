@@ -32,4 +32,4 @@ wasm-opt = ['-Os']
 
 [dependencies.web-sys]
 version = "0.3.58"
-features = [ "HtmlImageElement" ]
+features = [ "HtmlImageElement", "MouseScrollEvent", "ScrollAreaEvent", "EventTarget" ]

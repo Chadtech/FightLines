@@ -1,11 +1,11 @@
 use crate::style::Style;
 use crate::view::text::text;
 use seed::dom_entity_names::Tag;
-use seed::prelude::{mouse_ev, El, Ev, MessageMapper, Node};
+use seed::prelude::{ev, mouse_ev, El, Ev, MessageMapper, Node};
 use shared::point::Point;
 use std::borrow::Cow;
 use std::rc::Rc;
-use web_sys::MouseEvent;
+use web_sys::{Event, MouseEvent};
 
 ////////////////////////////////////////////////////////////////
 // Types //
@@ -28,6 +28,7 @@ pub struct Model<Msg> {
     click_handler: Option<Rc<dyn Fn(MouseEvent) -> Msg>>,
     as_img: Option<String>,
     screen_pos: Option<Point<i16>>,
+    scroll_handler: Option<Rc<dyn Fn(Event) -> Msg>>,
 }
 
 #[derive(Clone)]
@@ -117,6 +118,10 @@ impl<Msg: 'static> Cell<Msg> {
 
                 if let Some(msg) = model.click_handler {
                     element.add_event_handler(mouse_ev(Ev::Click, move |event| msg(event)));
+                }
+
+                if let Some(msg) = model.scroll_handler {
+                    element.add_event_handler(ev(Ev::Scroll, move |event| msg(event)));
                 }
 
                 if let Some(screen_pos) = model.screen_pos {
@@ -251,6 +256,24 @@ impl<Msg: 'static> Cell<Msg> {
             }
         }
     }
+    pub fn on_scroll(self, msg: impl FnOnce(Event) -> Msg + Clone + 'static) -> Cell<Msg> {
+        self.on_scroll_helper(Some(msg))
+    }
+    fn on_scroll_helper(
+        self,
+        maybe_msg: Option<impl FnOnce(Event) -> Msg + Clone + 'static>,
+    ) -> Cell<Msg> {
+        match self {
+            Cell::None => Cell::None,
+            Cell::Model(mut model) => match maybe_msg {
+                Some(msg) => {
+                    model.scroll_handler = Some(Rc::new(move |event| msg.clone()(event)));
+                    Cell::Model(model)
+                }
+                None => Cell::Model(model),
+            },
+        }
+    }
 
     pub fn with_img_src(self, source: String) -> Cell<Msg> {
         match self {
@@ -298,6 +321,7 @@ impl<Msg: 'static> Cell<Msg> {
             click_handler: None,
             as_img: None,
             screen_pos: None,
+            scroll_handler: None,
         })
     }
 
@@ -338,11 +362,17 @@ impl<Msg: 'static> Cell<Msg> {
                     move |event| msg_mapper(msg(event))
                 });
 
+                let new_on_scroll = model.scroll_handler.map(|msg| {
+                    let msg_mapper = f.clone();
+                    move |event| msg_mapper(msg(event))
+                });
+
                 Cell::new(model.styles, new_children, model.tag_name)
                     .on_mouse_down_helper(new_on_mouse_down)
                     .on_mouse_up_helper(new_on_mouse_up)
                     .on_mouse_move_helper(new_on_mouse_move)
                     .on_click_helper(new_on_click)
+                    .on_scroll_helper(new_on_scroll)
                     .at_screen_pos_helper(model.screen_pos)
             }
         }
@@ -359,6 +389,7 @@ impl<Msg: 'static> Cell<Msg> {
             click_handler: None,
             as_img: None,
             screen_pos: None,
+            scroll_handler: None,
         })
     }
 }

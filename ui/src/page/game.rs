@@ -41,7 +41,7 @@ use shared::unit::place::UnitPlace;
 use shared::unit::{Unit, UnitId};
 use shared::{game, located, tile};
 use std::collections::{HashMap, HashSet};
-use web_sys::KeyboardEvent;
+use web_sys::{EventTarget, KeyboardEvent};
 
 ///////////////////////////////////////////////////////////////
 // Helpers //
@@ -252,6 +252,7 @@ pub enum Msg {
     MovingFlyout(mode::moving::Msg),
     EnterPressed,
     EscapePressed,
+    ScrolledCanvasContainer,
 }
 
 ///////////////////////////////////////////////////////////////
@@ -281,7 +282,7 @@ pub fn init(
         height_fl: game_pixel_height as f64,
     };
 
-    let game_x = (window_size.width / 2.0) - (game_pixel_width as f64) + 192.0;
+    let game_x = (window_size.width / 2.0) - (game_pixel_width as f64);
 
     let game_y = (window_size.height / 2.0) - (game_pixel_height as f64);
 
@@ -551,6 +552,9 @@ pub fn update(
                 Stage::AnimatingMoves(_) => {}
             }
         }
+        Msg::ScrolledCanvasContainer => {
+            log!("Scroll");
+        }
     }
 }
 
@@ -722,7 +726,7 @@ fn refetch_game(
                 let visibility =
                     calculate_player_visibility(viewer_id, &model.game.map, &indices.by_id);
 
-                let sub_model = stage::animating_moves::Model::init(
+                let sub_model = animating_moves::Model::init(
                     indices.clone(),
                     animations,
                     visibility,
@@ -768,7 +772,6 @@ fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl 
         .collect();
 
     let mut rng = global.new_rand_gen();
-    log!(req_moves);
     game::action::order(&mut rng, &mut req_moves);
 
     let req_changes: Vec<game::Change> = model
@@ -1359,7 +1362,25 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                     );
 
                 draw_units_move(maybe_units_move);
-                draw_passender_units_moves(unit_id);
+
+                if let Some(loaded_units) = indices.by_transport.get(unit_id) {
+                    let _ = ctx
+                        .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+                            sheet,
+                            MISC_SPRITE_SHEET_COLUMN,
+                            26.0 * tile::PIXEL_WIDTH_FL,
+                            tile::PIXEL_WIDTH_FL,
+                            tile::PIXEL_HEIGHT_FL,
+                            x,
+                            y,
+                            tile::PIXEL_WIDTH_FL,
+                            tile::PIXEL_HEIGHT_FL,
+                        );
+
+                    for (loaded_unit_id, _) in loaded_units {
+                        draw_units_move(model.get_units_move(loaded_unit_id));
+                    }
+                };
             } else {
                 let mut colors = HashSet::new();
 
@@ -1473,7 +1494,17 @@ pub fn view(global: &global::Model, model: &Model) -> Vec<Cell<Msg>> {
             click_screen(model),
             flyout_view(model),
         ],
-    );
+    )
+    .on_scroll(|event| {
+        // let scroll_event:  = event.unchecked_into();
+        event.target().map(|target| {
+            let t: EventTarget = target;
+            // log!(t)
+        });
+        // log!(event.offset_x());
+
+        Msg::ScrolledCanvasContainer
+    });
 
     vec![
         sidebar_view(global, model),

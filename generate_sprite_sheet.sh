@@ -154,6 +154,7 @@ cp ./shared/src/sprites/units/tank_blue1.png ./server/src/assets/tank_blue.png
     ./shared/src/sprites/arrow_left_turn_down_moved.aseprite \
     ./shared/src/sprites/hills_tile.aseprite \
     ./shared/src/sprites/forest_tile.aseprite \
+    ./shared/src/sprites/loaded_indicator.aseprite \
   --sheet ./shared/src/sprites/misc_sheet.png
 
 /Applications/Aseprite.app/Contents/MacOS/aseprite \
