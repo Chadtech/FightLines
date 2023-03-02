@@ -22,7 +22,7 @@ use seed::prelude::{
     cmds, el_ref, streams, At, El, ElRef, Ev, IndexMap, JsCast, Node, Orders, St, StreamHandle,
     ToClasses, UpdateEl,
 };
-use seed::{attrs, canvas, log, style, C};
+use seed::{attrs, canvas, style, C};
 use shared::api::endpoint::Endpoint;
 use shared::api::game::submit_turn;
 use shared::arrow::Arrow;
@@ -41,7 +41,7 @@ use shared::unit::place::UnitPlace;
 use shared::unit::{Unit, UnitId};
 use shared::{game, located, tile};
 use std::collections::{HashMap, HashSet};
-use web_sys::{EventTarget, KeyboardEvent};
+use web_sys::KeyboardEvent;
 
 ///////////////////////////////////////////////////////////////
 // Helpers //
@@ -92,6 +92,7 @@ pub struct Model {
     assets: assets::Model,
     game_pixel_size: GamePixelSize,
     game_pos: Point<i16>,
+    scroll_pos: Point<i16>,
     handle_minimum_framerate_timeout: CmdHandle,
     handle_game_reload_timeout: Option<CmdHandle>,
     frame_count: FrameCount,
@@ -102,6 +103,7 @@ pub struct Model {
     stage: Stage,
     dialog: Option<Dialog>,
     status: Status,
+    #[allow(dead_code)]
     key_press_stream: StreamHandle,
 }
 
@@ -252,7 +254,7 @@ pub enum Msg {
     MovingFlyout(mode::moving::Msg),
     EnterPressed,
     EscapePressed,
-    ScrolledCanvasContainer,
+    ScrolledCanvasContainer(Result<Point<i16>, String>),
 }
 
 ///////////////////////////////////////////////////////////////
@@ -282,7 +284,7 @@ pub fn init(
         height_fl: game_pixel_height as f64,
     };
 
-    let game_x = (window_size.width / 2.0) - (game_pixel_width as f64);
+    let game_x = ((window_size.width - 384.0) / 2.0) - (game_pixel_width as f64);
 
     let game_y = (window_size.height / 2.0) - (game_pixel_height as f64);
 
@@ -359,6 +361,7 @@ pub fn init(
             x: game_x as i16,
             y: game_y as i16,
         },
+        scroll_pos: Point { x: 0, y: 0 },
         handle_minimum_framerate_timeout: wait_for_render_timeout(orders),
         handle_game_reload_timeout: None,
         frame_count: FrameCount::F1,
@@ -375,11 +378,11 @@ pub fn init(
     Ok(model)
 }
 
-fn click_pos_to_game_pos(page_pos: Point<i16>, model: &Model) -> Point<i16> {
-    let x_on_game = page_pos.x - model.game_pos.x;
+fn mouse_screen_pos_to_game_pos(page_pos: Point<i16>, model: &Model) -> Point<i16> {
+    let x_on_game = page_pos.x + model.scroll_pos.x - model.game_pos.x - 384;
     let x = x_on_game / ((tile::PIXEL_WIDTH * 2) as i16);
 
-    let y_on_game = page_pos.y - model.game_pos.y;
+    let y_on_game = page_pos.y + model.scroll_pos.y - model.game_pos.y;
     let y = y_on_game / ((tile::PIXEL_HEIGHT * 2) as i16);
 
     Point { x, y }
@@ -407,7 +410,7 @@ pub fn update(
                 handle_click_on_screen_during_turn(
                     global,
                     model,
-                    click_pos_to_game_pos(page_pos, model),
+                    mouse_screen_pos_to_game_pos(page_pos, model),
                 );
             }
         }
@@ -552,8 +555,10 @@ pub fn update(
                 Stage::AnimatingMoves(_) => {}
             }
         }
-        Msg::ScrolledCanvasContainer => {
-            log!("Scroll");
+        Msg::ScrolledCanvasContainer(pos_result) => {
+            if let Ok(pos) = pos_result {
+                model.scroll_pos = pos;
+            }
         }
     }
 }
@@ -635,7 +640,7 @@ fn handle_unit_selected_sidebar_msg(
 }
 
 fn handle_mouse_move_on_screen(model: &mut Model, page_pos: Point<i16>) -> Result<(), Error> {
-    let Point { x, y } = click_pos_to_game_pos(page_pos, model);
+    let Point { x, y } = mouse_screen_pos_to_game_pos(page_pos, model);
 
     model.mouse_game_position = if x < 0
         || y < 0
@@ -1495,15 +1500,26 @@ pub fn view(global: &global::Model, model: &Model) -> Vec<Cell<Msg>> {
             flyout_view(model),
         ],
     )
-    .on_scroll(|event| {
-        // let scroll_event:  = event.unchecked_into();
-        event.target().map(|target| {
-            let t: EventTarget = target;
-            // log!(t)
-        });
-        // log!(event.offset_x());
+    .with_html_id(CANVAS_CONTAINER_HTML_ID)
+    .on_scroll(|_| {
+        let maybe_pos: Option<Point<i16>> = seed::document()
+            .get_element_by_id(CANVAS_CONTAINER_HTML_ID)
+            .map(|el| {
+                let scroll_top = el.scroll_top() as i16;
+                let scroll_left = el.scroll_left() as i16;
 
-        Msg::ScrolledCanvasContainer
+                Point {
+                    x: scroll_left,
+                    y: scroll_top,
+                }
+            });
+
+        let pos_result = match maybe_pos {
+            None => Err("could not find canvas container element".to_string()),
+            Some(pos) => Ok(pos),
+        };
+
+        Msg::ScrolledCanvasContainer(pos_result)
     });
 
     vec![
@@ -1514,6 +1530,8 @@ pub fn view(global: &global::Model, model: &Model) -> Vec<Cell<Msg>> {
         dialog_view(model),
     ]
 }
+
+const CANVAS_CONTAINER_HTML_ID: &str = "canvases_container";
 
 fn mode_canvas_cell(model: &Model) -> Cell<Msg> {
     Cell::from_html(

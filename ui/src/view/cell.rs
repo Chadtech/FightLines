@@ -29,6 +29,7 @@ pub struct Model<Msg> {
     as_img: Option<String>,
     screen_pos: Option<Point<i16>>,
     scroll_handler: Option<Rc<dyn Fn(Event) -> Msg>>,
+    html_id: Option<&'static str>,
 }
 
 #[derive(Clone)]
@@ -136,7 +137,26 @@ impl<Msg: 'static> Cell<Msg> {
                     element.add_attr(Cow::Borrowed("style"), style_str);
                 }
 
+                if let Some(html_id) = model.html_id {
+                    element.add_attr(Cow::Borrowed("id"), html_id);
+                }
+
                 Node::Element(element)
+            }
+        }
+    }
+
+    pub fn with_html_id(self, html_id: &'static str) -> Cell<Msg> {
+        self.with_html_id_helper(Some(html_id))
+    }
+
+    fn with_html_id_helper(self, html_id: Option<&'static str>) -> Cell<Msg> {
+        match self {
+            Cell::None => Cell::None,
+
+            Cell::Model(mut model) => {
+                model.html_id = html_id;
+                Cell::Model(model)
             }
         }
     }
@@ -322,6 +342,7 @@ impl<Msg: 'static> Cell<Msg> {
             as_img: None,
             screen_pos: None,
             scroll_handler: None,
+            html_id: None,
         })
     }
 
@@ -374,6 +395,7 @@ impl<Msg: 'static> Cell<Msg> {
                     .on_click_helper(new_on_click)
                     .on_scroll_helper(new_on_scroll)
                     .at_screen_pos_helper(model.screen_pos)
+                    .with_html_id_helper(model.html_id)
             }
         }
     }
@@ -390,6 +412,7 @@ impl<Msg: 'static> Cell<Msg> {
             as_img: None,
             screen_pos: None,
             scroll_handler: None,
+            html_id: None,
         })
     }
 }

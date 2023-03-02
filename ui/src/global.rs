@@ -41,6 +41,7 @@ pub struct Model {
     handle_localstorage_save_timeout: CmdHandle,
 
     // Streams
+    #[allow(dead_code)]
     window_resize_stream: StreamHandle,
 }
 
