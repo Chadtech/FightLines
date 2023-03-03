@@ -22,7 +22,7 @@ use seed::prelude::{
     cmds, el_ref, streams, At, El, ElRef, Ev, IndexMap, JsCast, Node, Orders, St, StreamHandle,
     ToClasses, UpdateEl,
 };
-use seed::{attrs, canvas, style, C};
+use seed::{attrs, canvas, div, style, C};
 use shared::api::endpoint::Endpoint;
 use shared::api::game::submit_turn;
 use shared::arrow::Arrow;
@@ -40,6 +40,7 @@ use shared::tile::Tile;
 use shared::unit::place::UnitPlace;
 use shared::unit::{Unit, UnitId};
 use shared::{game, located, tile};
+use std::cmp;
 use std::collections::{HashMap, HashSet};
 use web_sys::KeyboardEvent;
 
@@ -284,9 +285,15 @@ pub fn init(
         height_fl: game_pixel_height as f64,
     };
 
-    let game_x = ((window_size.width - 384.0) / 2.0) - (game_pixel_width as f64);
+    let game_x = cmp::max(
+        0,
+        (((window_size.width - 384.0) / 2.0) - (game_pixel_width as f64)) as i16,
+    );
 
-    let game_y = (window_size.height / 2.0) - (game_pixel_height as f64);
+    let game_y = cmp::max(
+        0,
+        ((window_size.height / 2.0) - (game_pixel_height as f64)) as i16,
+    );
 
     orders.after_next_render(|_| Msg::RenderedFirstTime);
     let key_press_stream = orders.stream_with_handle(streams::window_event(Ev::KeyUp, |event| {
@@ -358,8 +365,8 @@ pub fn init(
         cursor_canvas: ElRef::<HtmlCanvasElement>::default(),
         assets,
         game_pos: Point {
-            x: game_x as i16,
-            y: game_y as i16,
+            x: game_x,
+            y: game_y,
         },
         scroll_pos: Point { x: 0, y: 0 },
         handle_minimum_framerate_timeout: wait_for_render_timeout(orders),
@@ -1578,11 +1585,7 @@ fn map_canvas_cell(model: &Model) -> Cell<Msg> {
 
 fn game_canvas(model: &Model, r: &ElRef<HtmlCanvasElement>, html_id: String) -> Node<Msg> {
     canvas![
-        C![
-            Style::Absolute.css_classes().concat(),
-            // Style::W512px.css_classes().concat(),
-            // Style::H512px.css_classes().concat()
-        ],
+        C![Style::Absolute.css_classes().concat()],
         attrs! {
             At::Width => px_u16(model.game_pixel_size.width).as_str(),
             At::Height => px_u16(model.game_pixel_size.height).as_str()
@@ -1619,35 +1622,39 @@ fn click_screen(model: &Model) -> Cell<Msg> {
         Style::CursorNone
     };
 
-    Cell::group(
-        vec![
-            Style::Absolute,
-            Style::Left0,
-            Style::Right0,
-            Style::Top0,
-            Style::Bottom0,
-            cursor_style,
-        ],
-        vec![],
-    )
-    .on_mouse_down(|event| {
-        Msg::MouseDownOnScreen(Point {
-            x: event.page_x() as i16,
-            y: event.page_y() as i16,
+    let screen: Node<Msg> = div![
+        C![Style::Absolute.css_classes().concat()],
+        attrs! {
+            At::Width => px_u16(model.game_pixel_size.width).as_str(),
+            At::Height => px_u16(model.game_pixel_size.height).as_str()
+        },
+        style! {
+            St::Left => px_i16(model.game_pos.x).as_str(),
+            St::Top => px_i16(model.game_pos.y).as_str(),
+            St::Width => px_u16(model.game_pixel_size.width * 2).as_str(),
+            St::Height => px_u16(model.game_pixel_size.height * 2).as_str()
+        },
+    ];
+
+    Cell::from_html(vec![cursor_style], vec![screen])
+        .on_mouse_down(|event| {
+            Msg::MouseDownOnScreen(Point {
+                x: event.page_x() as i16,
+                y: event.page_y() as i16,
+            })
         })
-    })
-    .on_mouse_up(|event| {
-        Msg::MouseUpOnScreen(Point {
-            x: event.page_x() as i16,
-            y: event.page_y() as i16,
+        .on_mouse_up(|event| {
+            Msg::MouseUpOnScreen(Point {
+                x: event.page_x() as i16,
+                y: event.page_y() as i16,
+            })
         })
-    })
-    .on_mouse_move(|event| {
-        Msg::MouseMoveOnScreen(Point {
-            x: event.page_x() as i16,
-            y: event.page_y() as i16,
+        .on_mouse_move(|event| {
+            Msg::MouseMoveOnScreen(Point {
+                x: event.page_x() as i16,
+                y: event.page_y() as i16,
+            })
         })
-    })
 }
 
 fn sidebar_view(global: &global::Model, model: &Model) -> Cell<Msg> {
