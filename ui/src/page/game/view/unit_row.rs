@@ -2,7 +2,7 @@ use crate::page::game::action::Action;
 use crate::style::Style;
 use crate::view::cell::Cell;
 use shared::api::endpoint::Endpoint;
-use shared::game::UnitModel;
+use shared::unit;
 use shared::unit::UnitId;
 use std::collections::HashMap;
 
@@ -21,7 +21,7 @@ pub enum Msg {
 
 pub fn view(
     unit_id: &UnitId,
-    unit_model: &UnitModel,
+    unit_model: &unit::Model,
     moves_index: &HashMap<UnitId, Action>,
 ) -> Cell<Msg> {
     let label = unit_model

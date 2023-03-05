@@ -9,7 +9,6 @@ use crate::game::unit_index::Indices;
 use crate::game::FromLobbyError::CouldNotFindInitialMapMilitary;
 use crate::id::Id;
 use crate::lobby::{Lobby, LobbyId};
-use crate::located;
 use crate::located::Located;
 use crate::map::{Map, MapOpt};
 use crate::owner::Owned;
@@ -17,8 +16,8 @@ use crate::path::Path;
 use crate::player::Player;
 use crate::rng::{RandGen, RandSeed};
 use crate::team_color::TeamColor;
-use crate::unit::place::UnitPlace;
-use crate::unit::{Unit, UnitId};
+use crate::unit::{Place, Unit, UnitId};
+use crate::{located, unit};
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::Iter;
 use std::collections::{HashMap, HashSet};
@@ -105,16 +104,6 @@ pub enum Outcome {
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct UnitModel {
-    pub unit: Unit,
-    pub place: UnitPlace,
-    pub owner: Id,
-    pub color: TeamColor,
-    pub name: Option<String>,
-    pub supplies: u16,
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct Guest {
     player: Player,
     visibility: HashSet<Located<()>>,
@@ -137,24 +126,24 @@ pub enum FromLobbyError {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl Game {
-    pub fn get_mut_unit(&mut self, unit_id: &UnitId) -> Option<&mut UnitModel> {
+    pub fn get_mut_unit(&mut self, unit_id: &UnitId) -> Option<&mut unit::Model> {
         self.indices.by_id.get_mut(unit_id)
     }
-    pub fn units_by_id(&mut self) -> &mut HashMap<UnitId, UnitModel> {
+    pub fn units_by_id(&mut self) -> &mut HashMap<UnitId, unit::Model> {
         &mut self.indices.by_id
     }
-    pub fn get_unit(&self, unit_id: &UnitId) -> Option<&UnitModel> {
+    pub fn get_unit(&self, unit_id: &UnitId) -> Option<&unit::Model> {
         self.indices.by_id.get(unit_id)
     }
     pub fn units_by_location(
         &self,
-    ) -> Iter<'_, Located<()>, Vec<(UnitId, FacingDirection, UnitModel)>> {
+    ) -> Iter<'_, Located<()>, Vec<(UnitId, FacingDirection, unit::Model)>> {
         self.indices.by_location.iter()
     }
-    pub fn get_units_by_transport(&self, unit_id: &UnitId) -> Option<&Vec<(UnitId, UnitModel)>> {
+    pub fn get_units_by_transport(&self, unit_id: &UnitId) -> Option<&Vec<(UnitId, unit::Model)>> {
         self.indices.by_transport.get(unit_id)
     }
-    pub fn get_units_by_player_id(&self, player_id: &Id) -> Option<&Vec<(UnitId, UnitModel)>> {
+    pub fn get_units_by_player_id(&self, player_id: &Id) -> Option<&Vec<(UnitId, unit::Model)>> {
         self.indices.by_player.get(player_id)
     }
     pub fn transport_index(&self) -> &unit_index::by_transport::Index {
@@ -169,7 +158,7 @@ impl Game {
         owner_id: Id,
         carrying_unit: &Unit,
         mouse_loc: &Located<()>,
-    ) -> Option<Vec<(UnitId, UnitModel)>> {
+    ) -> Option<Vec<(UnitId, unit::Model)>> {
         match self.indices.by_location.get(mouse_loc) {
             Some(units) => {
                 let rideable_units = units
@@ -183,7 +172,7 @@ impl Game {
                             None
                         }
                     })
-                    .collect::<Vec<(UnitId, UnitModel)>>();
+                    .collect::<Vec<(UnitId, unit::Model)>>();
 
                 if rideable_units.is_empty() {
                     None
@@ -315,7 +304,7 @@ impl Game {
                                 FacingDirection::from_directions(path.clone().to_directions())
                                     .unwrap_or(facing_dir);
 
-                            unit.place = UnitPlace::OnMap(Located {
+                            unit.place = Place::OnMap(Located {
                                 x: loc_dir.x,
                                 y: loc_dir.y,
                                 value: new_facing_dir,
@@ -334,7 +323,7 @@ impl Game {
                     ..
                 } => {
                     if let Some(unit) = self.get_mut_unit(&unit_id) {
-                        unit.place = UnitPlace::InUnit(loaded_into.clone());
+                        unit.place = Place::InUnit(loaded_into.clone());
                     }
                 }
             }
@@ -418,21 +407,21 @@ impl Game {
                 let mut id_units = |units: Vec<Located<(FacingDirection, Unit)>>,
                                     owner_id: &Id,
                                     color: &TeamColor|
-                 -> Vec<(UnitId, UnitModel)> {
-                    let mut units_with_ids: Vec<(UnitId, UnitModel)> = vec![];
+                 -> Vec<(UnitId, unit::Model)> {
+                    let mut units_with_ids: Vec<(UnitId, unit::Model)> = vec![];
 
                     for located_unit in units {
                         let unit_id = UnitId::new(rng);
 
                         let (facing, unit) = located_unit.value;
 
-                        let place: UnitPlace = UnitPlace::OnMap(Located {
+                        let place: Place = Place::OnMap(Located {
                             x: located_unit.x,
                             y: located_unit.y,
                             value: facing,
                         });
 
-                        let new_unit: UnitModel = UnitModel {
+                        let new_unit: unit::Model = unit::Model {
                             unit: unit.clone(),
                             owner: owner_id.clone(),
                             place,
@@ -447,7 +436,7 @@ impl Game {
                     units_with_ids
                 };
 
-                let mut remaining_guests_with_militaries: Vec<(UnitId, UnitModel)> = vec![];
+                let mut remaining_guests_with_militaries: Vec<(UnitId, unit::Model)> = vec![];
 
                 for (index, (guest_id, guest)) in rest.iter().enumerate() {
                     let initial_military = initial_militaries
@@ -475,14 +464,14 @@ impl Game {
                     &first_guest.color,
                 );
 
-                let units: Vec<(UnitId, UnitModel)> = vec![
+                let units: Vec<(UnitId, unit::Model)> = vec![
                     vec![host_units, first_guest_units].concat().to_vec(),
                     remaining_guests_with_militaries,
                 ]
                 .concat()
                 .to_vec();
 
-                let mut unit_hashmap: HashMap<UnitId, UnitModel> = HashMap::new();
+                let mut unit_hashmap: HashMap<UnitId, unit::Model> = HashMap::new();
 
                 for (unit_id, unit) in units {
                     unit_hashmap.insert(unit_id, unit);
@@ -698,7 +687,7 @@ impl Game {
     pub fn get_units_by_location(
         &self,
         key: &Located<()>,
-    ) -> Option<&Vec<(UnitId, FacingDirection, UnitModel)>> {
+    ) -> Option<&Vec<(UnitId, FacingDirection, unit::Model)>> {
         self.indices.by_location.get(key)
     }
 
@@ -710,13 +699,13 @@ impl Game {
 pub fn calculate_player_visibility(
     player_id: &Id,
     map: &Map,
-    units: &HashMap<UnitId, UnitModel>,
+    units: &HashMap<UnitId, unit::Model>,
 ) -> HashSet<Located<()>> {
     let mut visible_spots = HashSet::new();
 
     for unit in units.values() {
         if &unit.owner == player_id {
-            if let UnitPlace::OnMap(loc) = &unit.place {
+            if let Place::OnMap(loc) = &unit.place {
                 let budget = unit.unit.visibility_budget();
 
                 let mut search: HashMap<Located<()>, f32> = HashMap::new();

@@ -37,8 +37,7 @@ use shared::path::Path;
 use shared::point::Point;
 use shared::team_color::TeamColor;
 use shared::tile::Tile;
-use shared::unit::place::UnitPlace;
-use shared::unit::{Unit, UnitId};
+use shared::unit::{Place, Unit, UnitId};
 use shared::{game, located, tile};
 use std::cmp;
 use std::collections::{HashMap, HashSet};
@@ -155,8 +154,8 @@ impl Model {
             path,
             arrows: arrows.to_owned(),
             dismounted_from: match &unit.place {
-                UnitPlace::OnMap(_) => None,
-                UnitPlace::InUnit(transport_id) => Some(transport_id.clone()),
+                Place::OnMap(_) => None,
+                Place::InUnit(transport_id) => Some(transport_id.clone()),
             },
         };
 
@@ -883,8 +882,8 @@ fn handle_click_on_screen_when_move_mode(
         };
 
         let unit_pos = match &unit.place {
-            UnitPlace::OnMap(loc) => Some(loc.to_unit()),
-            UnitPlace::InUnit(_) => None,
+            Place::OnMap(loc) => Some(loc.to_unit()),
+            Place::InUnit(_) => None,
         };
 
         // If the user clicks back on the unit we should

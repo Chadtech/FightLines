@@ -1,13 +1,40 @@
 pub mod action;
-pub mod place;
 
+use crate::facing_direction::FacingDirection;
 use crate::id::Id;
+use crate::located::Located;
 use crate::rng::RandGen;
+use crate::team_color::TeamColor;
 use serde::{Deserialize, Serialize};
 
 ///////////////////////////////////////////////////////////////
 // Types
 ///////////////////////////////////////////////////////////////
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct Model {
+    pub unit: Unit,
+    pub place: Place,
+    pub owner: Id,
+    pub color: TeamColor,
+    pub name: Option<String>,
+    pub supplies: u16,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub enum Place {
+    OnMap(Located<FacingDirection>),
+    InUnit(UnitId),
+}
+
+impl Place {
+    pub fn is_on_map(&self) -> bool {
+        match self {
+            Place::OnMap(_) => true,
+            Place::InUnit(_) => false,
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Debug)]
 pub struct UnitId(Id);

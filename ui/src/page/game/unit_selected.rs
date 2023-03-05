@@ -5,9 +5,9 @@ use crate::style::Style;
 use crate::view::button::Button;
 use crate::view::cell::Cell;
 use crate::view::text_field::TextField;
-use shared::game;
-use shared::game::{Game, UnitModel};
+use shared::game::Game;
 use shared::unit::UnitId;
+use shared::{game, unit};
 use std::collections::HashMap;
 
 ///////////////////////////////////////////////////////////////
@@ -48,7 +48,7 @@ pub enum Msg {
 pub fn sidebar_content(
     model: &Model,
     transport_index: &game::unit_index::by_transport::Index,
-    unit_model: &UnitModel,
+    unit_model: &unit::Model,
     moves_index: &HashMap<UnitId, Action>,
     game: &Game,
 ) -> Vec<Cell<Msg>> {

@@ -3,12 +3,12 @@ use crate::view::cell::Cell;
 use shared::facing_direction::FacingDirection;
 use shared::game::day::Time;
 use shared::game::unit_index::Indices;
-use shared::game::{calculate_player_visibility, unit_index, UnitModel};
+use shared::game::{calculate_player_visibility, unit_index};
 use shared::id::Id;
 use shared::located::Located;
 use shared::map::Map;
-use shared::unit::place::UnitPlace;
-use shared::unit::UnitId;
+use shared::unit;
+use shared::unit::{Place, UnitId};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug)]
@@ -62,14 +62,14 @@ impl Model {
                                 y: step.y,
                                 value: step.value.to_facing_dir().unwrap_or(facing_dir),
                             };
-                            unit.place = UnitPlace::OnMap(loc);
+                            unit.place = Place::OnMap(loc);
 
                             self.indices.by_location =
                                 unit_index::by_location::make(&self.indices.by_id);
                         }
                         None => {
                             if let Some(transport_id) = loads_into {
-                                unit.place = UnitPlace::InUnit(transport_id.clone());
+                                unit.place = Place::InUnit(transport_id.clone());
                             }
 
                             self.indices.by_location =
@@ -94,7 +94,7 @@ impl Model {
 }
 
 pub fn sidebar_view<Msg: 'static>(
-    unit_index: &HashMap<UnitId, UnitModel>,
+    unit_index: &HashMap<UnitId, unit::Model>,
     model: &Model,
 ) -> Vec<Cell<Msg>> {
     match model.animations.first() {
