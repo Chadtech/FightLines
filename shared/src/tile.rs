@@ -25,6 +25,7 @@ impl Tile {
                 Unit::Infantry => 1.5,
                 Unit::Tank => 2.5,
                 Unit::Truck => 4.0,
+                Unit::SupplyCrate => 512.0,
             },
         }
     }

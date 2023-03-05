@@ -111,6 +111,7 @@ pub struct UnitModel {
     pub owner: Id,
     pub color: TeamColor,
     pub name: Option<String>,
+    pub supplies: u16,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -432,11 +433,12 @@ impl Game {
                         });
 
                         let new_unit: UnitModel = UnitModel {
-                            unit,
+                            unit: unit.clone(),
                             owner: owner_id.clone(),
                             place,
                             color: color.clone(),
                             name: None,
+                            supplies: unit.max_supplies(),
                         };
 
                         units_with_ids.push((unit_id, new_unit));

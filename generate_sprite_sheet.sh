@@ -17,6 +17,12 @@
   --palette ./shared/src/sprites/palette_blue.aseprite \
   --save-as ./shared/src/sprites/units/truck_blue.aseprite
 
+/Applications/Aseprite.app/Contents/MacOS/aseprite \
+  -b \
+  ./shared/src/sprites/units/supply_crate_red.aseprite \
+  --palette ./shared/src/sprites/palette_blue.aseprite \
+  --save-as ./shared/src/sprites/units/supply_crate_blue.aseprite
+
 # Make moved units
 /Applications/Aseprite.app/Contents/MacOS/aseprite \
   -b \
@@ -95,6 +101,8 @@ cp ./shared/src/sprites/units/tank_blue1.png ./server/src/assets/tank_blue.png
   --oneframe \
   ./shared/src/sprites/units/truck_blue.aseprite \
   --save-as ./shared/src/sprites/units/truck_blue.png
+cp ./shared/src/sprites/units/tank_blue1.png ./server/src/assets/truck_blue.png
+
 
 # Units
 /Applications/Aseprite.app/Contents/MacOS/aseprite \
@@ -105,6 +113,8 @@ cp ./shared/src/sprites/units/tank_blue1.png ./server/src/assets/tank_blue.png
     ./shared/src/sprites/units/tank_blue.aseprite \
     ./shared/src/sprites/units/truck_red.aseprite \
     ./shared/src/sprites/units/truck_blue.aseprite \
+    ./shared/src/sprites/units/supply_crate_red.aseprite \
+    ./shared/src/sprites/units/supply_crate_blue.aseprite \
   --sheet ./shared/src/sprites/units_sheet.png
 
 # Moved Units
@@ -116,6 +126,8 @@ cp ./shared/src/sprites/units/tank_blue1.png ./server/src/assets/tank_blue.png
     ./shared/src/sprites/units/tank_blue_moved.aseprite \
     ./shared/src/sprites/units/truck_red_moved.aseprite \
     ./shared/src/sprites/units/truck_blue_moved.aseprite \
+    ./shared/src/sprites/units/supply_crate_red.aseprite \
+    ./shared/src/sprites/units/supply_crate_blue.aseprite \
   --sheet ./shared/src/sprites/unit_moved_sheet.png
 
 # Flags

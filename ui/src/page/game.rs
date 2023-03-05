@@ -1348,6 +1348,7 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                         Unit::Infantry => 0.0,
                         Unit::Tank => 2.0,
                         Unit::Truck => 4.0,
+                        Unit::SupplyCrate => 6.0,
                     };
 
                     if unit_model.color == TeamColor::Blue {
