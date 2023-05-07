@@ -98,7 +98,8 @@ pub enum MapOpt {
 pub struct Militaries {
     pub first_player_military: Vec<Located<(FacingDirection, Unit)>>,
     pub second_player_military: Vec<Located<(FacingDirection, Unit)>>,
-    pub rest_players_miliatries: Vec<Vec<Located<(FacingDirection, Unit)>>>,
+    pub rest_players_militatries: Vec<Vec<Located<(FacingDirection, Unit)>>>,
+    pub non_player_units: Vec<Located<(FacingDirection, Unit)>>,
 }
 
 impl MapOpt {
@@ -140,7 +141,8 @@ impl MapOpt {
                         y: (map.height as u16) - 3,
                     },
                 ],
-                rest_players_miliatries: vec![],
+                rest_players_militatries: vec![],
+                non_player_units: vec![],
             },
             MapOpt::TerrainTest => Militaries {
                 first_player_military: vec![
@@ -197,13 +199,14 @@ impl MapOpt {
                         y: (map.height as u16) - 3,
                     },
                 ],
-                rest_players_miliatries: vec![],
+                rest_players_militatries: vec![],
+                non_player_units: vec![],
             },
         }
     }
 
     pub fn player_count(&self) -> u8 {
-        2 + (self.initial_militaries().rest_players_miliatries.len() as u8)
+        2 + (self.initial_militaries().rest_players_militatries.len() as u8)
     }
 
     pub fn to_map(&self) -> Map {

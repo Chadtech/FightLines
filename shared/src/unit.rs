@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct Model {
     pub unit: Unit,
     pub place: Place,
-    pub owner: Id,
+    pub owner: Option<Id>,
     pub color: TeamColor,
     pub name: Option<String>,
     pub supplies: u16,

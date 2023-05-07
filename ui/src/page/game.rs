@@ -952,7 +952,7 @@ fn handle_click_on_screen_when_no_mode(
     };
     let (first_unit_id, _, unit_model) = first;
 
-    if unit_model.owner != global.viewer_id() {
+    if unit_model.owner != Some(global.viewer_id()) {
         return;
     }
 

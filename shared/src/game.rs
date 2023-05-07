@@ -165,7 +165,11 @@ impl Game {
                     .iter()
                     .filter_map(|(rideable_unit_id, _, possibly_rideable_unit)| {
                         if possibly_rideable_unit.unit.can_carry(carrying_unit)
-                            && possibly_rideable_unit.owner == owner_id
+                            && possibly_rideable_unit
+                                .owner
+                                .clone()
+                                .map(|id| id == owner_id)
+                                .unwrap_or(false)
                         {
                             Some((rideable_unit_id.clone(), possibly_rideable_unit.clone()))
                         } else {
@@ -423,7 +427,7 @@ impl Game {
 
                         let new_unit: unit::Model = unit::Model {
                             unit: unit.clone(),
-                            owner: owner_id.clone(),
+                            owner: Some(owner_id.clone()),
                             place,
                             color: color.clone(),
                             name: None,
@@ -440,12 +444,12 @@ impl Game {
 
                 for (index, (guest_id, guest)) in rest.iter().enumerate() {
                     let initial_military = initial_militaries
-                        .rest_players_miliatries
+                        .rest_players_militatries
                         .get(index)
                         .ok_or(CouldNotFindInitialMapMilitary {
-                            required_player_count: map_choice.player_count(),
-                            found_player_count: num_players,
-                        })?;
+                        required_player_count: map_choice.player_count(),
+                        found_player_count: num_players,
+                    })?;
 
                     let mut military = id_units(initial_military.clone(), guest_id, &guest.color);
 
@@ -703,8 +707,15 @@ pub fn calculate_player_visibility(
 ) -> HashSet<Located<()>> {
     let mut visible_spots = HashSet::new();
 
+    let player_id = player_id.clone();
+
     for unit in units.values() {
-        if &unit.owner == player_id {
+        if unit
+            .owner
+            .clone()
+            .map(|owner_id| owner_id == player_id)
+            .unwrap_or(false)
+        {
             if let Place::OnMap(loc) = &unit.place {
                 let budget = unit.unit.visibility_budget();
 

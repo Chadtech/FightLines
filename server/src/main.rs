@@ -260,7 +260,15 @@ fn build_frontend() -> Result<(), String> {
                 }
             }
         }
-        Err(err) => Err(err.to_string()),
+        Err(err) => {
+            let mut err_msg = "\n\nError: ".to_string();
+
+            err_msg.push_str(err.to_string().as_str());
+
+            err_msg.push_str("\n\nAre you running fightlines from the server directory?\n\n");
+
+            Err(err_msg)
+        }
     }
 }
 
