@@ -37,6 +37,8 @@ body {
     --problem-2: #651A20;
     --problem-1: #320d10;
 
+    --success-5: #0ACA1A;
+
     --s-neg-7: -128px;
 
     --s-0: 0px;
@@ -317,9 +319,12 @@ a.button {
     background-color: var(--content-4);
 }
 
-
 .bg-important-1 {
     background-color: var(--important-1);
+}
+
+.bg-important-4 {
+    background-color: var(--important-4);
 }
 
 .bg-background-0 {
@@ -354,6 +359,13 @@ a.button {
     background-color: var(--problem-1);
 }
 
+.bg-problem-5 {
+    background-color: var(--problem-5);
+}
+
+.bg-success-5 {
+    background-color: var(--success-5);
+}
 .relative {
     position: relative;
 }

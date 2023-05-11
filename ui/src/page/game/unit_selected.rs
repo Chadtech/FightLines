@@ -5,6 +5,7 @@ use crate::style::Style;
 use crate::view::button::Button;
 use crate::view::cell::Cell;
 use crate::view::text_field::TextField;
+use seed::empty;
 use shared::game::Game;
 use shared::unit::UnitId;
 use shared::{game, unit};
@@ -105,10 +106,48 @@ pub fn sidebar_content(
         None => Cell::none(),
     };
 
+    let supplies_label = Cell::from_str(vec![], "supplies");
+    let supply_view = {
+        let supply_block_num: u16 = {
+            let percent_of_max: u16 = unit_model.supplies / unit_model.unit.max_supplies();
+
+            (((percent_of_max as f32) * 16.0).ceil() as u16)
+        };
+
+        let supply_block_color = if supply_block_num < 5 {
+            Style::BgProblem5
+        } else if supply_block_num < 9 {
+            Style::BgImportant4
+        } else {
+            Style::BgContent4
+        };
+
+        let supply_block = Cell::empty(vec![Style::W4, Style::H4, supply_block_color]);
+
+        let mut supply_blocks = vec![];
+
+        for _ in 0..supply_block_num {
+            supply_blocks.push(supply_block.clone())
+        }
+
+        Cell::group(
+            vec![
+                Style::FlexRow,
+                Style::Inset,
+                Style::BgBackground1,
+                Style::G3,
+                Style::P2,
+            ],
+            supply_blocks,
+        )
+    };
+
     vec![
         back_button_row,
         name_view,
         transporting_label,
         transporting_view,
+        supplies_label,
+        supply_view,
     ]
 }
