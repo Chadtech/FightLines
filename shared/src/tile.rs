@@ -29,6 +29,34 @@ impl Tile {
             },
         }
     }
+
+    pub fn travel_supply_cost(&self, unit: &Unit) -> i16 {
+        let multiplier = 16.0;
+
+        let cost: f32 = match unit {
+            Unit::Infantry => {
+                let infantry_cost = 4.0;
+                match self {
+                    Tile::GrassPlain => infantry_cost,
+                    Tile::Hills => infantry_cost,
+                    Tile::Forest => infantry_cost,
+                }
+            }
+            Unit::Tank => match self {
+                Tile::GrassPlain => 1.0,
+                Tile::Hills => 1.25,
+                Tile::Forest => 1.5,
+            },
+            Unit::Truck => match self {
+                Tile::GrassPlain => 1.0,
+                Tile::Hills => 1.25,
+                Tile::Forest => 1.75,
+            },
+            Unit::SupplyCrate => 0.0,
+        };
+
+        (multiplier * cost).floor() as i16
+    }
 }
 
 pub const PIXEL_WIDTH: u16 = 16;

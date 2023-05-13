@@ -91,11 +91,13 @@ pub enum Outcome {
     Traveled {
         unit_id: UnitId,
         path: Path,
+        supply_cost: u16,
     },
     LoadedInto {
         unit_id: UnitId,
         loaded_into: UnitId,
         path: Path,
+        supply_cost: u16,
     },
     NamedUnit {
         unit_id: UnitId,
@@ -134,6 +136,9 @@ impl Game {
     }
     pub fn get_unit(&self, unit_id: &UnitId) -> Option<&unit::Model> {
         self.indices.by_id.get(unit_id)
+    }
+    pub fn remove_unit(&mut self, unit_id: &UnitId) {
+        self.indices.by_id.remove(unit_id);
     }
     pub fn units_by_location(
         &self,
@@ -295,7 +300,11 @@ impl Game {
     pub fn consume_outcomes(&mut self, outcomes: Vec<Outcome>) -> Result<(), String> {
         for outcome in outcomes {
             match outcome {
-                Outcome::Traveled { unit_id, path } => {
+                Outcome::Traveled {
+                    unit_id,
+                    path,
+                    supply_cost,
+                } => {
                     if let Some(loc_dir) = path.last() {
                         let facing_dir = match self.indices.position_of_unit_or_transport(&unit_id)
                         {
@@ -304,6 +313,8 @@ impl Game {
                         };
 
                         if let Some(unit) = self.get_mut_unit(&unit_id) {
+                            unit.supplies = unit.supplies - (supply_cost as i16);
+
                             let new_facing_dir =
                                 FacingDirection::from_directions(path.clone().to_directions())
                                     .unwrap_or(facing_dir);
@@ -324,9 +335,11 @@ impl Game {
                 Outcome::LoadedInto {
                     unit_id,
                     loaded_into,
+                    supply_cost,
                     ..
                 } => {
                     if let Some(unit) = self.get_mut_unit(&unit_id) {
+                        unit.supplies = unit.supplies - (supply_cost as i16);
                         unit.place = Place::InUnit(loaded_into.clone());
                     }
                 }

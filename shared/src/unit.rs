@@ -18,7 +18,7 @@ pub struct Model {
     pub owner: Option<Id>,
     pub color: TeamColor,
     pub name: Option<String>,
-    pub supplies: u16,
+    pub supplies: i16,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -102,7 +102,7 @@ impl Unit {
         }
     }
 
-    pub fn max_supplies(&self) -> u16 {
+    pub fn max_supplies(&self) -> i16 {
         match self {
             Unit::Infantry => 1024,
             Unit::Tank => 3072,
