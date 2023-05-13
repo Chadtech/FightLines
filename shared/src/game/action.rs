@@ -133,16 +133,17 @@ mod test_game_actions {
         let mut actions = vec![
             Action::Traveled {
                 unit_id: truck_id.clone(),
-                path: Path::from_directions(
+                path: Path::from_directions_test_only(
                     &located::unit(5, 5),
                     &vec![Direction::East, Direction::East, Direction::East],
                 ),
                 dismounted_from: None,
+                supply_cost: 48.0,
             },
             Action::LoadInto {
                 unit_id: infantry_id.clone(),
                 load_into: truck_id.clone(),
-                path: Path::from_directions(
+                path: Path::from_directions_test_only(
                     &located::unit(3, 5),
                     &vec![Direction::East, Direction::East],
                 ),
@@ -157,14 +158,14 @@ mod test_game_actions {
                 Action::LoadInto {
                     unit_id: infantry_id.clone(),
                     load_into: truck_id.clone(),
-                    path: Path::from_directions(
+                    path: Path::from_directions_test_only(
                         &located::unit(3, 5),
                         &vec![Direction::East, Direction::East],
                     ),
                 },
                 Action::Traveled {
                     unit_id: truck_id.clone(),
-                    path: Path::from_directions(
+                    path: Path::from_directions_test_only(
                         &located::unit(5, 5),
                         &vec![Direction::East, Direction::East, Direction::East],
                     ),
@@ -187,7 +188,7 @@ mod test_game_actions {
         let mut actions = vec![
             Action::Traveled {
                 unit_id: truck_2_id.clone(),
-                path: Path::from_directions(
+                path: Path::from_directions_test_only(
                     &located::unit(10, 10),
                     &vec![Direction::East, Direction::East, Direction::East],
                 ),
@@ -195,7 +196,7 @@ mod test_game_actions {
             },
             Action::Traveled {
                 unit_id: truck_1_id.clone(),
-                path: Path::from_directions(
+                path: Path::from_directions_test_only(
                     &located::unit(5, 5),
                     &vec![Direction::East, Direction::East, Direction::East],
                 ),
@@ -204,7 +205,7 @@ mod test_game_actions {
             Action::LoadInto {
                 unit_id: infantry_1_id.clone(),
                 load_into: truck_1_id.clone(),
-                path: Path::from_directions(
+                path: Path::from_directions_test_only(
                     &located::unit(3, 5),
                     &vec![Direction::East, Direction::East],
                 ),
@@ -212,7 +213,7 @@ mod test_game_actions {
             Action::LoadInto {
                 unit_id: infantry_2_id.clone(),
                 load_into: truck_2_id.clone(),
-                path: Path::from_directions(
+                path: Path::from_directions_test_only(
                     &located::unit(8, 10),
                     &vec![Direction::East, Direction::East],
                 ),
@@ -228,14 +229,14 @@ mod test_game_actions {
                     Action::LoadInto {
                         unit_id: infantry_1_id.clone(),
                         load_into: truck_1_id.clone(),
-                        path: Path::from_directions(
+                        path: Path::from_directions_test_only(
                             &located::unit(3, 5),
                             &vec![Direction::East, Direction::East],
                         ),
                     },
                     Action::Traveled {
                         unit_id: truck_1_id.clone(),
-                        path: Path::from_directions(
+                        path: Path::from_directions_test_only(
                             &located::unit(5, 5),
                             &vec![Direction::East, Direction::East, Direction::East],
                         ),
@@ -246,14 +247,14 @@ mod test_game_actions {
                     Action::LoadInto {
                         unit_id: infantry_2_id.clone(),
                         load_into: truck_2_id.clone(),
-                        path: Path::from_directions(
+                        path: Path::from_directions_test_only(
                             &located::unit(8, 10),
                             &vec![Direction::East, Direction::East],
                         ),
                     },
                     Action::Traveled {
                         unit_id: truck_2_id.clone(),
-                        path: Path::from_directions(
+                        path: Path::from_directions_test_only(
                             &located::unit(10, 10),
                             &vec![Direction::East, Direction::East, Direction::East],
                         ),
@@ -274,7 +275,7 @@ mod test_game_actions {
         let mut actions = vec![
             Action::Traveled {
                 unit_id: truck_id.clone(),
-                path: Path::from_directions(
+                path: Path::from_directions_test_only(
                     &located::unit(5, 5),
                     &vec![Direction::East, Direction::East, Direction::East],
                 ),
@@ -282,7 +283,7 @@ mod test_game_actions {
             },
             Action::Traveled {
                 unit_id: infantry_id.clone(),
-                path: Path::from_directions(
+                path: Path::from_directions_test_only(
                     &located::unit(5, 5),
                     &vec![Direction::East, Direction::East],
                 ),
@@ -297,7 +298,7 @@ mod test_game_actions {
             vec![Action::Batch(vec![
                 Action::Traveled {
                     unit_id: infantry_id.clone(),
-                    path: Path::from_directions(
+                    path: Path::from_directions_test_only(
                         &located::unit(5, 5),
                         &vec![Direction::East, Direction::East],
                     ),
@@ -305,7 +306,7 @@ mod test_game_actions {
                 },
                 Action::Traveled {
                     unit_id: truck_id.clone(),
-                    path: Path::from_directions(
+                    path: Path::from_directions_test_only(
                         &located::unit(5, 5),
                         &vec![Direction::East, Direction::East, Direction::East],
                     ),

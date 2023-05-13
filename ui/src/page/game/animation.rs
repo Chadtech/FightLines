@@ -14,7 +14,7 @@ pub enum Animation {
 impl Animation {
     pub fn from_outcome(outcome: Outcome) -> Option<Animation> {
         match outcome {
-            Outcome::Traveled { unit_id, path } => Some(Animation::Travel {
+            Outcome::Traveled { unit_id, path, .. } => Some(Animation::Travel {
                 unit_id,
                 path,
                 loads_into: None,
@@ -23,6 +23,7 @@ impl Animation {
                 unit_id,
                 path,
                 loaded_into,
+                ..
             } => Some(Animation::Travel {
                 unit_id,
                 path,

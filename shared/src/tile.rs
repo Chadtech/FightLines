@@ -31,29 +31,48 @@ impl Tile {
     }
 
     pub fn travel_supply_cost(&self, unit: &Unit) -> i16 {
-        let multiplier = 16.0;
+        let max_supplies = unit.max_supplies() as f32;
+        let mobility_budget = unit.mobility_budget();
+
+        let supplies_per_tile_move = max_supplies / mobility_budget;
+
+        let turns_until_out_of_supplies = match unit {
+            Unit::Infantry => 18.0,
+            Unit::Tank => 14.0,
+            Unit::Truck => 16.0,
+            Unit::SupplyCrate => 100000.0,
+        };
+
+        let cost_per_tile = supplies_per_tile_move / turns_until_out_of_supplies;
 
         let cost: f32 = match unit {
-            Unit::Infantry => {
-                let infantry_cost = 4.0;
-                match self {
-                    Tile::GrassPlain => infantry_cost,
-                    Tile::Hills => infantry_cost,
-                    Tile::Forest => infantry_cost,
-                }
+            Unit::Infantry => match self {
+                Tile::GrassPlain => cost_per_tile,
+                Tile::Hills => cost_per_tile,
+                Tile::Forest => cost_per_tile,
+            },
+            Unit::Tank => {
+                let base = match self {
+                    Tile::GrassPlain => 1.0,
+                    Tile::Hills => 1.25,
+                    Tile::Forest => 1.5,
+                };
+
+                cost_per_tile * base
             }
-            Unit::Tank => match self {
-                Tile::GrassPlain => 1.0,
-                Tile::Hills => 1.25,
-                Tile::Forest => 1.5,
-            },
-            Unit::Truck => match self {
-                Tile::GrassPlain => 1.0,
-                Tile::Hills => 1.25,
-                Tile::Forest => 1.75,
-            },
+            Unit::Truck => {
+                let base = match self {
+                    Tile::GrassPlain => 1.0,
+                    Tile::Hills => 1.25,
+                    Tile::Forest => 1.75,
+                };
+
+                cost_per_tile * base
+            }
             Unit::SupplyCrate => 0.0,
         };
+
+        let multiplier = 1.0;
 
         (multiplier * cost).floor() as i16
     }

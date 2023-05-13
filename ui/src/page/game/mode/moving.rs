@@ -58,7 +58,7 @@ impl Model {
     pub fn path(&self, unit_id: &UnitId, game: &Game) -> Result<Path, String> {
         let loc = game.position_of_unit_or_transport(unit_id)?;
 
-        let path = Path::from_directions::<FacingDirection>(
+        let path = Path::from_directions_test_only::<FacingDirection>(
             &loc,
             &self
                 .arrows

@@ -34,6 +34,21 @@ impl<T> Located<T> {
     pub fn to_unit(&self) -> Located<()> {
         unit(self.x, self.y)
     }
+
+    pub fn set_value<U>(&mut self, u: U) -> Located<U> {
+        Located {
+            x: self.x,
+            y: self.y,
+            value: u,
+        }
+    }
+}
+
+impl<T: Clone> Iterator for Located<T> {
+    type Item = T;
+    fn next(&mut self) -> Option<T> {
+        Some(self.value.clone())
+    }
 }
 
 pub fn unit(x: u16, y: u16) -> Located<()> {

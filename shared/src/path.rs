@@ -1,30 +1,60 @@
 use crate::arrow::Arrow;
 use crate::direction::Direction;
 use crate::located::Located;
+use crate::tile::Tile;
+use crate::unit::Unit;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct Path {
-    steps: Vec<Located<Direction>>,
+    steps: Vec<Located<Step>>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+struct Step {
+    pub direction: Direction,
+    pub tile: Tile,
+}
+
+impl Step {
+    pub fn from_dir_test_only(dir: Direction) -> Step {
+        Step {
+            direction: dir,
+            tile: Tile::GrassPlain,
+        }
+    }
 }
 
 impl Path {
     pub fn shift_first(&mut self) -> Option<Located<Direction>> {
         if !self.steps.is_empty() {
-            Some(self.steps.remove(0))
+            let mut removed = self.steps.remove(0);
+
+            Some(removed.set_value(removed.value.direction.clone()))
         } else {
             None
         }
     }
-    pub fn last(&self) -> Option<&Located<Direction>> {
-        self.steps.last()
+    pub fn supply_cost(&self, unit: &Unit) -> i16 {
+        let mut cost: f32 = 0.0;
+
+        for loc_step in self.steps.iter() {
+            let tile = &loc_step.value.tile;
+
+            cost += tile.mobility_cost(unit);
+        }
+
+        cost.floor() as i16
+    }
+    pub fn last_pos(&self) -> Option<Located<()>> {
+        self.steps.last().map(|loc_step| loc_step.to_unit())
     }
 
     pub fn to_directions(&self) -> Vec<Direction> {
         self.steps
             .clone()
             .into_iter()
-            .map(|loc_dir| loc_dir.value)
+            .map(|loc_dir| loc_dir.value.direction)
             .collect::<Vec<Direction>>()
     }
 
@@ -32,8 +62,8 @@ impl Path {
         path_with_arrows(self.to_directions().as_slice())
     }
 
-    pub fn from_directions<T>(loc: &Located<T>, dirs: &Vec<Direction>) -> Path {
-        let mut path: Vec<Located<Direction>> = Vec::new();
+    pub fn from_directions_test_only<T>(loc: &Located<T>, dirs: &Vec<Direction>) -> Path {
+        let mut path: Vec<Located<Step>> = Vec::new();
 
         let mut pos_x = loc.x;
         let mut pos_y = loc.y;
@@ -42,7 +72,7 @@ impl Path {
             path.push(Located {
                 x: pos_x,
                 y: pos_y,
-                value: dir.clone(),
+                value: Step::from_dir_test_only(dir.clone()),
             });
         }
 
@@ -52,7 +82,7 @@ impl Path {
             path.push(Located {
                 x: pos_x,
                 y: pos_y,
-                value: dir.clone(),
+                value: Step::from_dir_test_only(dir.clone()),
             });
         }
 

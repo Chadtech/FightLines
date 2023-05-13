@@ -91,13 +91,11 @@ pub enum Outcome {
     Traveled {
         unit_id: UnitId,
         path: Path,
-        supply_cost: u16,
     },
     LoadedInto {
         unit_id: UnitId,
         loaded_into: UnitId,
         path: Path,
-        supply_cost: u16,
     },
     NamedUnit {
         unit_id: UnitId,
@@ -300,12 +298,8 @@ impl Game {
     pub fn consume_outcomes(&mut self, outcomes: Vec<Outcome>) -> Result<(), String> {
         for outcome in outcomes {
             match outcome {
-                Outcome::Traveled {
-                    unit_id,
-                    path,
-                    supply_cost,
-                } => {
-                    if let Some(loc_dir) = path.last() {
+                Outcome::Traveled { unit_id, path } => {
+                    if let Some(loc_dir) = path.last_pos() {
                         let facing_dir = match self.indices.position_of_unit_or_transport(&unit_id)
                         {
                             Ok(facing_dir_loc) => facing_dir_loc.value,
@@ -313,7 +307,7 @@ impl Game {
                         };
 
                         if let Some(unit) = self.get_mut_unit(&unit_id) {
-                            unit.supplies = unit.supplies - (supply_cost as i16);
+                            unit.supplies = unit.supplies - path.supply_cost(&unit.unit);
 
                             let new_facing_dir =
                                 FacingDirection::from_directions(path.clone().to_directions())
@@ -335,11 +329,11 @@ impl Game {
                 Outcome::LoadedInto {
                     unit_id,
                     loaded_into,
-                    supply_cost,
+                    path,
                     ..
                 } => {
                     if let Some(unit) = self.get_mut_unit(&unit_id) {
-                        unit.supplies = unit.supplies - (supply_cost as i16);
+                        unit.supplies = unit.supplies - path.supply_cost(&unit.unit);
                         unit.place = Place::InUnit(loaded_into.clone());
                     }
                 }
