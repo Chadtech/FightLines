@@ -1,3 +1,4 @@
+use crate::game::unit_index;
 use crate::id::Id;
 use crate::unit;
 use crate::unit::UnitId;
@@ -13,7 +14,7 @@ impl Index {
     }
 }
 
-pub fn make(units: &HashMap<UnitId, unit::Model>) -> Index {
+pub fn make(units: &unit_index::by_id::Index) -> Index {
     let mut ret = HashMap::new();
 
     for (unit_id, unit) in units.iter() {

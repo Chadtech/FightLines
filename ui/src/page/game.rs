@@ -29,8 +29,9 @@ use shared::arrow::Arrow;
 use shared::direction::Direction;
 use shared::facing_direction::FacingDirection;
 use shared::frame_count::FrameCount;
+use shared::game::outcome::Outcome;
 use shared::game::unit_index::Indices;
-use shared::game::{calculate_player_visibility, Game, GameId, Outcome, Turn};
+use shared::game::{calculate_player_visibility, Game, GameId, Turn};
 use shared::id::Id;
 use shared::located::Located;
 use shared::path::Path;
@@ -228,7 +229,7 @@ impl Model {
 enum Stage {
     TakingTurn(stage::taking_turn::Model),
     Waiting { indices: Indices },
-    AnimatingMoves(stage::animating_moves::Model),
+    AnimatingMoves(animating_moves::Model),
 }
 
 #[derive(PartialEq, Debug, Clone)]

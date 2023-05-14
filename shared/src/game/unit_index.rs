@@ -1,17 +1,17 @@
 use crate::facing_direction::FacingDirection;
 use crate::located::Located;
+use crate::unit::Place;
 use crate::unit::UnitId;
-use crate::unit::{Model, Place};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
+pub mod by_id;
 pub mod by_location;
 pub mod by_player;
 pub mod by_transport;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct Indices {
-    pub by_id: HashMap<UnitId, Model>,
+    pub by_id: by_id::Index,
     pub by_location: by_location::Index,
     pub by_player: by_player::Index,
     pub by_transport: by_transport::Index,

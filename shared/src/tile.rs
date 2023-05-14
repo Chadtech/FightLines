@@ -36,14 +36,7 @@ impl Tile {
 
         let supplies_per_tile_move = max_supplies / mobility_budget;
 
-        let turns_until_out_of_supplies = match unit {
-            Unit::Infantry => 18.0,
-            Unit::Tank => 14.0,
-            Unit::Truck => 16.0,
-            Unit::SupplyCrate => 100000.0,
-        };
-
-        let cost_per_tile = supplies_per_tile_move / turns_until_out_of_supplies;
+        let cost_per_tile = supplies_per_tile_move / unit.supply_lifespan();
 
         let cost: f32 = match unit {
             Unit::Infantry => match self {

@@ -7,9 +7,8 @@ use shared::game::{calculate_player_visibility, unit_index};
 use shared::id::Id;
 use shared::located::Located;
 use shared::map::Map;
-use shared::unit;
-use shared::unit::{Place, UnitId};
-use std::collections::{HashMap, HashSet};
+use shared::unit::Place;
+use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct Model {
@@ -84,6 +83,13 @@ impl Model {
 
                     Ok(false)
                 }
+                Animation::Expired { .. } => {
+                    self.animations.remove(0);
+
+                    // Animate!
+
+                    Ok(false)
+                }
             },
         };
 
@@ -94,7 +100,7 @@ impl Model {
 }
 
 pub fn sidebar_view<Msg: 'static>(
-    unit_index: &HashMap<UnitId, unit::Model>,
+    unit_index: &unit_index::by_id::Index,
     model: &Model,
 ) -> Vec<Cell<Msg>> {
     match model.animations.first() {
@@ -110,6 +116,23 @@ pub fn sidebar_view<Msg: 'static>(
                             .unwrap_or_else(|| unit_model.unit.to_string());
 
                         unit_name_msg.push_str(" moved");
+
+                        unit_name_msg
+                    }
+                };
+
+                vec![Cell::from_str(vec![], msg.as_str())]
+            }
+            Animation::Expired { unit_id } => {
+                let msg = match unit_index.get(unit_id) {
+                    None => "error: could not find unit".to_string(),
+                    Some(unit_model) => {
+                        let mut unit_name_msg = unit_model
+                            .name
+                            .clone()
+                            .unwrap_or_else(|| unit_model.unit.to_string());
+
+                        unit_name_msg.push_str(" expired");
 
                         unit_name_msg
                     }

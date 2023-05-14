@@ -1,4 +1,4 @@
-use shared::game::Outcome;
+use shared::game::outcome::Outcome;
 use shared::path::Path;
 use shared::unit::UnitId;
 
@@ -8,6 +8,9 @@ pub enum Animation {
         unit_id: UnitId,
         path: Path,
         loads_into: Option<UnitId>,
+    },
+    Expired {
+        unit_id: UnitId,
     },
 }
 
@@ -30,6 +33,8 @@ impl Animation {
                 loads_into: Some(loaded_into),
             }),
             Outcome::NamedUnit { .. } => None,
+            Outcome::Expired { unit_id } => Some(Animation::Expired { unit_id }),
+            Outcome::ConsumedSupplies { .. } => None,
         }
     }
 }

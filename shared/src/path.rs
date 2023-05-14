@@ -28,9 +28,9 @@ impl Step {
 impl Path {
     pub fn shift_first(&mut self) -> Option<Located<Direction>> {
         if !self.steps.is_empty() {
-            let mut removed = self.steps.remove(0);
+            let removed = self.steps.remove(0);
 
-            Some(removed.set_value(removed.value.direction.clone()))
+            Some(removed.map_value(|step| step.direction))
         } else {
             None
         }

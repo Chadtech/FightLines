@@ -22,6 +22,36 @@ pub struct Model {
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct Deleted {
+    pub unit: Unit,
+    pub owner: Option<Id>,
+    pub color: TeamColor,
+    pub name: Option<String>,
+}
+
+impl From<Model> for Deleted {
+    fn from(unit_model: Model) -> Deleted {
+        Deleted {
+            unit: unit_model.unit,
+            owner: unit_model.owner,
+            color: unit_model.color,
+            name: unit_model.name,
+        }
+    }
+}
+
+impl From<&Model> for Deleted {
+    fn from(unit_model: &Model) -> Deleted {
+        Deleted {
+            unit: unit_model.unit.clone(),
+            owner: unit_model.owner.clone(),
+            color: unit_model.color.clone(),
+            name: unit_model.name.clone(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum Place {
     OnMap(Located<FacingDirection>),
     InUnit(UnitId),
@@ -108,6 +138,16 @@ impl Unit {
             Unit::Tank => 3072,
             Unit::Truck => 2048,
             Unit::SupplyCrate => 8192,
+        }
+    }
+    // The idealized number of turns a unit would
+    // last if it did nothing at all
+    pub fn supply_lifespan(&self) -> f32 {
+        match self {
+            Unit::Infantry => 18.0,
+            Unit::Tank => 14.0,
+            Unit::Truck => 16.0,
+            Unit::SupplyCrate => 100000.0,
         }
     }
 }

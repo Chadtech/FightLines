@@ -1,4 +1,5 @@
 use crate::facing_direction::FacingDirection;
+use crate::game::unit_index;
 use crate::located::Located;
 use crate::unit;
 use crate::unit::{Place, UnitId};
@@ -19,7 +20,7 @@ impl Index {
     }
 }
 
-pub fn make(units: &HashMap<UnitId, unit::Model>) -> Index {
+pub fn make(units: &unit_index::by_id::Index) -> Index {
     let mut ret = HashMap::new();
 
     for (unit_id, unit) in units.iter() {

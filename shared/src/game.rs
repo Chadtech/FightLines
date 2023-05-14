@@ -1,10 +1,12 @@
 pub mod action;
 pub mod day;
+pub mod outcome;
 pub mod unit_index;
 
 use crate::facing_direction::FacingDirection;
 use crate::game::action::Action;
 use crate::game::day::Time;
+use crate::game::outcome::Outcome;
 use crate::game::unit_index::Indices;
 use crate::game::FromLobbyError::CouldNotFindInitialMapMilitary;
 use crate::id::Id;
@@ -12,7 +14,6 @@ use crate::lobby::{Lobby, LobbyId};
 use crate::located::Located;
 use crate::map::{Map, MapOpt};
 use crate::owner::Owned;
-use crate::path::Path;
 use crate::player::Player;
 use crate::rng::{RandGen, RandSeed};
 use crate::team_color::TeamColor;
@@ -87,23 +88,6 @@ pub enum Change {
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub enum Outcome {
-    Traveled {
-        unit_id: UnitId,
-        path: Path,
-    },
-    LoadedInto {
-        unit_id: UnitId,
-        loaded_into: UnitId,
-        path: Path,
-    },
-    NamedUnit {
-        unit_id: UnitId,
-        name: String,
-    },
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct Guest {
     player: Player,
     visibility: HashSet<Located<()>>,
@@ -129,15 +113,15 @@ impl Game {
     pub fn get_mut_unit(&mut self, unit_id: &UnitId) -> Option<&mut unit::Model> {
         self.indices.by_id.get_mut(unit_id)
     }
-    pub fn units_by_id(&mut self) -> &mut HashMap<UnitId, unit::Model> {
-        &mut self.indices.by_id
-    }
+    // pub fn units_by_id(&mut self) -> &mut HashMap<UnitId, unit::Model> {
+    //     &mut self.indices.by_id
+    // }
     pub fn get_unit(&self, unit_id: &UnitId) -> Option<&unit::Model> {
         self.indices.by_id.get(unit_id)
     }
-    pub fn remove_unit(&mut self, unit_id: &UnitId) {
-        self.indices.by_id.remove(unit_id);
-    }
+    // pub fn remove_unit(&mut self, unit_id: &UnitId) {
+    //     self.indices.by_id.remove(unit_id);
+    // }
     pub fn units_by_location(
         &self,
     ) -> Iter<'_, Located<()>, Vec<(UnitId, FacingDirection, unit::Model)>> {
@@ -256,7 +240,9 @@ impl Game {
             }
         };
 
-        let outcomes = outcomes_from_actions(&mut player_moves);
+        let mut supply_consumption = self.consume_supplies();
+        let mut outcomes = Outcome::from_actions(&mut player_moves);
+        outcomes.append(&mut supply_consumption);
 
         self.turn_number += 1;
         self.consume_changes();
@@ -293,6 +279,40 @@ impl Game {
                 }
             }
         }
+    }
+
+    fn consume_supplies(&self) -> Vec<Outcome> {
+        let mut outcomes = Vec::new();
+
+        for (unit_id, unit_model) in self.indices.by_id.iter() {
+            let maybe_supply_cost = match unit_model.unit {
+                Unit::Infantry => Some(unit_model.unit.supply_lifespan() / 48.0),
+                Unit::Tank => Some(unit_model.unit.supply_lifespan() / 48.0),
+                Unit::Truck => Some(unit_model.unit.supply_lifespan() / 192.0),
+                Unit::SupplyCrate => None,
+            };
+
+            if let Some(supply_cost) = maybe_supply_cost {
+                let supply_cost = supply_cost.ceil() as i16;
+
+                let new_supplies = unit_model.supplies - supply_cost;
+
+                let outcome = if new_supplies < 0 {
+                    Outcome::Expired {
+                        unit_id: unit_id.clone(),
+                    }
+                } else {
+                    Outcome::ConsumedSupplies {
+                        unit_id: unit_id.clone(),
+                        supplies: supply_cost,
+                    }
+                };
+
+                outcomes.push(outcome);
+            }
+        }
+
+        outcomes
     }
 
     pub fn consume_outcomes(&mut self, outcomes: Vec<Outcome>) -> Result<(), String> {
@@ -335,6 +355,14 @@ impl Game {
                     if let Some(unit) = self.get_mut_unit(&unit_id) {
                         unit.supplies = unit.supplies - path.supply_cost(&unit.unit);
                         unit.place = Place::InUnit(loaded_into.clone());
+                    }
+                }
+                Outcome::Expired { unit_id } => {
+                    self.indices.by_id.delete(&unit_id);
+                }
+                Outcome::ConsumedSupplies { unit_id, supplies } => {
+                    if let Some(unit) = self.get_mut_unit(&unit_id) {
+                        unit.supplies = unit.supplies - supplies;
                     }
                 }
             }
@@ -490,12 +518,14 @@ impl Game {
 
                 let host_id = lobby.host_id.clone();
 
+                let units_by_id = unit_index::by_id::Index::from_hash_map(unit_hashmap);
+
                 let remaining_guests: Vec<(Id, Guest)> = rest
                     .iter()
                     .map(|(guest_id, guest_player)| {
                         let guest = Guest {
                             player: guest_player.clone(),
-                            visibility: calculate_player_visibility(guest_id, &map, &unit_hashmap),
+                            visibility: calculate_player_visibility(guest_id, &map, &units_by_id),
                             turn: Turn::Waiting,
                         };
 
@@ -503,17 +533,17 @@ impl Game {
                     })
                     .collect();
 
-                let by_location_index = unit_index::by_location::make(&unit_hashmap);
-                let by_player_index = unit_index::by_player::make(&unit_hashmap);
-                let by_transport_index = unit_index::by_transport::make(&unit_hashmap);
+                let by_location_index = unit_index::by_location::make(&units_by_id);
+                let by_player_index = unit_index::by_player::make(&units_by_id);
+                let by_transport_index = unit_index::by_transport::make(&units_by_id);
 
-                let host_visibility = calculate_player_visibility(&host_id, &map, &unit_hashmap);
+                let host_visibility = calculate_player_visibility(&host_id, &map, &units_by_id);
 
                 let first_guest_visibility =
-                    calculate_player_visibility(first_guest_id, &map, &unit_hashmap);
+                    calculate_player_visibility(first_guest_id, &map, &units_by_id);
 
                 let indices = Indices {
-                    by_id: unit_hashmap,
+                    by_id: units_by_id,
                     by_location: by_location_index,
                     by_player: by_player_index,
                     by_transport: by_transport_index,
@@ -710,7 +740,7 @@ impl Game {
 pub fn calculate_player_visibility(
     player_id: &Id,
     map: &Map,
-    units: &HashMap<UnitId, unit::Model>,
+    units: &unit_index::by_id::Index,
 ) -> HashSet<Located<()>> {
     let mut visible_spots = HashSet::new();
 
@@ -820,53 +850,4 @@ pub fn calculate_player_visibility(
     }
 
     visible_spots
-}
-
-fn outcomes_from_actions(player_moves: &mut Vec<(Id, Vec<Action>)>) -> Vec<Outcome> {
-    let mut outcomes = Vec::new();
-
-    let mut player_index = 0;
-    let mut cont = true;
-
-    while cont {
-        if let Some((_, actions)) = player_moves.get_mut(player_index) {
-            if let Some(first) = actions.first() {
-                let mut new_outcomes = outcomes_from_action(first);
-                outcomes.append(&mut new_outcomes);
-
-                actions.remove(0);
-            }
-        }
-
-        player_index = (player_index + 1) % player_moves.len();
-
-        cont = !player_moves.iter().all(|(_, m)| m.is_empty());
-    }
-
-    outcomes
-}
-
-fn outcomes_from_action(action: &Action) -> Vec<Outcome> {
-    match action {
-        Action::Traveled { unit_id, path, .. } => {
-            vec![Outcome::Traveled {
-                unit_id: unit_id.clone(),
-                path: path.clone(),
-            }]
-        }
-        Action::LoadInto {
-            unit_id,
-            load_into,
-            path,
-        } => vec![Outcome::LoadedInto {
-            unit_id: unit_id.clone(),
-            loaded_into: load_into.clone(),
-            path: path.clone(),
-        }],
-        Action::Batch(actions) => actions
-            .iter()
-            .map(outcomes_from_action)
-            .collect::<Vec<Vec<Outcome>>>()
-            .concat(),
-    }
 }

@@ -35,11 +35,22 @@ impl<T> Located<T> {
         unit(self.x, self.y)
     }
 
-    pub fn set_value<U>(&mut self, u: U) -> Located<U> {
+    pub fn with_value<U>(&self, u: U) -> Located<U> {
         Located {
             x: self.x,
             y: self.y,
             value: u,
+        }
+    }
+
+    pub fn map_value<U>(&self, f: impl Fn(T) -> U + Clone) -> Located<U>
+    where
+        T: Clone,
+    {
+        Located {
+            x: self.x,
+            y: self.y,
+            value: f(self.value.clone()),
         }
     }
 }

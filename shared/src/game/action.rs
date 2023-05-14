@@ -138,7 +138,6 @@ mod test_game_actions {
                     &vec![Direction::East, Direction::East, Direction::East],
                 ),
                 dismounted_from: None,
-                supply_cost: 48.0,
             },
             Action::LoadInto {
                 unit_id: infantry_id.clone(),
