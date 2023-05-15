@@ -5,6 +5,7 @@ use crate::style::Style;
 use crate::view::button::Button;
 use crate::view::cell::Cell;
 use crate::view::text_field::TextField;
+use seed::log;
 use shared::game::Game;
 use shared::unit::UnitId;
 use shared::{game, unit};
@@ -117,6 +118,27 @@ pub fn sidebar_content(
             percent_of_max.ceil() as u16
         };
 
+        let supply_bar_width = match supply_block_num {
+            0 => Style::W0D16,
+            1 => Style::W1D16,
+            2 => Style::W2D16,
+            3 => Style::W3D16,
+            4 => Style::W4D16,
+            5 => Style::W5D16,
+            6 => Style::W6D16,
+            7 => Style::W7D16,
+            8 => Style::W8D16,
+            9 => Style::W9D16,
+            10 => Style::W10D16,
+            11 => Style::W11D16,
+            12 => Style::W12D16,
+            13 => Style::W13D16,
+            14 => Style::W14D16,
+            15 => Style::W15D16,
+            16 => Style::W16D16,
+            _ => Style::W0D16,
+        };
+
         let supply_block_color = if supply_block_num < 5 {
             Style::BgProblem5
         } else if supply_block_num < 9 {
@@ -125,13 +147,7 @@ pub fn sidebar_content(
             Style::BgContent4
         };
 
-        let supply_block = Cell::empty(vec![Style::W4, Style::H4, supply_block_color]);
-
-        let mut supply_blocks = vec![];
-
-        for _ in 0..supply_block_num {
-            supply_blocks.push(supply_block.clone())
-        }
+        let supply_block = Cell::empty(vec![supply_bar_width, Style::H4, supply_block_color]);
 
         Cell::group(
             vec![
@@ -140,8 +156,9 @@ pub fn sidebar_content(
                 Style::BgBackground1,
                 Style::G3,
                 Style::P2,
+                Style::Relative,
             ],
-            supply_blocks,
+            vec![supply_block],
         )
     };
 

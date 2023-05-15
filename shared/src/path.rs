@@ -36,15 +36,15 @@ impl Path {
         }
     }
     pub fn supply_cost(&self, unit: &Unit) -> i16 {
-        let mut cost: f32 = 0.0;
+        let mut cost: i16 = 0;
 
         for loc_step in self.steps.iter() {
             let tile = &loc_step.value.tile;
 
-            cost += tile.mobility_cost(unit);
+            cost += tile.travel_supply_cost(unit);
         }
 
-        cost.floor() as i16
+        cost
     }
     pub fn last_pos(&self) -> Option<Located<()>> {
         self.steps.last().map(|loc_step| loc_step.to_unit())

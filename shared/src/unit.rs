@@ -140,14 +140,27 @@ impl Unit {
             Unit::SupplyCrate => 8192,
         }
     }
-    // The idealized number of turns a unit would
-    // last if it did nothing at all
-    pub fn supply_lifespan(&self) -> f32 {
+
+    // Idealized number of turns a unit would last
+    // if it were actively moving around, not including the
+    // inactive supply life time
+    pub fn active_supply_lifespan(&self) -> Option<f32> {
         match self {
-            Unit::Infantry => 18.0,
-            Unit::Tank => 14.0,
-            Unit::Truck => 16.0,
-            Unit::SupplyCrate => 100000.0,
+            Unit::Infantry => Some(8.0),
+            Unit::Tank => Some(14.0),
+            Unit::Truck => Some(16.0),
+            Unit::SupplyCrate => None,
+        }
+    }
+
+    // Idealized number of turns a unit would last
+    // if it stayed in place and did nothing
+    pub fn inactive_supply_lifespan(&self) -> Option<f32> {
+        match self {
+            Unit::Infantry => Some(48.0),
+            Unit::Tank => Some(48.0),
+            Unit::Truck => Some(192.0),
+            Unit::SupplyCrate => None,
         }
     }
 }

@@ -31,43 +31,48 @@ impl Tile {
     }
 
     pub fn travel_supply_cost(&self, unit: &Unit) -> i16 {
-        let max_supplies = unit.max_supplies() as f32;
-        let mobility_budget = unit.mobility_budget();
+        match unit.active_supply_lifespan() {
+            Some(active_supply_lifetime) => {
+                let max_supplies = unit.max_supplies() as f32;
+                let mobility_budget = unit.mobility_budget();
 
-        let supplies_per_tile_move = max_supplies / mobility_budget;
+                let supplies_per_tile_move = max_supplies / mobility_budget;
 
-        let cost_per_tile = supplies_per_tile_move / unit.supply_lifespan();
+                let cost_per_tile = supplies_per_tile_move / active_supply_lifetime;
 
-        let cost: f32 = match unit {
-            Unit::Infantry => match self {
-                Tile::GrassPlain => cost_per_tile,
-                Tile::Hills => cost_per_tile,
-                Tile::Forest => cost_per_tile,
-            },
-            Unit::Tank => {
-                let base = match self {
-                    Tile::GrassPlain => 1.0,
-                    Tile::Hills => 1.25,
-                    Tile::Forest => 1.5,
+                let cost: f32 = match unit {
+                    Unit::Infantry => match self {
+                        Tile::GrassPlain => cost_per_tile,
+                        Tile::Hills => cost_per_tile,
+                        Tile::Forest => cost_per_tile,
+                    },
+                    Unit::Tank => {
+                        let base = match self {
+                            Tile::GrassPlain => 1.0,
+                            Tile::Hills => 1.25,
+                            Tile::Forest => 1.5,
+                        };
+
+                        cost_per_tile * base
+                    }
+                    Unit::Truck => {
+                        let base = match self {
+                            Tile::GrassPlain => 1.0,
+                            Tile::Hills => 1.25,
+                            Tile::Forest => 1.75,
+                        };
+
+                        cost_per_tile * base
+                    }
+                    Unit::SupplyCrate => 0.0,
                 };
 
-                cost_per_tile * base
+                let multiplier = 1.0;
+
+                (multiplier * cost).floor() as i16
             }
-            Unit::Truck => {
-                let base = match self {
-                    Tile::GrassPlain => 1.0,
-                    Tile::Hills => 1.25,
-                    Tile::Forest => 1.75,
-                };
-
-                cost_per_tile * base
-            }
-            Unit::SupplyCrate => 0.0,
-        };
-
-        let multiplier = 1.0;
-
-        (multiplier * cost).floor() as i16
+            None => 0,
+        }
     }
 }
 

@@ -242,6 +242,7 @@ impl Game {
 
         let mut supply_consumption = self.consume_supplies();
         let mut outcomes = Outcome::from_actions(&mut player_moves);
+
         outcomes.append(&mut supply_consumption);
 
         self.turn_number += 1;
@@ -285,12 +286,11 @@ impl Game {
         let mut outcomes = Vec::new();
 
         for (unit_id, unit_model) in self.indices.by_id.iter() {
-            let maybe_supply_cost = match unit_model.unit {
-                Unit::Infantry => Some(unit_model.unit.supply_lifespan() / 48.0),
-                Unit::Tank => Some(unit_model.unit.supply_lifespan() / 48.0),
-                Unit::Truck => Some(unit_model.unit.supply_lifespan() / 192.0),
-                Unit::SupplyCrate => None,
-            };
+            let unit = &unit_model.unit;
+
+            let maybe_supply_cost = unit
+                .inactive_supply_lifespan()
+                .map(|s| (s / (unit.max_supplies() as f32)) * 100.00);
 
             if let Some(supply_cost) = maybe_supply_cost {
                 let supply_cost = supply_cost.ceil() as i16;
@@ -362,6 +362,7 @@ impl Game {
                 }
                 Outcome::ConsumedSupplies { unit_id, supplies } => {
                     if let Some(unit) = self.get_mut_unit(&unit_id) {
+                        println!("Consuming {}", supplies);
                         unit.supplies = unit.supplies - supplies;
                     }
                 }
