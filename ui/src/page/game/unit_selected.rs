@@ -108,6 +108,8 @@ pub fn sidebar_content(
 
     let supplies_label = Cell::from_str(vec![], "supplies");
     let supply_view = {
+        log!("Supplies", unit_model.supplies);
+
         let supply_block_num: u16 = {
             let percent_of_max: f32 = if unit_model.supplies > 0 {
                 ((unit_model.supplies as f32) / (unit_model.unit.max_supplies() as f32)) * 16.0

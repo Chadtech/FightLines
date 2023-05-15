@@ -211,6 +211,9 @@ impl Game {
         self.turns_changes.append(changes);
     }
 
+    pub fn outcomes(&mut self, player_moves: &mut Vec<(Id, Vec<Action>)>) -> Vec<Outcome> {
+        vec![self.consume_supplies(), Outcome::from_actions(player_moves)].concat()
+    }
     pub fn advance_turn(&mut self, seed: RandSeed) -> Result<bool, String> {
         let mut rng = RandGen::from_seed(seed);
         let mut player_moves: Vec<(Id, Vec<Action>)> = match &mut self.all_players_turns() {
@@ -240,14 +243,12 @@ impl Game {
             }
         };
 
-        let mut supply_consumption = self.consume_supplies();
-        let mut outcomes = Outcome::from_actions(&mut player_moves);
-
-        outcomes.append(&mut supply_consumption);
+        let outcomes = self.outcomes(&mut player_moves);
 
         self.turn_number += 1;
-        self.consume_changes();
-        self.consume_outcomes(outcomes.clone())?;
+        self.process_changes();
+        self.process_outcomes(outcomes.clone())?;
+
         self.prev_outcomes = outcomes;
         self.indices.by_location = unit_index::by_location::make(&self.indices.by_id);
         self.indices.by_player = unit_index::by_player::make(&self.indices.by_id);
@@ -268,7 +269,7 @@ impl Game {
         Ok(true)
     }
 
-    fn consume_changes(&mut self) {
+    fn process_changes(&mut self) {
         for change in &mut self.turns_changes {
             match change {
                 Change::NameUnit { unit_id, name } => {
@@ -286,13 +287,7 @@ impl Game {
         let mut outcomes = Vec::new();
 
         for (unit_id, unit_model) in self.indices.by_id.iter() {
-            let unit = &unit_model.unit;
-
-            let maybe_supply_cost = unit
-                .inactive_supply_lifespan()
-                .map(|s| (s / (unit.max_supplies() as f32)) * 100.00);
-
-            if let Some(supply_cost) = maybe_supply_cost {
+            if let Some(supply_cost) = unit_model.unit.baseline_supply_cost() {
                 let supply_cost = supply_cost.ceil() as i16;
 
                 let new_supplies = unit_model.supplies - supply_cost;
@@ -315,7 +310,7 @@ impl Game {
         outcomes
     }
 
-    pub fn consume_outcomes(&mut self, outcomes: Vec<Outcome>) -> Result<(), String> {
+    pub fn process_outcomes(&mut self, outcomes: Vec<Outcome>) -> Result<(), String> {
         for outcome in outcomes {
             match outcome {
                 Outcome::Traveled { unit_id, path } => {
@@ -362,7 +357,6 @@ impl Game {
                 }
                 Outcome::ConsumedSupplies { unit_id, supplies } => {
                     if let Some(unit) = self.get_mut_unit(&unit_id) {
-                        println!("Consuming {}", supplies);
                         unit.supplies = unit.supplies - supplies;
                     }
                 }

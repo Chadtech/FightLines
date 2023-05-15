@@ -155,13 +155,18 @@ impl Unit {
 
     // Idealized number of turns a unit would last
     // if it stayed in place and did nothing
-    pub fn inactive_supply_lifespan(&self) -> Option<f32> {
+    pub fn baseline_supply_lifetime(&self) -> Option<f32> {
         match self {
             Unit::Infantry => Some(48.0),
             Unit::Tank => Some(48.0),
             Unit::Truck => Some(192.0),
             Unit::SupplyCrate => None,
         }
+    }
+
+    pub fn baseline_supply_cost(&self) -> Option<f32> {
+        self.baseline_supply_lifetime()
+            .map(|supply_lifespan| ((self.max_supplies() as f32) / supply_lifespan))
     }
 }
 
@@ -173,5 +178,17 @@ impl ToString for Unit {
             Unit::Truck => "truck".to_string(),
             Unit::SupplyCrate => "supply crate".to_string(),
         }
+    }
+}
+
+#[cfg(test)]
+mod test_units {
+    use crate::unit::Unit;
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn infantry_mobility() {
+        let want = Some(21.333334);
+        assert_eq!(want, Unit::Infantry.baseline_supply_cost());
     }
 }

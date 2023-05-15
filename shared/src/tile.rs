@@ -81,3 +81,16 @@ pub const PIXEL_HEIGHT: u16 = 16;
 
 pub const PIXEL_WIDTH_FL: f64 = 16.0;
 pub const PIXEL_HEIGHT_FL: f64 = 16.0;
+
+#[cfg(test)]
+mod test_tiles {
+    use crate::tile::Tile;
+    use crate::unit::Unit;
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn infantry_mobility_cost() {
+        let want = 42;
+        assert_eq!(want, Tile::GrassPlain.travel_supply_cost(&Unit::Infantry));
+    }
+}
