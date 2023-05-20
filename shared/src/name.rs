@@ -11,7 +11,7 @@ pub struct Name(String);
 
 impl Name {
     pub fn random(rng: &mut RandGen) -> Name {
-        let i = rng.gen::<u8>(0, 63);
+        let i = rng.gen::<u8>(0, (RANDOM_NAMES.len() - 1) as u8);
 
         let name = RANDOM_NAMES[i as usize];
 
@@ -65,7 +65,7 @@ impl ToString for Error {
 // Helpers //
 ///////////////////////////////////////////////////////////////
 
-const RANDOM_NAMES: [&str; 64] = [
+const RANDOM_NAMES: [&str; 67] = [
     "Partch",
     "Cage",
     "Lang",
@@ -130,4 +130,7 @@ const RANDOM_NAMES: [&str; 64] = [
     "Cowen",
     "Tabarrok",
     "Hsu",
+    "Dewey",
+    "Chan",
+    "Adams",
 ];

@@ -357,7 +357,7 @@ impl Game {
                 }
                 Outcome::ConsumedSupplies { unit_id, supplies } => {
                     if let Some(unit) = self.get_mut_unit(&unit_id) {
-                        unit.supplies = unit.supplies - supplies;
+                        unit.supplies -= supplies;
                     }
                 }
             }
