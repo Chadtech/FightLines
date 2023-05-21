@@ -21,6 +21,12 @@ pub struct Model {
     pub supplies: i16,
 }
 
+impl Model {
+    pub fn supplies_percent(&self) -> f32 {
+        (self.supplies as f32) / (self.unit.max_supplies() as f32)
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct Deleted {
     pub unit: Unit,
