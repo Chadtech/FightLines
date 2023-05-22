@@ -153,8 +153,8 @@ impl Unit {
     pub fn active_supply_lifespan(&self) -> Option<f32> {
         match self {
             Unit::Infantry => Some(8.0),
-            Unit::Tank => Some(10.0),
-            Unit::Truck => Some(12.0),
+            Unit::Tank => Some(9.0),
+            Unit::Truck => Some(10.0),
             Unit::SupplyCrate => None,
         }
     }

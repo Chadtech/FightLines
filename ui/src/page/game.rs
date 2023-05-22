@@ -1312,7 +1312,7 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
             if units.len() == 1 {
                 let (unit_id, facing_direction, unit_model) = units.get(0).unwrap();
 
-                let sheet = match facing_direction {
+                let sheet_for_unit_draw = match facing_direction {
                     FacingDirection::Left => &model.assets.sheet_flipped,
                     FacingDirection::Right => &model.assets.sheet,
                 };
@@ -1363,7 +1363,7 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
 
                 let _ = ctx
                     .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                        sheet,
+                        sheet_for_unit_draw,
                         sx,
                         sy,
                         tile::PIXEL_WIDTH_FL,
@@ -1379,7 +1379,7 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                 if let Some(loaded_units) = indices.by_transport.get(unit_id) {
                     let _ = ctx
                         .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                            sheet,
+                            &model.assets.sheet,
                             MISC_SPRITE_SHEET_COLUMN,
                             26.0 * tile::PIXEL_WIDTH_FL,
                             tile::PIXEL_WIDTH_FL,
@@ -1402,7 +1402,7 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                         if supplies_below_25_percent {
                             let _ = ctx
                             .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                                sheet,
+                                &model.assets.sheet,
                                 MISC_SPRITE_SHEET_COLUMN,
                                 27.0 * tile::PIXEL_WIDTH_FL,
                                 tile::PIXEL_WIDTH_FL,
