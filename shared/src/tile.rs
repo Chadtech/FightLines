@@ -31,15 +31,8 @@ impl Tile {
     }
 
     pub fn travel_supply_cost(&self, unit: &Unit) -> i16 {
-        match unit.active_supply_lifespan() {
-            Some(active_supply_lifetime) => {
-                let max_supplies = unit.max_supplies() as f32;
-                let mobility_budget = unit.mobility_budget();
-
-                let supplies_per_tile_move = max_supplies / mobility_budget;
-
-                let cost_per_tile = supplies_per_tile_move / active_supply_lifetime;
-
+        match unit.active_supply_cost() {
+            Some(cost_per_tile) => {
                 let cost: f32 = match unit {
                     Unit::Infantry => match self {
                         Tile::GrassPlain => cost_per_tile,

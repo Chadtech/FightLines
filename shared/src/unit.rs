@@ -147,32 +147,26 @@ impl Unit {
         }
     }
 
-    // Idealized number of turns a unit would last
-    // if it were actively moving around, not including the
-    // inactive supply life time
-    pub fn active_supply_lifespan(&self) -> Option<f32> {
+    // The cost of moving one tile, without any adjustments
+    // for terrain type
+    pub fn active_supply_cost(&self) -> Option<f32> {
         match self {
-            Unit::Infantry => Some(8.0),
-            Unit::Tank => Some(9.0),
-            Unit::Truck => Some(10.0),
+            Unit::Infantry => Some(5.1625),
+            Unit::Tank => Some(56.8889),
+            Unit::Truck => Some(25.6),
             Unit::SupplyCrate => None,
         }
     }
 
-    // Idealized number of turns a unit would last
-    // if it stayed in place and did nothing
-    pub fn baseline_supply_lifetime(&self) -> Option<f32> {
-        match self {
-            Unit::Infantry => Some(48.0),
-            Unit::Tank => Some(48.0),
-            Unit::Truck => Some(192.0),
-            Unit::SupplyCrate => None,
-        }
-    }
-
+    // The cost of just existing for one turn, whether
+    // the unit did anything or not
     pub fn baseline_supply_cost(&self) -> Option<f32> {
-        self.baseline_supply_lifetime()
-            .map(|supply_lifespan| ((self.max_supplies() as f32) / supply_lifespan))
+        match self {
+            Unit::Infantry => Some(21.3333),
+            Unit::Tank => Some(64.0),
+            Unit::Truck => Some(10.6667),
+            Unit::SupplyCrate => None,
+        }
     }
 }
 
