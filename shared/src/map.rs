@@ -169,6 +169,16 @@ impl MapOpt {
                         x: 3,
                         y: 3,
                     },
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Right, Unit::SupplyCrate),
+                        x: 6,
+                        y: 6,
+                    },
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Right, Unit::SupplyCrate),
+                        x: 8,
+                        y: 6,
+                    },
                 ],
                 second_player_military: vec![
                     Located::<(FacingDirection, Unit)> {
