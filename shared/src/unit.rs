@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct Model {
     pub unit: Unit,
     pub place: Place,
-    pub owner: Option<Id>,
+    pub owner: Id,
     pub color: TeamColor,
     pub name: Option<String>,
     pub supplies: i16,
@@ -30,7 +30,7 @@ impl Model {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct Deleted {
     pub unit: Unit,
-    pub owner: Option<Id>,
+    pub owner: Id,
     pub color: TeamColor,
     pub name: Option<String>,
 }

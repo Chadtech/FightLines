@@ -230,7 +230,7 @@ fn build_frontend() -> Result<(), String> {
 
     let build_result = Command::new("cargo")
         .current_dir("../ui")
-        .args(&["make", "build"])
+        .args(["make", "build"])
         .output();
 
     match build_result {

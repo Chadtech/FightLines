@@ -152,11 +152,7 @@ impl Game {
                     .iter()
                     .filter_map(|(rideable_unit_id, _, possibly_rideable_unit)| {
                         if possibly_rideable_unit.unit.can_carry(carrying_unit)
-                            && possibly_rideable_unit
-                                .owner
-                                .clone()
-                                .map(|id| id == owner_id)
-                                .unwrap_or(false)
+                            && possibly_rideable_unit.owner == owner_id
                         {
                             Some((rideable_unit_id.clone(), possibly_rideable_unit.clone()))
                         } else {
@@ -322,17 +318,13 @@ impl Game {
                         };
 
                         if let Some(unit) = self.get_mut_unit(&unit_id) {
-                            unit.supplies = unit.supplies - path.supply_cost(&unit.unit);
+                            unit.supplies -= path.supply_cost(&unit.unit);
 
                             let new_facing_dir =
                                 FacingDirection::from_directions(path.clone().to_directions())
                                     .unwrap_or(facing_dir);
 
-                            unit.place = Place::OnMap(Located {
-                                x: loc_dir.x,
-                                y: loc_dir.y,
-                                value: new_facing_dir,
-                            });
+                            unit.place = Place::OnMap(loc_dir.with_value(new_facing_dir));
                         }
                     }
                 }
@@ -348,7 +340,7 @@ impl Game {
                     ..
                 } => {
                     if let Some(unit) = self.get_mut_unit(&unit_id) {
-                        unit.supplies = unit.supplies - path.supply_cost(&unit.unit);
+                        unit.supplies -= path.supply_cost(&unit.unit);
                         unit.place = Place::InUnit(loaded_into.clone());
                     }
                 }
@@ -431,7 +423,7 @@ impl Game {
         let map_choice = MapOpt::TerrainTest;
         // let map_choice = MapOpt::GrassSquare;
         let map = map_choice.to_map();
-        let initial_militaries = map_choice.initial_militaries();
+        let initial_units = map_choice.initial_units();
 
         match guests.split_first() {
             None => Err(FromLobbyError::NotEnoughPlayers),
@@ -457,7 +449,7 @@ impl Game {
 
                         let new_unit: unit::Model = unit::Model {
                             unit: unit.clone(),
-                            owner: Some(owner_id.clone()),
+                            owner: owner_id.clone(),
                             place,
                             color: color.clone(),
                             name: None,
@@ -473,13 +465,13 @@ impl Game {
                 let mut remaining_guests_with_militaries: Vec<(UnitId, unit::Model)> = vec![];
 
                 for (index, (guest_id, guest)) in rest.iter().enumerate() {
-                    let initial_military = initial_militaries
+                    let initial_military = initial_units
                         .rest_players_militatries
                         .get(index)
                         .ok_or(CouldNotFindInitialMapMilitary {
-                        required_player_count: map_choice.player_count(),
-                        found_player_count: num_players,
-                    })?;
+                            required_player_count: map_choice.player_count(),
+                            found_player_count: num_players,
+                        })?;
 
                     let mut military = id_units(initial_military.clone(), guest_id, &guest.color);
 
@@ -487,13 +479,13 @@ impl Game {
                 }
 
                 let host_units = id_units(
-                    initial_militaries.first_player_military,
+                    initial_units.first_player_military,
                     &lobby.host_id,
                     &lobby.host.color,
                 );
 
                 let first_guest_units = id_units(
-                    initial_militaries.second_player_military,
+                    initial_units.second_player_military,
                     first_guest_id,
                     &first_guest.color,
                 );
@@ -742,12 +734,7 @@ pub fn calculate_player_visibility(
     let player_id = player_id.clone();
 
     for unit in units.values() {
-        if unit
-            .owner
-            .clone()
-            .map(|owner_id| owner_id == player_id)
-            .unwrap_or(false)
-        {
+        if unit.owner.clone() == player_id {
             if let Place::OnMap(loc) = &unit.place {
                 let budget = unit.unit.visibility_budget();
 

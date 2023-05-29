@@ -275,8 +275,8 @@ pub fn init(
 ) -> Result<Model, String> {
     let window_size = global.window_size();
 
-    let game_pixel_width = (flags.game.map.width as u16) * tile::PIXEL_WIDTH;
-    let game_pixel_height = (flags.game.map.height as u16) * tile::PIXEL_HEIGHT;
+    let game_pixel_width = flags.game.map.width * tile::PIXEL_WIDTH;
+    let game_pixel_height = flags.game.map.height * tile::PIXEL_HEIGHT;
 
     let game_pixel_size = GamePixelSize {
         width: game_pixel_width,
@@ -844,9 +844,6 @@ fn handle_click_on_screen_during_turn(
         match mode {
             Mode::None => handle_click_on_screen_when_no_mode(global, model, x, y),
             Mode::MovingUnit(moving_model) => {
-                let x = x as u16;
-                let y = y as u16;
-
                 let mouse_loc = located::unit(x, y);
 
                 if moving_model.mobility.contains(&mouse_loc) {
@@ -953,7 +950,7 @@ fn handle_click_on_screen_when_no_mode(
     };
     let (first_unit_id, _, unit_model) = first;
 
-    if unit_model.owner != Some(global.viewer_id()) {
+    if unit_model.owner != global.viewer_id() {
         return;
     }
 
@@ -1228,10 +1225,7 @@ fn draw_visibility(visibility: &HashSet<Located<()>>, model: &Model) {
 
     for x in 0..model.game.map.width {
         for y in 0..model.game.map.height {
-            let x_u16 = x as u16;
-            let y_u16 = y as u16;
-
-            let loc = located::unit(x_u16, y_u16);
+            let loc = located::unit(x, y);
 
             if !visibility.contains(&loc) {
                 let sheet = &model.assets.sheet;
@@ -1239,8 +1233,8 @@ fn draw_visibility(visibility: &HashSet<Located<()>>, model: &Model) {
                 let sx = MISC_SPRITE_SHEET_COLUMN;
                 let sy = 16.0;
 
-                let x_fl = (x_u16 * tile::PIXEL_WIDTH) as f64;
-                let y_fl = (y_u16 * tile::PIXEL_HEIGHT) as f64;
+                let x_fl = (x * tile::PIXEL_WIDTH) as f64;
+                let y_fl = (y * tile::PIXEL_HEIGHT) as f64;
 
                 let _ = ctx
                     .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(

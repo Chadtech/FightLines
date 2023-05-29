@@ -130,7 +130,7 @@ impl Lobby {
         let players = self.clone().players();
 
         if self.num_players() < MAX_PLAYERS {
-            if !players.into_iter().map(|(id, _)| id).any(|x| x == guest_id) {
+            if !players.into_keys().any(|x| x == guest_id) {
                 self.guests.insert(guest_id, guest);
             }
 

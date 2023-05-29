@@ -67,8 +67,8 @@ impl Map {
 
                 let loc_tile = Located::<Tile> {
                     value: feature,
-                    x: x as u16,
-                    y: y as u16,
+                    x,
+                    y,
                 };
 
                 row.push(loc_tile);
@@ -95,18 +95,17 @@ pub enum MapOpt {
     TerrainTest,
 }
 
-pub struct Militaries {
+pub struct StartingUnits {
     pub first_player_military: Vec<Located<(FacingDirection, Unit)>>,
     pub second_player_military: Vec<Located<(FacingDirection, Unit)>>,
     pub rest_players_militatries: Vec<Vec<Located<(FacingDirection, Unit)>>>,
-    pub non_player_units: Vec<Located<(FacingDirection, Unit)>>,
 }
 
 impl MapOpt {
-    pub fn initial_militaries(&self) -> Militaries {
+    pub fn initial_units(&self) -> StartingUnits {
         let map = self.to_map();
         match self {
-            MapOpt::GrassSquare => Militaries {
+            MapOpt::GrassSquare => StartingUnits {
                 first_player_military: vec![
                     Located::<(FacingDirection, Unit)> {
                         value: (FacingDirection::Right, Unit::Infantry),
@@ -127,24 +126,23 @@ impl MapOpt {
                 second_player_military: vec![
                     Located::<(FacingDirection, Unit)> {
                         value: (FacingDirection::Left, Unit::Infantry),
-                        x: (map.width as u16) - 3,
-                        y: (map.height as u16) - 3,
+                        x: map.width - 3,
+                        y: map.height - 3,
                     },
                     Located::<(FacingDirection, Unit)> {
                         value: (FacingDirection::Left, Unit::Tank),
-                        x: (map.width as u16) - 4,
-                        y: (map.height as u16) - 5,
+                        x: map.width - 4,
+                        y: map.height - 5,
                     },
                     Located::<(FacingDirection, Unit)> {
                         value: (FacingDirection::Left, Unit::Truck),
-                        x: (map.width as u16) - 5,
-                        y: (map.height as u16) - 3,
+                        x: map.width - 5,
+                        y: map.height - 3,
                     },
                 ],
                 rest_players_militatries: vec![],
-                non_player_units: vec![],
             },
-            MapOpt::TerrainTest => Militaries {
+            MapOpt::TerrainTest => StartingUnits {
                 first_player_military: vec![
                     Located::<(FacingDirection, Unit)> {
                         value: (FacingDirection::Right, Unit::Infantry),
@@ -175,38 +173,37 @@ impl MapOpt {
                 second_player_military: vec![
                     Located::<(FacingDirection, Unit)> {
                         value: (FacingDirection::Left, Unit::Infantry),
-                        x: (map.width as u16) - 3,
-                        y: (map.height as u16) - 3,
+                        x: map.width - 3,
+                        y: map.height - 3,
                     },
                     Located::<(FacingDirection, Unit)> {
                         value: (FacingDirection::Left, Unit::Infantry),
-                        x: (map.width as u16) - 2,
-                        y: (map.height as u16) - 3,
+                        x: map.width - 2,
+                        y: map.height - 3,
                     },
                     Located::<(FacingDirection, Unit)> {
                         value: (FacingDirection::Left, Unit::Tank),
-                        x: (map.width as u16) - 4,
-                        y: (map.height as u16) - 5,
+                        x: map.width - 4,
+                        y: map.height - 5,
                     },
                     Located::<(FacingDirection, Unit)> {
                         value: (FacingDirection::Left, Unit::Truck),
-                        x: (map.width as u16) - 5,
-                        y: (map.height as u16) - 3,
+                        x: map.width - 5,
+                        y: map.height - 3,
                     },
                     Located::<(FacingDirection, Unit)> {
                         value: (FacingDirection::Left, Unit::Truck),
-                        x: (map.width as u16) - 6,
-                        y: (map.height as u16) - 3,
+                        x: map.width - 6,
+                        y: map.height - 3,
                     },
                 ],
                 rest_players_militatries: vec![],
-                non_player_units: vec![],
             },
         }
     }
 
     pub fn player_count(&self) -> u8 {
-        2 + (self.initial_militaries().rest_players_militatries.len() as u8)
+        2 + (self.initial_units().rest_players_militatries.len() as u8)
     }
 
     pub fn to_map(&self) -> Map {
