@@ -49,6 +49,7 @@ pub struct Lobby {
     pub game_started: bool,
 }
 
+#[derive(Debug)]
 pub enum AddError {
     LobbyIsFull,
 }

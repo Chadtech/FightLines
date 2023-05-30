@@ -23,6 +23,8 @@ pub struct Model {
 
     // Viewer
     viewer_id: Id,
+    dev_viewer_id: Id,
+    dev_map: bool,
     pub viewer_name: Name,
 
     // toasts
@@ -109,6 +111,8 @@ fn get_window_size() -> Result<(f64, f64), String> {
 // Api //
 ///////////////////////////////////////////////////////////////
 
+const DEV_VIEWER_ID_KEY: &str = "fightlines-dev-viewer-id";
+
 const VIEWER_ID_KEY: &str = "fightlines-viewer-id";
 
 const VIEWER_NAME_KEY: &str = "fightlines-viewer-name";
@@ -135,6 +139,8 @@ impl Model {
 
         let model = Model {
             viewer_id,
+            dev_viewer_id: get_dev_viewer_id(),
+            dev_map: false,
             viewer_name,
             random_seed,
             toasts: Vec::new(),
@@ -162,7 +168,15 @@ impl Model {
     }
 
     pub fn viewer_id(&self) -> Id {
-        self.viewer_id.clone()
+        if self.dev_map {
+            self.dev_viewer_id.clone()
+        } else {
+            self.viewer_id.clone()
+        }
+    }
+
+    pub fn dev_map(&mut self) {
+        self.dev_map = true
     }
 
     pub fn toast(&mut self, toast: Toast) {
@@ -221,6 +235,12 @@ fn get_viewer_id(rand_gen: &mut RandGen) -> Id {
     let new_viewer_id: Id = Id::new(rand_gen);
 
     viewer_id_result.unwrap_or(new_viewer_id)
+}
+
+fn get_dev_viewer_id() -> Id {
+    let viewer_id_result: Result<Id, WebStorageError> = LocalStorage::get(DEV_VIEWER_ID_KEY);
+
+    viewer_id_result.unwrap_or(Id::Dev("red".to_string()))
 }
 
 ///////////////////////////////////////////////////////////////

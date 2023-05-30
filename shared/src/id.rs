@@ -9,8 +9,9 @@ use serde::{Deserialize, Serialize};
 ////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Debug)]
-pub struct Id {
-    bytes: [u8; N],
+pub enum Id {
+    Bytes { bytes: [u8; N] },
+    Dev(String),
 }
 
 pub struct UniformId(UniformInt<u8>);
@@ -42,20 +43,20 @@ impl Id {
             rng.gen::<u8>(0, 255),
         ];
 
-        Id { bytes: id_bytes }
+        Id::Bytes { bytes: id_bytes }
     }
 
     pub fn from_string(s: String) -> Option<Id> {
         match hex::decode(s) {
             Ok(bytes) => {
                 if bytes.len() == N {
-                    let mut new_id = Id::empty();
+                    let mut new_id = [0; N];
 
                     for (i, byte) in bytes.iter().enumerate() {
-                        new_id.bytes[i] = *byte;
+                        new_id[i] = *byte;
                     }
 
-                    Some(new_id)
+                    Some(Id::Bytes { bytes: new_id })
                 } else {
                     None
                 }
@@ -64,12 +65,8 @@ impl Id {
         }
     }
 
-    fn empty() -> Id {
-        Id { bytes: [0; N] }
-    }
-
     pub fn from_int_test_only(n: u8) -> Id {
-        Id {
+        Id::Bytes {
             bytes: [n, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         }
     }
@@ -77,22 +74,27 @@ impl Id {
 
 impl ToString for Id {
     fn to_string(&self) -> String {
-        let mut buf = String::new();
+        match self {
+            Id::Bytes { bytes } => {
+                let mut buf = String::new();
 
-        for byte in self.bytes {
-            let hex: String = format!("{:02X}", byte);
+                for byte in bytes {
+                    let hex: String = format!("{:02X}", byte);
 
-            buf.push_str(hex.as_str());
+                    buf.push_str(hex.as_str());
+                }
+
+                buf
+            }
+            Id::Dev(dev_id) => dev_id.clone(),
         }
-
-        buf
     }
 }
 
 impl Distribution<Id> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Id {
         let rand_bytes: [u8; N] = rng.gen();
-        Id { bytes: rand_bytes }
+        Id::Bytes { bytes: rand_bytes }
     }
 }
 
@@ -103,10 +105,16 @@ impl UniformSampler for UniformId {
         B1: SampleBorrow<Self::X> + Sized,
         B2: SampleBorrow<Self::X> + Sized,
     {
-        UniformId(UniformInt::<u8>::new(
-            low.borrow().bytes[0],
-            high.borrow().bytes[0],
-        ))
+        let l = match low.borrow() {
+            Id::Bytes { bytes } => bytes[0],
+            Id::Dev(_) => 0,
+        };
+
+        let h = match high.borrow() {
+            Id::Bytes { bytes } => bytes[0],
+            Id::Dev(_) => 255,
+        };
+        UniformId(UniformInt::<u8>::new(l, h))
     }
     fn new_inclusive<B1, B2>(low: B1, high: B2) -> Self
     where
@@ -116,7 +124,7 @@ impl UniformSampler for UniformId {
         UniformSampler::new(low, high)
     }
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Self::X {
-        Id {
+        Id::Bytes {
             bytes: [
                 self.0.sample(rng),
                 self.0.sample(rng),

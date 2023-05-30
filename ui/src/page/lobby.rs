@@ -18,6 +18,7 @@ use shared::lobby;
 use shared::lobby::{Lobby, LobbyId, MAX_GUESTS};
 use shared::name::{Error, Name};
 use shared::player::Player;
+use std::convert::TryFrom;
 use std::str::FromStr;
 
 ///////////////////////////////////////////////////////////////
@@ -290,10 +291,7 @@ pub fn update(
                 // Games use the same id as the lobby they were
                 // created from. Should that ever change, this code
                 // should change too.
-                go_to_route(
-                    orders,
-                    Route::Game(GameId::from_lobby_id(model.lobby_id.clone())),
-                );
+                go_to_route(orders, Route::game(model.lobby_id.clone()));
             }
             Err(error) => global.toast(
                 Toast::init("error", "could not load new game")
@@ -311,7 +309,7 @@ fn attempt_start_game(
 ) {
     let mut rand_gen = global.new_rand_gen();
 
-    match Game::from_lobby(model.lobby.clone(), &mut rand_gen) {
+    match Game::try_from((model.lobby.clone(), &mut rand_gen)) {
         Ok(_) => {
             let req = lobby_start::Request {
                 player_id: global.viewer_id(),
@@ -376,10 +374,7 @@ fn handle_updated_lobby(
         model.lobby = lobby.clone();
 
         if lobby.game_started {
-            go_to_route(
-                orders,
-                Route::Game(GameId::from_lobby_id(model.lobby_id.clone())),
-            )
+            go_to_route(orders, Route::game(model.lobby_id.clone()))
         }
     }
 }

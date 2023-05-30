@@ -1,6 +1,7 @@
 use crate::rng::RandGen;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+use std::string::ToString;
 
 ///////////////////////////////////////////////////////////////
 // Types //
@@ -49,6 +50,7 @@ impl ToString for Name {
     }
 }
 
+#[derive(Debug)]
 pub enum Error {
     NameCannotBeEmpty,
 }

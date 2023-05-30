@@ -44,6 +44,10 @@ impl ToString for Route {
 }
 
 impl Route {
+    pub fn game(lobby_id: LobbyId) -> Route {
+        Route::Game(GameId::from_lobby_id(lobby_id))
+    }
+
     fn to_pieces(&self) -> Vec<String> {
         match self {
             Route::Title => vec![],
@@ -62,8 +66,8 @@ impl Route {
             Route::Kicked => {
                 vec![KICKED.to_string()]
             }
-            Route::Game(id) => {
-                vec![GAME.to_string(), id.to_string()]
+            Route::Game(game_id) => {
+                vec![GAME.to_string(), game_id.to_string()]
             }
         }
     }

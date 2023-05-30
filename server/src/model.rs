@@ -41,13 +41,19 @@ impl Model {
         let lobbies_seed: RandSeed = RandSeed::next(&mut rand_gen);
         let games_seed: RandSeed = RandSeed::next(&mut rand_gen);
 
+        let games = if flags.dev_mode {
+            Games::init_dev(games_seed)
+        } else {
+            Games::init(games_seed)
+        };
+
         Model {
             ip_address: flags.ip_address,
             admin_password: flags.admin_password,
             port_number: flags.port_number,
             setting,
             lobbies: Mutex::new(Lobbies::init(lobbies_seed)),
-            games: Mutex::new(Games::init(games_seed)),
+            games: Mutex::new(games),
         }
     }
 }

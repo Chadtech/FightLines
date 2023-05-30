@@ -22,27 +22,45 @@ use crate::{located, unit};
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::Iter;
 use std::collections::{HashMap, HashSet};
+use std::convert::TryFrom;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Types //
 ////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Debug)]
-pub struct GameId(Id);
+pub enum GameId {
+    GameId(Id),
+    DisplayTest,
+}
 
 impl ToString for GameId {
     fn to_string(&self) -> String {
-        self.0.to_string()
+        match self {
+            GameId::GameId(id) => id.to_string(),
+            GameId::DisplayTest => DISPLAY_TEST.to_string(),
+        }
     }
 }
 
 impl GameId {
     pub fn from_lobby_id(lobby_id: LobbyId) -> GameId {
-        GameId(lobby_id.ambiguate())
+        GameId::GameId(lobby_id.ambiguate())
     }
 
     pub fn from_string(s: String) -> Option<GameId> {
-        Id::from_string(s).map(GameId)
+        if s == DISPLAY_TEST {
+            return Some(GameId::DisplayTest);
+        }
+
+        Id::from_string(s).map(GameId::GameId)
+    }
+
+    pub fn is_dev(&self) -> bool {
+        match self {
+            GameId::GameId(_) => false,
+            GameId::DisplayTest => true,
+        }
     }
 }
 
@@ -97,6 +115,7 @@ pub struct Guest {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct Military(HashMap<UnitId, Located<Owned<Unit>>>);
 
+#[derive(Debug)]
 pub enum FromLobbyError {
     NotEnoughPlayers,
     CouldNotFindInitialMapMilitary {
@@ -104,6 +123,8 @@ pub enum FromLobbyError {
         found_player_count: u8,
     },
 }
+
+const DISPLAY_TEST: &str = "display-test";
 
 ////////////////////////////////////////////////////////////////////////////////
 // Api //
@@ -113,15 +134,9 @@ impl Game {
     pub fn get_mut_unit(&mut self, unit_id: &UnitId) -> Option<&mut unit::Model> {
         self.indices.by_id.get_mut(unit_id)
     }
-    // pub fn units_by_id(&mut self) -> &mut HashMap<UnitId, unit::Model> {
-    //     &mut self.indices.by_id
-    // }
     pub fn get_unit(&self, unit_id: &UnitId) -> Option<&unit::Model> {
         self.indices.by_id.get(unit_id)
     }
-    // pub fn remove_unit(&mut self, unit_id: &UnitId) {
-    //     self.indices.by_id.remove(unit_id);
-    // }
     pub fn units_by_location(
         &self,
     ) -> Iter<'_, Located<()>, Vec<(UnitId, FacingDirection, unit::Model)>> {
@@ -416,147 +431,6 @@ impl Game {
             ))
         }
     }
-    pub fn from_lobby(lobby: Lobby, rng: &mut RandGen) -> Result<Game, FromLobbyError> {
-        let num_players = lobby.num_players();
-        let guests: Vec<(Id, Player)> = lobby.guests.into_iter().collect();
-
-        let map_choice = MapOpt::TerrainTest;
-        // let map_choice = MapOpt::GrassSquare;
-        let map = map_choice.to_map();
-        let initial_units = map_choice.initial_units();
-
-        match guests.split_first() {
-            None => Err(FromLobbyError::NotEnoughPlayers),
-            Some((first, rest)) => {
-                let (first_guest_id, first_guest) = first;
-
-                let mut id_units = |units: Vec<Located<(FacingDirection, Unit)>>,
-                                    owner_id: &Id,
-                                    color: &TeamColor|
-                 -> Vec<(UnitId, unit::Model)> {
-                    let mut units_with_ids: Vec<(UnitId, unit::Model)> = vec![];
-
-                    for located_unit in units {
-                        let unit_id = UnitId::new(rng);
-
-                        let (facing, unit) = located_unit.value;
-
-                        let place: Place = Place::OnMap(Located {
-                            x: located_unit.x,
-                            y: located_unit.y,
-                            value: facing,
-                        });
-
-                        let new_unit: unit::Model = unit::Model {
-                            unit: unit.clone(),
-                            owner: owner_id.clone(),
-                            place,
-                            color: color.clone(),
-                            name: None,
-                            supplies: unit.max_supplies(),
-                        };
-
-                        units_with_ids.push((unit_id, new_unit));
-                    }
-
-                    units_with_ids
-                };
-
-                let mut remaining_guests_with_militaries: Vec<(UnitId, unit::Model)> = vec![];
-
-                for (index, (guest_id, guest)) in rest.iter().enumerate() {
-                    let initial_military = initial_units
-                        .rest_players_militatries
-                        .get(index)
-                        .ok_or(CouldNotFindInitialMapMilitary {
-                            required_player_count: map_choice.player_count(),
-                            found_player_count: num_players,
-                        })?;
-
-                    let mut military = id_units(initial_military.clone(), guest_id, &guest.color);
-
-                    remaining_guests_with_militaries.append(&mut military);
-                }
-
-                let host_units = id_units(
-                    initial_units.first_player_military,
-                    &lobby.host_id,
-                    &lobby.host.color,
-                );
-
-                let first_guest_units = id_units(
-                    initial_units.second_player_military,
-                    first_guest_id,
-                    &first_guest.color,
-                );
-
-                let units: Vec<(UnitId, unit::Model)> = vec![
-                    vec![host_units, first_guest_units].concat().to_vec(),
-                    remaining_guests_with_militaries,
-                ]
-                .concat()
-                .to_vec();
-
-                let mut unit_hashmap: HashMap<UnitId, unit::Model> = HashMap::new();
-
-                for (unit_id, unit) in units {
-                    unit_hashmap.insert(unit_id, unit);
-                }
-
-                let host_id = lobby.host_id.clone();
-
-                let units_by_id = unit_index::by_id::Index::from_hash_map(unit_hashmap);
-
-                let remaining_guests: Vec<(Id, Guest)> = rest
-                    .iter()
-                    .map(|(guest_id, guest_player)| {
-                        let guest = Guest {
-                            player: guest_player.clone(),
-                            visibility: calculate_player_visibility(guest_id, &map, &units_by_id),
-                            turn: Turn::Waiting,
-                        };
-
-                        (guest_id.clone(), guest)
-                    })
-                    .collect();
-
-                let by_location_index = unit_index::by_location::make(&units_by_id);
-                let by_player_index = unit_index::by_player::make(&units_by_id);
-                let by_transport_index = unit_index::by_transport::make(&units_by_id);
-
-                let host_visibility = calculate_player_visibility(&host_id, &map, &units_by_id);
-
-                let first_guest_visibility =
-                    calculate_player_visibility(first_guest_id, &map, &units_by_id);
-
-                let indices = Indices {
-                    by_id: units_by_id,
-                    by_location: by_location_index,
-                    by_player: by_player_index,
-                    by_transport: by_transport_index,
-                };
-
-                let game = Game {
-                    host: lobby.host,
-                    host_id,
-                    host_visibility,
-                    hosts_turn: Turn::Waiting,
-                    first_guest: first_guest.clone(),
-                    first_guest_id: first_guest_id.clone(),
-                    first_guest_visibility,
-                    first_guests_turn: Turn::Waiting,
-                    remaining_guests,
-                    indices,
-                    map,
-                    turn_number: 0,
-                    turns_changes: Vec::new(),
-                    prev_outcomes: Vec::new(),
-                };
-
-                Ok(game)
-            }
-        }
-    }
 
     pub fn get_players_visibility(&self, player_id: &Id) -> Result<&HashSet<Located<()>>, String> {
         if &self.host_id == player_id {
@@ -832,4 +706,152 @@ pub fn calculate_player_visibility(
     }
 
     visible_spots
+}
+
+impl TryFrom<(Lobby, &mut RandGen)> for Game {
+    type Error = FromLobbyError;
+
+    fn try_from(params: (Lobby, &mut RandGen)) -> Result<Self, Self::Error> {
+        let (lobby, rng) = params;
+
+        let num_players = lobby.num_players();
+        let guests: Vec<(Id, Player)> = lobby.guests.into_iter().collect();
+
+        let map_choice = MapOpt::TerrainTest;
+        // let map_choice = MapOpt::GrassSquare;
+        let map = map_choice.to_map();
+        let initial_units = map_choice.initial_units();
+
+        match guests.split_first() {
+            None => Err(FromLobbyError::NotEnoughPlayers),
+            Some((first, rest)) => {
+                let (first_guest_id, first_guest) = first;
+
+                let mut id_units = |units: Vec<Located<(FacingDirection, Unit)>>,
+                                    owner_id: &Id,
+                                    color: &TeamColor|
+                 -> Vec<(UnitId, unit::Model)> {
+                    let mut units_with_ids: Vec<(UnitId, unit::Model)> = vec![];
+
+                    for located_unit in units {
+                        let unit_id = UnitId::new(rng);
+
+                        let (facing, unit) = located_unit.value;
+
+                        let place: Place = Place::OnMap(Located {
+                            x: located_unit.x,
+                            y: located_unit.y,
+                            value: facing,
+                        });
+
+                        let new_unit: unit::Model = unit::Model {
+                            unit: unit.clone(),
+                            owner: owner_id.clone(),
+                            place,
+                            color: color.clone(),
+                            name: None,
+                            supplies: unit.max_supplies(),
+                        };
+
+                        units_with_ids.push((unit_id, new_unit));
+                    }
+
+                    units_with_ids
+                };
+
+                let mut remaining_guests_with_militaries: Vec<(UnitId, unit::Model)> = vec![];
+
+                for (index, (guest_id, guest)) in rest.iter().enumerate() {
+                    let initial_military = initial_units
+                        .rest_players_militatries
+                        .get(index)
+                        .ok_or(CouldNotFindInitialMapMilitary {
+                            required_player_count: map_choice.player_count(),
+                            found_player_count: num_players,
+                        })?;
+
+                    let mut military = id_units(initial_military.clone(), guest_id, &guest.color);
+
+                    remaining_guests_with_militaries.append(&mut military);
+                }
+
+                let host_units = id_units(
+                    initial_units.first_player_military,
+                    &lobby.host_id,
+                    &lobby.host.color,
+                );
+
+                let first_guest_units = id_units(
+                    initial_units.second_player_military,
+                    first_guest_id,
+                    &first_guest.color,
+                );
+
+                let units: Vec<(UnitId, unit::Model)> = vec![
+                    vec![host_units, first_guest_units].concat().to_vec(),
+                    remaining_guests_with_militaries,
+                ]
+                .concat()
+                .to_vec();
+
+                let mut unit_hashmap: HashMap<UnitId, unit::Model> = HashMap::new();
+
+                for (unit_id, unit) in units {
+                    unit_hashmap.insert(unit_id, unit);
+                }
+
+                let host_id = lobby.host_id.clone();
+
+                let units_by_id = unit_index::by_id::Index::from_hash_map(unit_hashmap);
+
+                let remaining_guests: Vec<(Id, Guest)> = rest
+                    .iter()
+                    .map(|(guest_id, guest_player)| {
+                        let guest = Guest {
+                            player: guest_player.clone(),
+                            visibility: calculate_player_visibility(guest_id, &map, &units_by_id),
+                            turn: Turn::Waiting,
+                        };
+
+                        (guest_id.clone(), guest)
+                    })
+                    .collect();
+
+                let by_location_index = unit_index::by_location::make(&units_by_id);
+                let by_player_index = unit_index::by_player::make(&units_by_id);
+                let by_transport_index = unit_index::by_transport::make(&units_by_id);
+
+                let host_visibility = calculate_player_visibility(&host_id, &map, &units_by_id);
+
+                let first_guest_visibility =
+                    calculate_player_visibility(first_guest_id, &map, &units_by_id);
+
+                let indices = Indices {
+                    by_id: units_by_id,
+                    by_location: by_location_index,
+                    by_player: by_player_index,
+                    by_transport: by_transport_index,
+                };
+
+                let game = Game {
+                    host: lobby.host,
+                    host_id,
+                    host_visibility,
+                    hosts_turn: Turn::Waiting,
+                    first_guest: first_guest.clone(),
+                    first_guest_id: first_guest_id.clone(),
+                    first_guest_visibility,
+                    first_guests_turn: Turn::Waiting,
+                    remaining_guests,
+                    indices,
+                    map,
+                    turn_number: 0,
+                    turns_changes: Vec::new(),
+                    prev_outcomes: Vec::new(),
+                };
+
+                Ok(game)
+            }
+        }
+    }
 }

@@ -1,5 +1,6 @@
 #![allow(clippy::wildcard_imports)]
 
+use seed::prelude::js_sys::global;
 use seed::{prelude::*, *};
 
 use page::Page;
@@ -176,6 +177,10 @@ fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders
         }
         Route::Kicked => Page::Kicked,
         Route::Game(id) => {
+            if id.is_dev() {
+                model.global.dev_map();
+            }
+
             let maybe_game =
                 match &model.page {
                     Page::Lobby(sub_model) => {
