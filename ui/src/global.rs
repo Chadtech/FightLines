@@ -179,6 +179,10 @@ impl Model {
         self.dev_map = true
     }
 
+    pub fn set_dev_viewer_id(&mut self, id: Id) {
+        self.dev_viewer_id = id;
+    }
+
     pub fn toast(&mut self, toast: Toast) {
         self.toasts.push(toast);
     }

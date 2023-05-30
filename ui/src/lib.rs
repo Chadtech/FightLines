@@ -176,28 +176,36 @@ fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders
             }
         }
         Route::Kicked => Page::Kicked,
-        Route::Game(id) => {
-            if id.is_dev() {
+        Route::Game {
+            game_id,
+            dev_viewer_id,
+        } => {
+            if game_id.is_dev() {
                 model.global.dev_map();
+
+                if let Some(dev_viewer_id) = dev_viewer_id {
+                    model.global.set_dev_viewer_id(dev_viewer_id);
+                }
             }
 
-            let maybe_game =
-                match &model.page {
-                    Page::Lobby(sub_model) => {
-                        sub_model.started_game().and_then(|(game_id, game)| {
-                            if game_id == id {
+            let maybe_game = match &model.page {
+                Page::Lobby(sub_model) => {
+                    sub_model
+                        .started_game()
+                        .and_then(|(started_game_id, game)| {
+                            if started_game_id == game_id {
                                 Some(game)
                             } else {
                                 None
                             }
                         })
-                    }
-                    _ => None,
-                };
+                }
+                _ => None,
+            };
 
             match maybe_game {
                 None => {
-                    let url = Endpoint::make_get_game(id.clone());
+                    let url = Endpoint::make_get_game(game_id.clone());
 
                     orders.skip().perform_cmd({
                         async {
@@ -229,7 +237,7 @@ fn handle_route_change(route: Route, model: &mut Model, orders: &mut impl Orders
                         &mut model.global,
                         game::Flags {
                             game: game.clone(),
-                            game_id: id.clone(),
+                            game_id: game_id.clone(),
                         },
                         &mut orders.proxy(Msg::Game),
                     );

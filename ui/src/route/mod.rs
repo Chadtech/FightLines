@@ -1,5 +1,6 @@
 use seed::Url;
 use shared::game::GameId;
+use shared::id::Id;
 use shared::lobby::LobbyId;
 
 pub mod component_library;
@@ -14,7 +15,10 @@ pub enum Route {
     ComponentLibrary(component_library::Route),
     Lobby(LobbyId),
     Kicked,
-    Game(GameId),
+    Game {
+        game_id: GameId,
+        dev_viewer_id: Option<Id>,
+    },
 }
 
 ////////////////////////////////////////////////////////////////
@@ -34,18 +38,38 @@ const GAME: &str = "game";
 impl ToString for Route {
     fn to_string(&self) -> String {
         let pieces = self.to_pieces();
+        let query = self.to_query();
 
         if pieces.is_empty() {
             String::new()
         } else {
-            self.to_pieces().join("/")
+            let mut pieces_combined = self.to_pieces().join("/");
+
+            if !query.is_empty() {
+                pieces_combined.push('?');
+
+                for (key, value) in query {
+                    let mut param = key;
+
+                    param.push('=');
+
+                    param.push_str(value.as_str());
+
+                    pieces_combined.push_str(param.as_str());
+                }
+            }
+
+            pieces_combined
         }
     }
 }
 
 impl Route {
     pub fn game(lobby_id: LobbyId) -> Route {
-        Route::Game(GameId::from_lobby_id(lobby_id))
+        Route::Game {
+            game_id: GameId::from_lobby_id(lobby_id),
+            dev_viewer_id: None,
+        }
     }
 
     fn to_pieces(&self) -> Vec<String> {
@@ -66,11 +90,27 @@ impl Route {
             Route::Kicked => {
                 vec![KICKED.to_string()]
             }
-            Route::Game(game_id) => {
+            Route::Game { game_id, .. } => {
                 vec![GAME.to_string(), game_id.to_string()]
             }
         }
     }
+
+    fn to_query(&self) -> Vec<(String, String)> {
+        match self {
+            Route::Title => vec![],
+            Route::ComponentLibrary(_) => vec![],
+            Route::Lobby(_) => vec![],
+            Route::Kicked => vec![],
+            Route::Game { dev_viewer_id, .. } => match dev_viewer_id {
+                None => vec![],
+                Some(dev_viewer_id) => {
+                    vec![("dev-viewer-id".to_string(), dev_viewer_id.to_string())]
+                }
+            },
+        }
+    }
+
     pub fn from_url(url: Url) -> Option<Route> {
         let mut path = url.path().iter();
 
@@ -85,10 +125,19 @@ impl Route {
                 }
 
                 if first == GAME {
+                    let dev_viewer_id = url
+                        .search()
+                        .get("dev-viewer-id")
+                        .and_then(|values| values.first())
+                        .map(|value| Id::Dev(value.to_string()));
+
                     return path
                         .next()
                         .and_then(|id| GameId::from_string(id.clone()))
-                        .map(Route::Game);
+                        .map(|game_id| Route::Game {
+                            game_id,
+                            dev_viewer_id,
+                        });
                 }
 
                 if first == component_library::ROOT {
