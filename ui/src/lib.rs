@@ -40,7 +40,7 @@ struct Model {
 #[derive(Clone)]
 enum Msg {
     // Pages
-    Title(title::Msg),
+    Title(Box<title::Msg>),
     Lobby(lobby::Msg),
     Error(page::error::Msg),
     Kicked(kicked::Msg),
@@ -273,11 +273,11 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
     match msg {
         Msg::Title(sub_msg) => {
             if let Page::Title(sub_model) = &mut model.page {
-                page::title::update(
+                title::update(
                     &model.global,
-                    sub_msg,
+                    *sub_msg,
                     sub_model,
-                    &mut orders.proxy(Msg::Title),
+                    &mut orders.proxy(|sub_msg: title::Msg| Msg::Title(Box::new(sub_msg))),
                 );
             }
         }
@@ -375,7 +375,7 @@ fn view(model: &Model) -> Node<Msg> {
             let body: Vec<Row<Msg>> = match &model.page {
                 Page::Title(sub_model) => title::view(sub_model)
                     .into_iter()
-                    .map(|row| row.map_msg(Msg::Title))
+                    .map(|row| row.map_msg(|sub_msg| Msg::Title(Box::new(sub_msg))))
                     .collect(),
 
                 Page::ComponentLibrary(sub_model) => component_library::view(sub_model),

@@ -45,7 +45,7 @@ async fn main() -> Result<(), String> {
                 });
             };
 
-            let web_model = actix_web::web::Data::new(model);
+            let web_model = web::Data::new(model);
 
             HttpServer::new(move || {
                 let cors = Cors::permissive();

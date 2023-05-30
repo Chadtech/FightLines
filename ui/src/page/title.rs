@@ -35,7 +35,7 @@ enum NewGameError {
 #[derive(Clone, Debug)]
 pub enum Msg {
     ClickedStartGame,
-    LoadedLobby(Result<create::Response, String>),
+    LoadedLobby(Box<Result<create::Response, String>>),
     ClickedGoBackToTitle,
     ClickedGoToNewGame,
 }
@@ -82,7 +82,7 @@ pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut 
                                 }
                             };
 
-                            Msg::LoadedLobby(result)
+                            Msg::LoadedLobby(Box::new(result))
                         }
                     });
                 }
@@ -92,7 +92,7 @@ pub fn update(global: &global::Model, msg: Msg, model: &mut Model, orders: &mut 
                 }
             };
         }
-        Msg::LoadedLobby(result) => match result {
+        Msg::LoadedLobby(result) => match *result {
             Ok(res) => {
                 let lobby_id = res.lobby_id;
 
