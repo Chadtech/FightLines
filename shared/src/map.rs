@@ -255,6 +255,11 @@ impl MapOpt {
                         x: 2,
                         y: 6,
                     },
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Right, Unit::SupplyCrate),
+                        x: 2,
+                        y: 10,
+                    },
                 ],
                 second_player_military: vec![
                     Located::<(FacingDirection, Unit)> {
@@ -271,6 +276,11 @@ impl MapOpt {
                         value: (FacingDirection::Left, Unit::Truck),
                         x: 4,
                         y: 6,
+                    },
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Left, Unit::SupplyCrate),
+                        x: 4,
+                        y: 10,
                     },
                 ],
                 rest_players_militatries: vec![],
