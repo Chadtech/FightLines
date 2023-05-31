@@ -75,6 +75,8 @@ pub const PIXEL_HEIGHT: u16 = 16;
 pub const PIXEL_WIDTH_FL: f64 = 16.0;
 pub const PIXEL_HEIGHT_FL: f64 = 16.0;
 
+pub const ALL: [Tile; 3] = [Tile::GrassPlain, Tile::Hills, Tile::Forest];
+
 #[cfg(test)]
 mod test_tiles {
     use crate::tile::Tile;

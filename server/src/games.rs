@@ -2,6 +2,7 @@ use shared::game;
 use shared::game::{Game, GameId};
 use shared::id::Id;
 use shared::lobby::Lobby;
+use shared::map::MapOpt;
 use shared::name::Name;
 use shared::player::Player;
 use shared::rng::{RandGen, RandSeed};
@@ -52,6 +53,8 @@ impl Games {
                     color: TeamColor::Blue,
                 },
             );
+
+            lobby.set_map_choice(MapOpt::DisplayTest);
 
             let new_seed: RandSeed = RandSeed::next(&mut rng);
 

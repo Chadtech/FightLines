@@ -1,4 +1,5 @@
 use crate::id::Id;
+use crate::map::MapOpt;
 use crate::name::Name;
 use crate::player::Player;
 use crate::rng::RandGen;
@@ -47,6 +48,7 @@ pub struct Lobby {
     pub name: Name,
     pub kicked_guests: HashSet<Id>,
     pub game_started: bool,
+    pub map_choice: MapOpt,
 }
 
 #[derive(Debug)]
@@ -61,6 +63,7 @@ pub enum Update {
     ChangeName(Name),
     ChangePlayerName { player_id: Id, new_name: Name },
     KickGuest { guest_id: Id },
+    SetMapOption(MapOpt),
 }
 
 #[derive(Clone)]
@@ -97,6 +100,7 @@ impl Lobby {
             name: Name::new("game"),
             num_players_limit: 2,
             kicked_guests: HashSet::new(),
+            map_choice: MapOpt::GrassSquare,
         }
     }
 
@@ -163,6 +167,10 @@ impl Lobby {
         self.game_started = true;
     }
 
+    pub fn set_map_choice(&mut self, map_opt: MapOpt) {
+        self.map_choice = map_opt;
+    }
+
     pub fn update(&mut self, upt: Update) -> Result<(), UpdateError> {
         match upt {
             Update::AddSlot => {
@@ -200,6 +208,9 @@ impl Lobby {
             Update::KickGuest { guest_id } => {
                 self.guests.remove(&guest_id);
                 self.kicked_guests.insert(guest_id);
+            }
+            Update::SetMapOption(map_opt) => {
+                self.set_map_choice(map_opt);
             }
         }
 

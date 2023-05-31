@@ -1,8 +1,8 @@
 use crate::facing_direction::FacingDirection;
-use crate::located;
 use crate::located::Located;
 use crate::tile::Tile;
 use crate::unit::Unit;
+use crate::{located, tile};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -25,6 +25,33 @@ impl Map {
             grid: Vec::new(),
             width: 16,
             height: 16,
+        }
+        .sync_grid()
+    }
+
+    pub fn display_test() -> Map {
+        let mut features = HashMap::new();
+
+        let block_size = 4;
+        let block_size_plus_gap = block_size + 1;
+
+        let size: u16 = ((tile::ALL.len() * block_size_plus_gap) + 1) as u16;
+
+        for (index, tile) in tile::ALL.iter().enumerate() {
+            for y in 0..block_size {
+                for x in 0..block_size {
+                    let loc_x = (index * block_size_plus_gap) + x;
+                    features.insert(located::unit(loc_x as u16, y as u16), tile.clone());
+                }
+            }
+        }
+
+        Map {
+            base_tile: Tile::GrassPlain,
+            features,
+            grid: Vec::new(),
+            width: size,
+            height: size,
         }
         .sync_grid()
     }
@@ -90,9 +117,11 @@ impl Map {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum MapOpt {
     GrassSquare,
     TerrainTest,
+    DisplayTest,
 }
 
 pub struct StartingUnits {
@@ -209,6 +238,43 @@ impl MapOpt {
                 ],
                 rest_players_militatries: vec![],
             },
+            MapOpt::DisplayTest => StartingUnits {
+                first_player_military: vec![
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Right, Unit::Infantry),
+                        x: 2,
+                        y: 2,
+                    },
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Right, Unit::Tank),
+                        x: 2,
+                        y: 4,
+                    },
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Right, Unit::Truck),
+                        x: 2,
+                        y: 6,
+                    },
+                ],
+                second_player_military: vec![
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Left, Unit::Infantry),
+                        x: 4,
+                        y: 2,
+                    },
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Left, Unit::Tank),
+                        x: 4,
+                        y: 4,
+                    },
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Left, Unit::Truck),
+                        x: 4,
+                        y: 6,
+                    },
+                ],
+                rest_players_militatries: vec![],
+            },
         }
     }
 
@@ -220,6 +286,7 @@ impl MapOpt {
         match self {
             MapOpt::GrassSquare => Map::grass_square(),
             MapOpt::TerrainTest => Map::terrain_test(),
+            MapOpt::DisplayTest => Map::display_test(),
         }
     }
 }

@@ -8,11 +8,10 @@ use crate::game::action::Action;
 use crate::game::day::Time;
 use crate::game::outcome::Outcome;
 use crate::game::unit_index::Indices;
-use crate::game::FromLobbyError::CouldNotFindInitialMapMilitary;
 use crate::id::Id;
 use crate::lobby::{Lobby, LobbyId};
 use crate::located::Located;
-use crate::map::{Map, MapOpt};
+use crate::map::Map;
 use crate::owner::Owned;
 use crate::player::Player;
 use crate::rng::{RandGen, RandSeed};
@@ -717,8 +716,8 @@ impl TryFrom<(Lobby, &mut RandGen)> for Game {
         let num_players = lobby.num_players();
         let guests: Vec<(Id, Player)> = lobby.guests.into_iter().collect();
 
-        let map_choice = MapOpt::TerrainTest;
-        // let map_choice = MapOpt::GrassSquare;
+        let map_choice = lobby.map_choice;
+
         let map = map_choice.to_map();
         let initial_units = map_choice.initial_units();
 
@@ -765,7 +764,7 @@ impl TryFrom<(Lobby, &mut RandGen)> for Game {
                     let initial_military = initial_units
                         .rest_players_militatries
                         .get(index)
-                        .ok_or(CouldNotFindInitialMapMilitary {
+                        .ok_or(FromLobbyError::CouldNotFindInitialMapMilitary {
                             required_player_count: map_choice.player_count(),
                             found_player_count: num_players,
                         })?;
