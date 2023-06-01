@@ -17,4 +17,10 @@ pub enum Action {
         path: Path,
         arrows: Vec<(Direction, Arrow)>,
     },
+    PickUp {
+        unit_id: UnitId,
+        cargo_id: UnitId,
+        path: Path,
+        arrows: Vec<(Direction, Arrow)>,
+    },
 }

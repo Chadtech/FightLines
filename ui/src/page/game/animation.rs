@@ -8,6 +8,7 @@ pub enum Animation {
         unit_id: UnitId,
         path: Path,
         loads_into: Option<UnitId>,
+        picks_up: Option<UnitId>,
     },
     Expired {
         unit_id: UnitId,
@@ -21,6 +22,7 @@ impl Animation {
                 unit_id,
                 path,
                 loads_into: None,
+                picks_up: None,
             }),
             Outcome::LoadedInto {
                 unit_id,
@@ -31,10 +33,21 @@ impl Animation {
                 unit_id,
                 path,
                 loads_into: Some(loaded_into),
+                picks_up: None,
             }),
             Outcome::NamedUnit { .. } => None,
             Outcome::Expired { unit_id } => Some(Animation::Expired { unit_id }),
             Outcome::ConsumedSupplies { .. } => None,
+            Outcome::PickUp {
+                unit_id,
+                path,
+                cargo_id,
+            } => Some(Animation::Travel {
+                unit_id,
+                path,
+                loads_into: None,
+                picks_up: Some(cargo_id),
+            }),
         }
     }
 }

@@ -40,6 +40,7 @@ impl Model {
                     unit_id,
                     path,
                     loads_into,
+                    picks_up,
                 } => {
                     let facing_dir = match self.indices.position_of_unit_or_transport(unit_id) {
                         Ok(facing_dir_loc) => facing_dir_loc.value,
@@ -69,6 +70,15 @@ impl Model {
                         None => {
                             if let Some(transport_id) = loads_into {
                                 unit.place = Place::InUnit(transport_id.clone());
+                            }
+
+                            if let Some(cargo_id) = picks_up {
+                                let cargo = match self.indices.by_id.get_mut(cargo_id) {
+                                    None => return Err("could not find cargo unit".to_string()),
+                                    Some(u) => u,
+                                };
+
+                                cargo.place = Place::InUnit(unit_id.clone());
                             }
 
                             self.indices.by_location =

@@ -115,6 +115,23 @@ impl Unit {
         }
     }
 
+    pub fn can_pick_up_supply_crates(&self) -> bool {
+        match self {
+            Unit::Infantry => false,
+            Unit::Tank => false,
+            Unit::Truck => true,
+            Unit::SupplyCrate => false,
+        }
+    }
+
+    pub fn is_supply_crate(&self) -> bool {
+        match self {
+            Unit::Infantry => false,
+            Unit::Tank => false,
+            Unit::Truck => false,
+            Unit::SupplyCrate => true,
+        }
+    }
     pub fn can_carry(&self, carry_unit: &Unit) -> bool {
         match self {
             Unit::Infantry => false,

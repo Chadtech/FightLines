@@ -156,7 +156,7 @@ impl Game {
     }
     pub fn get_rideable_units_by_location(
         &self,
-        owner_id: Id,
+        owner_id: &Id,
         carrying_unit: &Unit,
         mouse_loc: &Located<()>,
     ) -> Option<Vec<(UnitId, unit::Model)>> {
@@ -166,7 +166,7 @@ impl Game {
                     .iter()
                     .filter_map(|(rideable_unit_id, _, possibly_rideable_unit)| {
                         if possibly_rideable_unit.unit.can_carry(carrying_unit)
-                            && possibly_rideable_unit.owner == owner_id
+                            && &possibly_rideable_unit.owner == owner_id
                         {
                             Some((rideable_unit_id.clone(), possibly_rideable_unit.clone()))
                         } else {
@@ -179,6 +179,32 @@ impl Game {
                     None
                 } else {
                     Some(rideable_units)
+                }
+            }
+            None => None,
+        }
+    }
+    pub fn get_supply_crates_by_location(
+        &self,
+        mouse_loc: &Located<()>,
+    ) -> Option<Vec<(UnitId, unit::Model)>> {
+        match self.indices.by_location.get(mouse_loc) {
+            Some(units) => {
+                let supply_crates = units
+                    .iter()
+                    .filter_map(|(unit_id, _, possibly_supply_crate)| {
+                        if possibly_supply_crate.unit.is_supply_crate() {
+                            Some((unit_id.clone(), possibly_supply_crate.clone()))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<(UnitId, unit::Model)>>();
+
+                if supply_crates.is_empty() {
+                    None
+                } else {
+                    Some(supply_crates)
                 }
             }
             None => None,
@@ -365,6 +391,33 @@ impl Game {
                     if let Some(unit) = self.get_mut_unit(&unit_id) {
                         unit.supplies -= supplies;
                     }
+                }
+                Outcome::PickUp {
+                    unit_id,
+                    cargo_id,
+                    path,
+                } => {
+                    if self.get_unit(&cargo_id).is_none() || self.get_unit(&unit_id).is_none() {
+                        return Ok(());
+                    }
+
+                    let cargo_unit = match self.get_mut_unit(&cargo_id) {
+                        Some(cargo) => cargo,
+                        None => {
+                            return Ok(());
+                        }
+                    };
+
+                    cargo_unit.place = Place::InUnit(unit_id.clone());
+
+                    let unit = match self.get_mut_unit(&unit_id) {
+                        Some(u) => u,
+                        None => {
+                            return Ok(());
+                        }
+                    };
+
+                    unit.supplies -= path.supply_cost(&unit.unit);
                 }
             }
         }

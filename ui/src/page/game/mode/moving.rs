@@ -79,27 +79,53 @@ pub struct RideOptionsModel {
 }
 
 #[derive(Debug, Clone)]
-pub struct RideOption {
-    unit_id: UnitId,
-    label: String,
+
+pub enum RideOption {
+    LoadInto { unit_id: UnitId, unit_label: String },
+    PickUp { unit_id: UnitId, unit_label: String },
 }
 
 impl RideOption {
-    pub fn init(unit_id: UnitId, label: String) -> RideOption {
-        RideOption { unit_id, label }
+    pub fn load_into(unit_id: UnitId, label: String) -> RideOption {
+        RideOption::LoadInto {
+            unit_id,
+            unit_label: label,
+        }
+    }
+
+    pub fn pick_up(unit_id: UnitId, label: String) -> RideOption {
+        RideOption::PickUp {
+            unit_id,
+            unit_label: label,
+        }
+    }
+
+    pub fn label(&self) -> String {
+        match self {
+            RideOption::LoadInto {
+                unit_label: label, ..
+            } => {
+                format!("load into {}", label)
+            }
+            RideOption::PickUp { unit_label, .. } => {
+                format!("pick up {}", unit_label)
+            }
+        }
     }
 }
 
 #[derive(Clone, Debug)]
-pub enum Msg {
-    ClickedLoadInto(UnitId),
-    ClickedMoveTo,
+pub enum ClickMsg {
+    LoadInto(UnitId),
+    PickUp(UnitId),
+    MoveTo,
 }
+
 ///////////////////////////////////////////////////////////////
 // View
 ///////////////////////////////////////////////////////////////
 
-pub fn flyout_view(model: &Model, game_screen_pos: &Point<i16>) -> Cell<Msg> {
+pub fn flyout_view(model: &Model, game_screen_pos: &Point<i16>) -> Cell<ClickMsg> {
     match &model.ride_options {
         None => Cell::none(),
         Some(loc_ride_options) => {
@@ -117,15 +143,16 @@ pub fn flyout_view(model: &Model, game_screen_pos: &Point<i16>) -> Cell<Msg> {
 
             let mut move_buttons = vec![];
 
-            move_buttons.push(Button::simple("move to").on_click(|_| Msg::ClickedMoveTo));
+            move_buttons.push(Button::simple("move to").on_click(|_| ClickMsg::MoveTo));
 
             for ride_option in &loc_ride_options.value.ride_options {
-                let label = format!("load into {}", ride_option.label);
+                let msg = match ride_option {
+                    RideOption::LoadInto { unit_id, .. } => ClickMsg::LoadInto(unit_id.clone()),
+                    RideOption::PickUp { unit_id, .. } => ClickMsg::PickUp(unit_id.clone()),
+                };
 
-                let click_unit_id = ride_option.unit_id.clone();
-
-                let button = Button::simple(label.as_str())
-                    .on_click(|_| Msg::ClickedLoadInto(click_unit_id))
+                let button = Button::simple(ride_option.label().as_str())
+                    .on_click(|_| msg)
                     .full_width();
 
                 move_buttons.push(button)
@@ -142,7 +169,7 @@ pub fn flyout_view(model: &Model, game_screen_pos: &Point<i16>) -> Cell<Msg> {
                 move_buttons
                     .into_iter()
                     .map(|button| button.full_width().cell())
-                    .collect::<Vec<Cell<Msg>>>(),
+                    .collect::<Vec<Cell<ClickMsg>>>(),
             )
             .at_screen_pos(Point {
                 x: screen_x,

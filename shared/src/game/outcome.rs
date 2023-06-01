@@ -15,6 +15,11 @@ pub enum Outcome {
         loaded_into: UnitId,
         path: Path,
     },
+    PickUp {
+        unit_id: UnitId,
+        cargo_id: UnitId,
+        path: Path,
+    },
     NamedUnit {
         unit_id: UnitId,
         name: String,
@@ -76,5 +81,16 @@ fn outcomes_from_action(action: &Action) -> Vec<Outcome> {
             .map(outcomes_from_action)
             .collect::<Vec<Vec<Outcome>>>()
             .concat(),
+        Action::PickedUp {
+            unit_id,
+            cargo_id,
+            path,
+        } => {
+            vec![Outcome::PickUp {
+                unit_id: unit_id.clone(),
+                cargo_id: cargo_id.clone(),
+                path: path.clone(),
+            }]
+        }
     }
 }

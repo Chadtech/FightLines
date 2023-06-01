@@ -252,7 +252,7 @@ pub enum Msg {
     GameReloadTimeExpired,
     GroupSelectedSidebar(group_selected::Msg),
     UnitSelectedSidebar(unit_selected::Msg),
-    MovingFlyout(mode::moving::Msg),
+    MovingFlyout(mode::moving::ClickMsg),
     EnterPressed,
     EscapePressed,
     ScrolledCanvasContainer(Result<Point<i16>, String>),
@@ -347,6 +347,12 @@ pub fn init(
                 } => {
                     moves_index_ret.insert(unit_id.clone(), action.clone());
                     moves_index_ret.insert(load_into.clone(), action.clone());
+                }
+                Action::PickUp {
+                    unit_id, cargo_id, ..
+                } => {
+                    moves_index_ret.insert(unit_id.clone(), action.clone());
+                    moves_index_ret.insert(cargo_id.clone(), action.clone());
                 }
             }
         }
@@ -675,7 +681,7 @@ fn handle_rendered_first_frame(model: &mut Model, viewer_id: Id) -> Result<(), E
     draw(&viewer_id, model)
 }
 
-fn handle_moving_flyout_msg(model: &mut Model, msg: mode::moving::Msg) -> Result<(), Error> {
+fn handle_moving_flyout_msg(model: &mut Model, msg: mode::moving::ClickMsg) -> Result<(), Error> {
     let sub_model = if let Stage::TakingTurn(stage::taking_turn::Model {
         mode: Mode::MovingUnit(sub_model),
         ..
@@ -687,7 +693,27 @@ fn handle_moving_flyout_msg(model: &mut Model, msg: mode::moving::Msg) -> Result
     };
 
     match msg {
-        mode::moving::Msg::ClickedLoadInto(rideable_unit_id) => {
+        mode::moving::ClickMsg::PickUp(cargo_unit_id) => {
+            let unit_id = &sub_model.unit_id.clone();
+            let arrows = &sub_model.arrows.clone();
+
+            let path = sub_model
+                .path(unit_id, &model.game)
+                .map_err(|err_msg| Error::new("handle moving flyout msg".to_string(), err_msg))?;
+
+            model.moves_index_by_unit.insert(
+                sub_model.unit_id.clone(),
+                Action::PickUp {
+                    unit_id: unit_id.clone(),
+                    cargo_id: cargo_unit_id,
+                    arrows: arrows.clone(),
+                    path,
+                },
+            );
+
+            model.clear_mode()
+        }
+        mode::moving::ClickMsg::LoadInto(rideable_unit_id) => {
             let unit_id = &sub_model.unit_id.clone();
             let arrows = &sub_model.arrows.clone();
 
@@ -707,7 +733,7 @@ fn handle_moving_flyout_msg(model: &mut Model, msg: mode::moving::Msg) -> Result
 
             model.clear_mode()
         }
-        mode::moving::Msg::ClickedMoveTo => {
+        mode::moving::ClickMsg::MoveTo => {
             let unit_id = &sub_model.unit_id.clone();
             let arrows = &sub_model.arrows.clone();
 
@@ -778,6 +804,11 @@ fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl 
             } => game::action::Action::LoadInto {
                 unit_id: unit_id.clone(),
                 load_into: load_into.clone(),
+                path: path.clone(),
+            },
+            Action::PickUp { cargo_id, path, .. } => game::action::Action::PickedUp {
+                unit_id: unit_id.clone(),
+                cargo_id: cargo_id.clone(),
                 path: path.clone(),
             },
         })
@@ -890,20 +921,22 @@ fn handle_click_on_screen_when_move_mode(
             return model.clear_mode();
         }
 
-        let arrows = moving_model.arrows.clone();
-
+        // If the unit clicks a unit that can carry it, we
+        // need to bring up menu options to select
         let path = moving_model
             .path(&moving_model.unit_id, &model.game)
             .map_err(|err_msg| Error::new(error_title.clone(), err_msg))?;
 
+        let mut ride_options = vec![];
+
         if let Some(rideable_units) = model
             .game
-            .get_rideable_units_by_location(viewer_id, &unit.unit, mouse_loc)
+            .get_rideable_units_by_location(&viewer_id, &unit.unit, mouse_loc)
         {
-            let rideable_unit_options = rideable_units
+            let mut rideable_unit_options = rideable_units
                 .iter()
                 .map(|(rideable_unit_id, rideable_unit)| {
-                    mode::moving::RideOption::init(
+                    mode::moving::RideOption::load_into(
                         rideable_unit_id.clone(),
                         rideable_unit
                             .name
@@ -913,9 +946,34 @@ fn handle_click_on_screen_when_move_mode(
                 })
                 .collect::<Vec<mode::moving::RideOption>>();
 
-            moving_model.with_options(mouse_loc.x, mouse_loc.y, rideable_unit_options, path);
-        } else {
+            ride_options.append(&mut rideable_unit_options);
+        }
+
+        if unit.unit.can_pick_up_supply_crates() {
+            if let Some(supply_crates) = model.game.get_supply_crates_by_location(mouse_loc) {
+                ride_options.append(
+                    &mut supply_crates
+                        .iter()
+                        .map(|(supply_crate_id, supply_crate)| {
+                            mode::moving::RideOption::pick_up(
+                                supply_crate_id.clone(),
+                                supply_crate
+                                    .name
+                                    .clone()
+                                    .unwrap_or_else(|| supply_crate.unit.to_string()),
+                            )
+                        })
+                        .collect::<Vec<mode::moving::RideOption>>(),
+                )
+            }
+        }
+
+        if ride_options.is_empty() {
+            let arrows = moving_model.arrows.clone();
+
             model.travel_unit(&unit_id, path, &arrows)?;
+        } else {
+            moving_model.with_options(mouse_loc.x, mouse_loc.y, ride_options, path);
         }
     }
 
@@ -1285,6 +1343,9 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                         draw_arrows(&ctx, model, game_pos, arrows);
                     }
                     Action::LoadInto { arrows, .. } => {
+                        draw_arrows(&ctx, model, game_pos, arrows);
+                    }
+                    Action::PickUp { arrows, .. } => {
                         draw_arrows(&ctx, model, game_pos, arrows);
                     }
                 };
@@ -2032,6 +2093,19 @@ fn game_moves_to_page_actions(moves: Vec<game::action::Action>) -> Vec<Action> {
             game::action::Action::Batch(more_moves) => {
                 let mut more_moves_ret = game_moves_to_page_actions(more_moves);
                 moves_ret.append(&mut more_moves_ret);
+            }
+            game::action::Action::PickedUp {
+                unit_id,
+                path,
+                cargo_id,
+                ..
+            } => {
+                moves_ret.push(Action::PickUp {
+                    unit_id: unit_id.clone(),
+                    cargo_id: cargo_id.clone(),
+                    path: path.clone(),
+                    arrows: path.with_arrows(),
+                });
             }
         }
     }

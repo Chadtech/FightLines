@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct Index {
-    units: HashMap<UnitId, unit::Model>,
+    pub units: HashMap<UnitId, unit::Model>,
     deleted: HashMap<UnitId, unit::Deleted>,
 }
 

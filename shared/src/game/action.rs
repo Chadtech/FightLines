@@ -15,6 +15,11 @@ pub enum Action {
         load_into: UnitId,
         path: Path,
     },
+    PickedUp {
+        unit_id: UnitId,
+        cargo_id: UnitId,
+        path: Path,
+    },
     Batch(Vec<Action>),
 }
 
@@ -56,6 +61,7 @@ pub fn order(rng: &mut RandGen, actions: &mut Vec<Action>) {
                             }
                             Action::LoadInto { .. } => {}
                             Action::Batch(_) => {}
+                            Action::PickedUp { .. } => {}
                         }
 
                         j += 1;
@@ -89,12 +95,14 @@ pub fn order(rng: &mut RandGen, actions: &mut Vec<Action>) {
                         }
                         Action::LoadInto { .. } => {}
                         Action::Batch(_) => {}
+                        Action::PickedUp { .. } => {}
                     }
 
                     j += 1;
                 }
             }
             Action::Batch(_) => {}
+            Action::PickedUp { .. } => {}
         }
 
         i += 1;
