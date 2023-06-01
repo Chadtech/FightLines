@@ -52,7 +52,7 @@ impl GameId {
             return Some(GameId::DisplayTest);
         }
 
-        Id::from_string(s).map(GameId::GameId)
+        Id::from_string(s, false).map(GameId::GameId)
     }
 
     pub fn is_dev(&self) -> bool {

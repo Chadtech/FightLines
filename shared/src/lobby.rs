@@ -31,7 +31,7 @@ impl LobbyId {
     }
 
     pub fn from_string(s: String) -> Option<LobbyId> {
-        Id::from_string(s).map(LobbyId)
+        Id::from_string(s, false).map(LobbyId)
     }
 
     pub fn new(rng: &mut RandGen) -> LobbyId {

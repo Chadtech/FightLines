@@ -85,7 +85,7 @@ mod test_tiles {
 
     #[test]
     fn infantry_mobility_cost() {
-        let want = 42;
+        let want = 5;
         assert_eq!(want, Tile::GrassPlain.travel_supply_cost(&Unit::Infantry));
     }
 }

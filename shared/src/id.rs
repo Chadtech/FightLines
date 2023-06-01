@@ -46,8 +46,8 @@ impl Id {
         Id::Bytes { bytes: id_bytes }
     }
 
-    pub fn from_string(s: String) -> Option<Id> {
-        match hex::decode(s) {
+    pub fn from_string(s: String, is_dev: bool) -> Option<Id> {
+        let decoded_id = match hex::decode(s.clone()) {
             Ok(bytes) => {
                 if bytes.len() == N {
                     let mut new_id = [0; N];
@@ -62,6 +62,12 @@ impl Id {
                 }
             }
             Err(_) => None,
+        };
+
+        if is_dev {
+            Some(decoded_id.unwrap_or(Id::Dev(s)))
+        } else {
+            decoded_id
         }
     }
 
@@ -158,7 +164,7 @@ mod test_id {
     #[test]
     fn can_make_id_from_string() {
         let id_string = "6D5B5DBFF37475EFE4C09C075A968A54".to_string();
-        let maybe_id = Id::from_string(id_string.clone());
+        let maybe_id = Id::from_string(id_string.clone(), false);
 
         if maybe_id.is_none() {}
 
@@ -174,22 +180,22 @@ mod test_id {
 
     #[test]
     fn cannot_make_id_from_short_string() {
-        if Id::from_string("6D5B5DBFF37475EFE4C09C075A968A5".to_string()).is_some() {
+        if Id::from_string("6D5B5DBFF37475EFE4C09C075A968A5".to_string(), false).is_some() {
             panic!("Could make id from string");
         }
 
-        if Id::from_string("6D5B5DBFF37475EFE4C09C075A968A".to_string()).is_some() {
+        if Id::from_string("6D5B5DBFF37475EFE4C09C075A968A".to_string(), false).is_some() {
             panic!("Could make id from string");
         }
     }
 
     #[test]
     fn cannot_make_id_from_long_string() {
-        if Id::from_string("6D5B5DBFF37475EFE4C09C075A968A5FF".to_string()).is_some() {
+        if Id::from_string("6D5B5DBFF37475EFE4C09C075A968A5FF".to_string(), false).is_some() {
             panic!("Could make id from string");
         }
 
-        if Id::from_string("6D5B5DBFF37475EFE4C09C075A968AF".to_string()).is_some() {
+        if Id::from_string("6D5B5DBFF37475EFE4C09C075A968AF".to_string(), false).is_some() {
             panic!("Could make id from string");
         }
     }

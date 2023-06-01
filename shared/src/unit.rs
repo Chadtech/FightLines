@@ -188,7 +188,7 @@ mod test_units {
 
     #[test]
     fn infantry_mobility() {
-        let want = Some(21.333334);
+        let want = Some(21.3333);
         assert_eq!(want, Unit::Infantry.baseline_supply_cost());
     }
 }

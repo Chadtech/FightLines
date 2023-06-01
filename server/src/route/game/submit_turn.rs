@@ -19,14 +19,10 @@ pub async fn handle(
         }
     };
 
-    let player_id: Id = match Id::from_string(player_id_param.clone()) {
+    let player_id: Id = match Id::from_string(player_id_param.clone(), game_id.is_dev()) {
         Some(id) => id,
         None => {
-            if game_id.is_dev() {
-                Id::Dev(player_id_param)
-            } else {
-                return HttpResponse::BadRequest().body("Invalid player id");
-            }
+            return HttpResponse::BadRequest().body("Invalid player id");
         }
     };
 
