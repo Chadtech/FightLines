@@ -39,7 +39,7 @@ use shared::point::Point;
 use shared::team_color::TeamColor;
 use shared::tile::Tile;
 use shared::unit::{Place, Unit, UnitId};
-use shared::{game, located, tile};
+use shared::{game, located, tile, unit};
 use std::cmp;
 use std::collections::{HashMap, HashSet};
 use web_sys::KeyboardEvent;
@@ -60,9 +60,18 @@ fn wait_for_game_reload_timeout(orders: &mut impl Orders<Msg>) -> CmdHandle {
 
 fn set_to_moving_unit_mode(global: &mut global::Model, model: &mut Model, unit_id: UnitId) {
     if let Stage::TakingTurn(sub_model) = &mut model.stage {
+        let unit_model: &unit::Model = match model.game.get_unit(&unit_id) {
+            Some(u) => u,
+            None => {
+                return;
+            }
+        };
+
         match model.game.get_units_mobility(&unit_id.clone()) {
             Ok(mobility) => {
-                sub_model.mode = Mode::MovingUnit(mode::moving::Model::init(unit_id, mobility));
+                if !unit_model.unit.is_supply_crate() {
+                    sub_model.mode = Mode::MovingUnit(mode::moving::Model::init(unit_id, mobility));
+                }
 
                 if let Err(error) = draw_mode(model) {
                     global.toast_error(error);
@@ -334,7 +343,7 @@ pub fn init(
         }
     };
 
-    let moves_index = {
+    let moves_index_by_unit = {
         let mut moves_index_ret = HashMap::new();
 
         for action in &moves {
@@ -353,6 +362,14 @@ pub fn init(
                 } => {
                     moves_index_ret.insert(unit_id.clone(), action.clone());
                     moves_index_ret.insert(cargo_id.clone(), action.clone());
+                }
+                Action::DropOff {
+                    cargo_unit_loc: loc,
+                    ..
+                } => {
+                    let (_, cargo_unit_id) = loc.value.clone();
+
+                    moves_index_ret.insert(cargo_unit_id, action.clone());
                 }
             }
         }
@@ -378,7 +395,7 @@ pub fn init(
         handle_minimum_framerate_timeout: wait_for_render_timeout(orders),
         handle_game_reload_timeout: None,
         frame_count: FrameCount::F1,
-        moves_index_by_unit: moves_index,
+        moves_index_by_unit,
         moves,
         changes: Vec::new(),
         mouse_game_position: None,
@@ -646,8 +663,38 @@ fn handle_unit_selected_sidebar_msg(
                 taking_turn_model.sidebar = Sidebar::GroupSelected(group_model);
             }
         }
-        unit_selected::Msg::UnitRow(view::unit_row::Msg::Clicked(unit_id)) => {
-            set_to_moving_unit_mode(global, model, unit_id);
+        unit_selected::Msg::UnitRow(view::unit_row::Msg::Clicked(cargo_unit_id)) => {
+            if let Some(cargo_unit_model) = model.game.get_unit(&cargo_unit_id) {
+                if cargo_unit_model.unit.is_supply_crate() {
+                    let unit_model = match model.game.get_unit(&sub_model.unit_id) {
+                        Some(u) => u,
+                        None => {
+                            return;
+                        }
+                    };
+
+                    let loc = match unit_model.place.clone() {
+                        Place::OnMap(l) => l,
+                        Place::InUnit(_) => {
+                            return;
+                        }
+                    };
+
+                    model.moves_index_by_unit.insert(
+                        cargo_unit_id.clone(),
+                        Action::DropOff {
+                            cargo_unit_loc: Located {
+                                x: loc.x,
+                                y: loc.y,
+                                value: (loc.value, cargo_unit_id.clone()),
+                            },
+                            transport_id: sub_model.unit_id.clone(),
+                        },
+                    );
+                } else {
+                    set_to_moving_unit_mode(global, model, cargo_unit_id);
+                }
+            }
         }
     }
 }
@@ -810,6 +857,13 @@ fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl 
                 unit_id: unit_id.clone(),
                 cargo_id: cargo_id.clone(),
                 path: path.clone(),
+            },
+            Action::DropOff {
+                cargo_unit_loc: loc,
+                transport_id,
+            } => game::action::Action::DropOff {
+                cargo_unit_loc: loc.clone(),
+                transport_id: transport_id.clone(),
             },
         })
         .collect();
@@ -1042,6 +1096,10 @@ fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Resu
     match mode {
         Mode::None => {}
         Mode::MovingUnit(moving_model) => {
+            if moving_model.ride_options.is_some() {
+                return Ok(());
+            }
+
             if moving_model.mobility.contains(&mouse_loc) {
                 let error_title = "handle mouse move in move mode".to_string();
                 let unit_model = model.game.get_unit(&moving_model.unit_id).ok_or_else(|| {
@@ -1348,6 +1406,7 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                     Action::PickUp { arrows, .. } => {
                         draw_arrows(&ctx, model, game_pos, arrows);
                     }
+                    Action::DropOff { .. } => {}
                 };
             }
         };
@@ -2107,6 +2166,13 @@ fn game_moves_to_page_actions(moves: Vec<game::action::Action>) -> Vec<Action> {
                     arrows: path.with_arrows(),
                 });
             }
+            game::action::Action::DropOff {
+                cargo_unit_loc: loc,
+                transport_id,
+            } => moves_ret.push(Action::DropOff {
+                cargo_unit_loc: loc.clone(),
+                transport_id: transport_id.clone(),
+            }),
         }
     }
 

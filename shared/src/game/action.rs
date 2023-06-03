@@ -1,3 +1,5 @@
+use crate::facing_direction::FacingDirection;
+use crate::located::Located;
 use crate::path::Path;
 use crate::rng::RandGen;
 use crate::unit::UnitId;
@@ -19,6 +21,10 @@ pub enum Action {
         unit_id: UnitId,
         cargo_id: UnitId,
         path: Path,
+    },
+    DropOff {
+        cargo_unit_loc: Located<(FacingDirection, UnitId)>,
+        transport_id: UnitId,
     },
     Batch(Vec<Action>),
 }
@@ -62,6 +68,7 @@ pub fn order(rng: &mut RandGen, actions: &mut Vec<Action>) {
                             Action::LoadInto { .. } => {}
                             Action::Batch(_) => {}
                             Action::PickedUp { .. } => {}
+                            Action::DropOff { .. } => {}
                         }
 
                         j += 1;
@@ -96,6 +103,7 @@ pub fn order(rng: &mut RandGen, actions: &mut Vec<Action>) {
                         Action::LoadInto { .. } => {}
                         Action::Batch(_) => {}
                         Action::PickedUp { .. } => {}
+                        Action::DropOff { .. } => {}
                     }
 
                     j += 1;
@@ -103,6 +111,7 @@ pub fn order(rng: &mut RandGen, actions: &mut Vec<Action>) {
             }
             Action::Batch(_) => {}
             Action::PickedUp { .. } => {}
+            Action::DropOff { .. } => {}
         }
 
         i += 1;

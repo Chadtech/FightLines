@@ -1,4 +1,6 @@
+use shared::facing_direction::FacingDirection;
 use shared::game::outcome::Outcome;
+use shared::located::Located;
 use shared::path::Path;
 use shared::unit::UnitId;
 
@@ -12,6 +14,10 @@ pub enum Animation {
     },
     Expired {
         unit_id: UnitId,
+    },
+    DropOff {
+        cargo_unit: Located<(FacingDirection, UnitId)>,
+        transport_id: UnitId,
     },
 }
 
@@ -47,6 +53,13 @@ impl Animation {
                 path,
                 loads_into: None,
                 picks_up: Some(cargo_id),
+            }),
+            Outcome::Placed {
+                cargo_unit_loc: loc,
+                transport_id,
+            } => Some(Animation::DropOff {
+                cargo_unit: loc,
+                transport_id,
             }),
         }
     }

@@ -1,5 +1,7 @@
 use shared::arrow::Arrow;
 use shared::direction::Direction;
+use shared::facing_direction::FacingDirection;
+use shared::located::Located;
 use shared::path::Path;
 use shared::unit::UnitId;
 
@@ -22,5 +24,9 @@ pub enum Action {
         cargo_id: UnitId,
         path: Path,
         arrows: Vec<(Direction, Arrow)>,
+    },
+    DropOff {
+        cargo_unit_loc: Located<(FacingDirection, UnitId)>,
+        transport_id: UnitId,
     },
 }

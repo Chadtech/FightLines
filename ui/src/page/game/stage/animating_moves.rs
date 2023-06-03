@@ -100,6 +100,28 @@ impl Model {
 
                     Ok(false)
                 }
+                Animation::DropOff {
+                    cargo_unit: loc, ..
+                } => {
+                    let (facing_dir, cargo_id) = loc.value.clone();
+
+                    let cargo_unit_model = match self.indices.by_id.get_mut(&cargo_id) {
+                        Some(u) => u,
+                        None => {
+                            return Err("could not find cargo unit".to_string());
+                        }
+                    };
+
+                    cargo_unit_model.place = Place::OnMap(loc.with_value(facing_dir));
+
+                    self.indices.by_location = unit_index::by_location::make(&self.indices.by_id);
+
+                    self.indices.by_transport = unit_index::by_transport::make(&self.indices.by_id);
+
+                    self.animations.remove(0);
+
+                    Ok(false)
+                }
             },
         };
 
@@ -146,6 +168,37 @@ pub fn sidebar_view<Msg: 'static>(
 
                         unit_name_msg
                     }
+                };
+
+                vec![Cell::from_str(vec![], msg.as_str())]
+            }
+            Animation::DropOff {
+                cargo_unit: loc,
+                transport_id,
+            } => {
+                let cargo_id = &loc.value.1;
+
+                let msg = match (unit_index.get(transport_id), unit_index.get(cargo_id)) {
+                    (Some(transport), Some(cargo)) => {
+                        let mut dropoff_msg = transport
+                            .name
+                            .clone()
+                            .unwrap_or_else(|| transport.unit.to_string());
+
+                        dropoff_msg.push_str(" dropped off ");
+
+                        dropoff_msg.push_str(
+                            cargo
+                                .name
+                                .clone()
+                                .unwrap_or_else(|| cargo.unit.to_string())
+                                .as_str(),
+                        );
+
+                        dropoff_msg
+                    }
+                    (None, _) => "error: could not find transport unit".to_string(),
+                    (_, None) => "error: could not find cargo unit".to_string(),
                 };
 
                 vec![Cell::from_str(vec![], msg.as_str())]

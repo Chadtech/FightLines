@@ -397,9 +397,17 @@ impl Game {
                     cargo_id,
                     path,
                 } => {
-                    if self.get_unit(&cargo_id).is_none() || self.get_unit(&unit_id).is_none() {
+                    if self.get_unit(&cargo_id).is_none()
+                        || self.get_unit(&unit_id).is_none()
+                        || path.last_pos().is_none()
+                    {
                         return Ok(());
                     }
+
+                    let facing_dir = match self.indices.position_of_unit_or_transport(&unit_id) {
+                        Ok(facing_dir_loc) => facing_dir_loc.value,
+                        Err(msg) => return Err(msg),
+                    };
 
                     let cargo_unit = match self.get_mut_unit(&cargo_id) {
                         Some(cargo) => cargo,
@@ -418,6 +426,26 @@ impl Game {
                     };
 
                     unit.supplies -= path.supply_cost(&unit.unit);
+
+                    if let Some(loc_dir) = path.last_pos() {
+                        let new_facing_dir =
+                            FacingDirection::from_directions(path.clone().to_directions())
+                                .unwrap_or(facing_dir);
+
+                        unit.place = Place::OnMap(loc_dir.with_value(new_facing_dir));
+                    }
+                }
+                Outcome::Placed { cargo_unit_loc, .. } => {
+                    let (facing_dir, unit_id) = cargo_unit_loc.value.clone();
+
+                    let unit = match self.get_mut_unit(&unit_id) {
+                        Some(u) => u,
+                        None => {
+                            return Ok(());
+                        }
+                    };
+
+                    unit.place = Place::OnMap(cargo_unit_loc.with_value(facing_dir));
                 }
             }
         }
@@ -525,7 +553,9 @@ impl Game {
 
                 let mut search: HashMap<Located<()>, f32> = HashMap::new();
 
-                search.insert(located::unit(loc.x, loc.y), budget);
+                if !unit_model.unit.is_supply_crate() {
+                    search.insert(located::unit(loc.x, loc.y), budget);
+                }
 
                 let map = &self.map;
 
@@ -659,10 +689,10 @@ pub fn calculate_player_visibility(
 
     let player_id = player_id.clone();
 
-    for unit in units.values() {
-        if unit.owner.clone() == player_id {
-            if let Place::OnMap(loc) = &unit.place {
-                let budget = unit.unit.visibility_budget();
+    for unit_model in units.values() {
+        if unit_model.owner.clone() == player_id && !unit_model.unit.is_supply_crate() {
+            if let Place::OnMap(loc) = &unit_model.place {
+                let budget = unit_model.unit.visibility_budget();
 
                 let mut search: HashMap<Located<()>, f32> = HashMap::new();
 

@@ -1,5 +1,7 @@
+use crate::facing_direction::FacingDirection;
 use crate::game::action::Action;
 use crate::id::Id;
+use crate::located::Located;
 use crate::path::Path;
 use crate::unit::UnitId;
 use serde::{Deserialize, Serialize};
@@ -9,6 +11,10 @@ pub enum Outcome {
     Traveled {
         unit_id: UnitId,
         path: Path,
+    },
+    Placed {
+        cargo_unit_loc: Located<(FacingDirection, UnitId)>,
+        transport_id: UnitId,
     },
     LoadedInto {
         unit_id: UnitId,
@@ -90,6 +96,15 @@ fn outcomes_from_action(action: &Action) -> Vec<Outcome> {
                 unit_id: unit_id.clone(),
                 cargo_id: cargo_id.clone(),
                 path: path.clone(),
+            }]
+        }
+        Action::DropOff {
+            cargo_unit_loc: loc,
+            transport_id,
+        } => {
+            vec![Outcome::Placed {
+                cargo_unit_loc: loc.clone(),
+                transport_id: transport_id.clone(),
             }]
         }
     }
