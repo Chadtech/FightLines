@@ -96,6 +96,9 @@ impl Endpoint {
                 let mut buf = unit.to_string();
                 buf.push('-');
                 buf.push_str(team_color.to_string().as_str());
+
+                buf = buf.replace(" ", "-");
+
                 buf.push_str(".png");
 
                 vec!["asset".to_string(), buf]
