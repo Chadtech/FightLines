@@ -209,6 +209,7 @@ cp ./shared/src/sprites/units/tank_blue1.png ./server/src/assets/truck_blue.png
     ./shared/src/sprites/forest_tile.aseprite \
     ./shared/src/sprites/loaded_indicator.aseprite \
     ./shared/src/sprites/low_supplies_indicator.aseprite \
+    ./shared/src/sprites/fully_loaded_indicator.aseprite \
   --sheet ./shared/src/sprites/misc_sheet.png
 
 /Applications/Aseprite.app/Contents/MacOS/aseprite \

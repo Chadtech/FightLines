@@ -132,6 +132,16 @@ impl Unit {
             Unit::SupplyCrate => true,
         }
     }
+
+    pub fn carrying_capacity(&self) -> usize {
+        match self {
+            Unit::Infantry => 0,
+            Unit::Tank => 0,
+            Unit::Truck => 1,
+            Unit::SupplyCrate => 0,
+        }
+    }
+
     pub fn can_carry(&self, carry_unit: &Unit) -> bool {
         match self {
             Unit::Infantry => false,

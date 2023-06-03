@@ -246,6 +246,16 @@ impl MapOpt {
                         y: 2,
                     },
                     Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Right, Unit::Infantry),
+                        x: 3,
+                        y: 3,
+                    },
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Right, Unit::Infantry),
+                        x: 2,
+                        y: 3,
+                    },
+                    Located::<(FacingDirection, Unit)> {
                         value: (FacingDirection::Right, Unit::Tank),
                         x: 2,
                         y: 4,

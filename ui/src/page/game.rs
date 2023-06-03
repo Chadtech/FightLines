@@ -1491,11 +1491,18 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                 draw_units_move(maybe_units_move);
 
                 if let Some(loaded_units) = indices.by_transport.get(unit_id) {
+                    let misc_sheet_row =
+                        if loaded_units.len() >= unit_model.unit.carrying_capacity() {
+                            28.0
+                        } else {
+                            26.0
+                        };
+
                     let _ = ctx
                         .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
                             &model.assets.sheet,
                             MISC_SPRITE_SHEET_COLUMN,
-                            26.0 * tile::PIXEL_WIDTH_FL,
+                            misc_sheet_row * tile::PIXEL_HEIGHT_FL,
                             tile::PIXEL_WIDTH_FL,
                             tile::PIXEL_HEIGHT_FL,
                             x,

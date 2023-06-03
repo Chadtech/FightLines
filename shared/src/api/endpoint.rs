@@ -97,7 +97,7 @@ impl Endpoint {
                 buf.push('-');
                 buf.push_str(team_color.to_string().as_str());
 
-                buf = buf.replace(" ", "-");
+                buf = buf.replace(' ', "-");
 
                 buf.push_str(".png");
 
