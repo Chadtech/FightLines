@@ -11,6 +11,14 @@ impl Index {
     pub fn get(&self, unit_id: &UnitId) -> Option<&Vec<(UnitId, unit::Model)>> {
         self.0.get(unit_id)
     }
+
+    pub fn get_mut(&mut self, unit_id: &UnitId) -> Option<&mut Vec<(UnitId, unit::Model)>> {
+        self.0.get_mut(unit_id)
+    }
+
+    pub fn contains(&mut self, unit_id: &UnitId) -> bool {
+        self.0.contains_key(unit_id)
+    }
 }
 
 pub fn make(units: &unit_index::by_id::Index) -> Index {

@@ -386,6 +386,21 @@ impl Game {
                 }
                 Outcome::Expired { unit_id } => {
                     self.indices.by_id.delete(&unit_id);
+
+                    if self.indices.by_transport.contains(&unit_id) {
+                        let facing_dir_loc =
+                            match self.indices.position_of_unit_or_transport(&unit_id) {
+                                Ok(l) => l,
+                                Err(msg) => {
+                                    return Err(msg);
+                                }
+                            };
+
+                        for (_, cargo_model) in self.indices.by_transport.get_mut(&unit_id).unwrap()
+                        {
+                            cargo_model.place = Place::OnMap(facing_dir_loc.clone());
+                        }
+                    }
                 }
                 Outcome::ConsumedSupplies { unit_id, supplies } => {
                     if let Some(unit) = self.get_mut_unit(&unit_id) {

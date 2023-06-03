@@ -1003,7 +1003,12 @@ fn handle_click_on_screen_when_move_mode(
             ride_options.append(&mut rideable_unit_options);
         }
 
-        if unit.unit.can_pick_up_supply_crates() {
+        let visibility = model
+            .game
+            .get_players_visibility(&viewer_id)
+            .map_err(|err| Error::new(error_title, err.to_string()))?;
+
+        if unit.unit.can_pick_up_supply_crates() && visibility.contains(mouse_loc) {
             if let Some(supply_crates) = model.game.get_supply_crates_by_location(mouse_loc) {
                 ride_options.append(
                     &mut supply_crates

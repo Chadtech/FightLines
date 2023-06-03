@@ -178,7 +178,7 @@ impl Unit {
     // for terrain type
     pub fn active_supply_cost(&self) -> Option<f32> {
         match self {
-            Unit::Infantry => Some(5.1625),
+            Unit::Infantry => Some(10.3333),
             Unit::Tank => Some(56.8889),
             Unit::Truck => Some(25.6),
             Unit::SupplyCrate => None,
