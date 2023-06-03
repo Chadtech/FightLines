@@ -93,7 +93,7 @@ impl Model {
 
                     Ok(false)
                 }
-                Animation::Expired { .. } => {
+                Animation::Perish { .. } => {
                     self.animations.remove(0);
 
                     // Animate!
@@ -155,7 +155,7 @@ pub fn sidebar_view<Msg: 'static>(
 
                 vec![Cell::from_str(vec![], msg.as_str())]
             }
-            Animation::Expired { unit_id } => {
+            Animation::Perish { unit_id } => {
                 let msg = match unit_index.get(unit_id) {
                     None => "error: could not find unit".to_string(),
                     Some(unit_model) => {
@@ -164,7 +164,7 @@ pub fn sidebar_view<Msg: 'static>(
                             .clone()
                             .unwrap_or_else(|| unit_model.unit.to_string());
 
-                        unit_name_msg.push_str(" expired");
+                        unit_name_msg.push_str(" perished");
 
                         unit_name_msg
                     }

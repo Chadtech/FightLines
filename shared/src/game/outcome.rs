@@ -30,7 +30,7 @@ pub enum Outcome {
         unit_id: UnitId,
         name: String,
     },
-    Expired {
+    Perished {
         unit_id: UnitId,
     },
     ConsumedSupplies {

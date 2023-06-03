@@ -12,7 +12,7 @@ pub enum Animation {
         loads_into: Option<UnitId>,
         picks_up: Option<UnitId>,
     },
-    Expired {
+    Perish {
         unit_id: UnitId,
     },
     DropOff {
@@ -42,7 +42,7 @@ impl Animation {
                 picks_up: None,
             }),
             Outcome::NamedUnit { .. } => None,
-            Outcome::Expired { unit_id } => Some(Animation::Expired { unit_id }),
+            Outcome::Perished { unit_id } => Some(Animation::Perish { unit_id }),
             Outcome::ConsumedSupplies { .. } => None,
             Outcome::PickUp {
                 unit_id,

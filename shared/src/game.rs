@@ -329,7 +329,7 @@ impl Game {
                 let new_supplies = unit_model.supplies - supply_cost;
 
                 let outcome = if new_supplies < 0 {
-                    Outcome::Expired {
+                    Outcome::Perished {
                         unit_id: unit_id.clone(),
                     }
                 } else {
@@ -384,7 +384,7 @@ impl Game {
                         unit.place = Place::InUnit(loaded_into.clone());
                     }
                 }
-                Outcome::Expired { unit_id } => {
+                Outcome::Perished { unit_id } => {
                     self.indices.by_id.delete(&unit_id);
 
                     if self.indices.by_transport.contains(&unit_id) {
