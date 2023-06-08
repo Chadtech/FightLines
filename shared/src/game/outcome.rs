@@ -37,6 +37,10 @@ pub enum Outcome {
         unit_id: UnitId,
         supplies: i16,
     },
+    Replenished {
+        replenishing_unit_id: UnitId,
+        units: Vec<(UnitId, i16)>,
+    },
 }
 
 impl Outcome {
@@ -67,7 +71,7 @@ impl Outcome {
 
 fn outcomes_from_action(action: &Action) -> Vec<Outcome> {
     match action {
-        Action::Traveled { unit_id, path, .. } => {
+        Action::Travel { unit_id, path, .. } => {
             vec![Outcome::Traveled {
                 unit_id: unit_id.clone(),
                 path: path.clone(),
@@ -87,7 +91,7 @@ fn outcomes_from_action(action: &Action) -> Vec<Outcome> {
             .map(outcomes_from_action)
             .collect::<Vec<Vec<Outcome>>>()
             .concat(),
-        Action::PickedUp {
+        Action::PickUp {
             unit_id,
             cargo_id,
             path,
@@ -106,6 +110,12 @@ fn outcomes_from_action(action: &Action) -> Vec<Outcome> {
                 cargo_unit_loc: loc.clone(),
                 transport_id: transport_id.clone(),
             }]
+        }
+        Action::Replenish {
+            replenishing_unit_id,
+            units,
+        } => {
+            todo!("Make replenishment outcome")
         }
     }
 }

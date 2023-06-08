@@ -462,6 +462,13 @@ impl Game {
 
                     unit.place = Place::OnMap(cargo_unit_loc.with_value(facing_dir));
                 }
+                Outcome::Replenished { units, .. } => {
+                    for (unit_id, supplies) in units {
+                        if let Some(unit) = self.get_mut_unit(&unit_id) {
+                            unit.supplies += supplies;
+                        };
+                    }
+                }
             }
         }
 

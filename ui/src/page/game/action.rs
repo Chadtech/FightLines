@@ -5,7 +5,7 @@ use shared::located::Located;
 use shared::path::Path;
 use shared::unit::UnitId;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Action {
     TraveledTo {
         unit_id: UnitId,
@@ -28,5 +28,9 @@ pub enum Action {
     DropOff {
         cargo_unit_loc: Located<(FacingDirection, UnitId)>,
         transport_id: UnitId,
+    },
+    Replenish {
+        replenishing_unit_id: UnitId,
+        units: Vec<UnitId>,
     },
 }

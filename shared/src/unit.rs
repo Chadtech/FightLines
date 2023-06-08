@@ -106,6 +106,15 @@ impl Unit {
         }
     }
 
+    pub fn replenishable(&self) -> bool {
+        match self {
+            Unit::Infantry => true,
+            Unit::Tank => true,
+            Unit::Truck => true,
+            Unit::SupplyCrate => false,
+        }
+    }
+
     pub fn is_rideable(&self) -> bool {
         match self {
             Unit::Infantry => false,

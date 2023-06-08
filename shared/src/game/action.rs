@@ -4,10 +4,11 @@ use crate::path::Path;
 use crate::rng::RandGen;
 use crate::unit::UnitId;
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum Action {
-    Traveled {
+    Travel {
         unit_id: UnitId,
         path: Path,
         dismounted_from: Option<UnitId>,
@@ -17,7 +18,7 @@ pub enum Action {
         load_into: UnitId,
         path: Path,
     },
-    PickedUp {
+    PickUp {
         unit_id: UnitId,
         cargo_id: UnitId,
         path: Path,
@@ -26,17 +27,48 @@ pub enum Action {
         cargo_unit_loc: Located<(FacingDirection, UnitId)>,
         transport_id: UnitId,
     },
+    Replenish {
+        replenishing_unit_id: UnitId,
+        units: Vec<UnitId>,
+    },
     Batch(Vec<Action>),
+}
+
+impl Action {
+    pub fn to_priority(&self) -> u8 {
+        match self {
+            Action::Travel { .. } => 1,
+            Action::LoadInto { .. } => 1,
+            Action::PickUp { .. } => 1,
+            Action::DropOff { .. } => 1,
+            Action::Replenish { .. } => 0,
+            Action::Batch(_) => 1,
+        }
+    }
+}
+
+impl Ord for Action {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.to_priority().cmp(&other.to_priority())
+    }
+}
+
+impl PartialOrd for Action {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 pub fn order(rng: &mut RandGen, actions: &mut Vec<Action>) {
     let mut i = 0;
 
+    actions.sort();
+
     while i < actions.len() {
         let action = actions[i].clone();
 
         match action {
-            Action::Traveled {
+            Action::Travel {
                 ref dismounted_from,
                 ..
             } => {
@@ -49,7 +81,7 @@ pub fn order(rng: &mut RandGen, actions: &mut Vec<Action>) {
                         let possibly_travel_action = actions.get(j).unwrap().clone();
 
                         match possibly_travel_action {
-                            Action::Traveled {
+                            Action::Travel {
                                 unit_id: ref possible_transport_id,
                                 ..
                             } => {
@@ -67,8 +99,9 @@ pub fn order(rng: &mut RandGen, actions: &mut Vec<Action>) {
                             }
                             Action::LoadInto { .. } => {}
                             Action::Batch(_) => {}
-                            Action::PickedUp { .. } => {}
+                            Action::PickUp { .. } => {}
                             Action::DropOff { .. } => {}
+                            Action::Replenish { .. } => {}
                         }
 
                         j += 1;
@@ -84,7 +117,7 @@ pub fn order(rng: &mut RandGen, actions: &mut Vec<Action>) {
                     let possibly_travel_action = actions.get(j).unwrap().clone();
 
                     match possibly_travel_action {
-                        Action::Traveled {
+                        Action::Travel {
                             unit_id: ref possible_transport_id,
                             ..
                         } => {
@@ -102,16 +135,18 @@ pub fn order(rng: &mut RandGen, actions: &mut Vec<Action>) {
                         }
                         Action::LoadInto { .. } => {}
                         Action::Batch(_) => {}
-                        Action::PickedUp { .. } => {}
+                        Action::PickUp { .. } => {}
                         Action::DropOff { .. } => {}
+                        Action::Replenish { .. } => {}
                     }
 
                     j += 1;
                 }
             }
             Action::Batch(_) => {}
-            Action::PickedUp { .. } => {}
+            Action::PickUp { .. } => {}
             Action::DropOff { .. } => {}
+            Action::Replenish { .. } => {}
         }
 
         i += 1;
@@ -148,7 +183,7 @@ mod test_game_actions {
         let infantry_id = UnitId::new(&mut rand_gen);
 
         let mut actions = vec![
-            Action::Traveled {
+            Action::Travel {
                 unit_id: truck_id.clone(),
                 path: Path::from_directions_test_only(
                     &located::unit(5, 5),
@@ -179,7 +214,7 @@ mod test_game_actions {
                         &vec![Direction::East, Direction::East],
                     ),
                 },
-                Action::Traveled {
+                Action::Travel {
                     unit_id: truck_id.clone(),
                     path: Path::from_directions_test_only(
                         &located::unit(5, 5),
@@ -202,7 +237,7 @@ mod test_game_actions {
         let infantry_2_id = UnitId::new(&mut rand_gen);
 
         let mut actions = vec![
-            Action::Traveled {
+            Action::Travel {
                 unit_id: truck_2_id.clone(),
                 path: Path::from_directions_test_only(
                     &located::unit(10, 10),
@@ -210,7 +245,7 @@ mod test_game_actions {
                 ),
                 dismounted_from: None,
             },
-            Action::Traveled {
+            Action::Travel {
                 unit_id: truck_1_id.clone(),
                 path: Path::from_directions_test_only(
                     &located::unit(5, 5),
@@ -250,7 +285,7 @@ mod test_game_actions {
                             &vec![Direction::East, Direction::East],
                         ),
                     },
-                    Action::Traveled {
+                    Action::Travel {
                         unit_id: truck_1_id.clone(),
                         path: Path::from_directions_test_only(
                             &located::unit(5, 5),
@@ -268,7 +303,7 @@ mod test_game_actions {
                             &vec![Direction::East, Direction::East],
                         ),
                     },
-                    Action::Traveled {
+                    Action::Travel {
                         unit_id: truck_2_id.clone(),
                         path: Path::from_directions_test_only(
                             &located::unit(10, 10),
@@ -289,7 +324,7 @@ mod test_game_actions {
         let infantry_id = UnitId::new(&mut rand_gen);
 
         let mut actions = vec![
-            Action::Traveled {
+            Action::Travel {
                 unit_id: truck_id.clone(),
                 path: Path::from_directions_test_only(
                     &located::unit(5, 5),
@@ -297,7 +332,7 @@ mod test_game_actions {
                 ),
                 dismounted_from: None,
             },
-            Action::Traveled {
+            Action::Travel {
                 unit_id: infantry_id.clone(),
                 path: Path::from_directions_test_only(
                     &located::unit(5, 5),
@@ -312,7 +347,7 @@ mod test_game_actions {
         assert_eq!(
             actions,
             vec![Action::Batch(vec![
-                Action::Traveled {
+                Action::Travel {
                     unit_id: infantry_id.clone(),
                     path: Path::from_directions_test_only(
                         &located::unit(5, 5),
@@ -320,7 +355,7 @@ mod test_game_actions {
                     ),
                     dismounted_from: Some(truck_id.clone()),
                 },
-                Action::Traveled {
+                Action::Travel {
                     unit_id: truck_id.clone(),
                     path: Path::from_directions_test_only(
                         &located::unit(5, 5),

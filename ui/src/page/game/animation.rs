@@ -19,6 +19,10 @@ pub enum Animation {
         cargo_unit: Located<(FacingDirection, UnitId)>,
         transport_id: UnitId,
     },
+    Replenish {
+        replenishing_unit_id: UnitId,
+        units: Vec<UnitId>,
+    },
 }
 
 impl Animation {
@@ -60,6 +64,17 @@ impl Animation {
             } => Some(Animation::DropOff {
                 cargo_unit: loc,
                 transport_id,
+            }),
+            Outcome::Replenished {
+                replenishing_unit_id,
+                units,
+                ..
+            } => Some(Animation::Replenish {
+                units: units
+                    .iter()
+                    .map(|unit| unit.0.clone())
+                    .collect::<Vec<UnitId>>(),
+                replenishing_unit_id,
             }),
         }
     }

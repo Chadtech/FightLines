@@ -122,6 +122,13 @@ impl Model {
 
                     Ok(false)
                 }
+                Animation::Replenish { .. } => {
+                    self.animations.remove(0);
+
+                    // Animate!
+
+                    Ok(false)
+                }
             },
         };
 
@@ -199,6 +206,69 @@ pub fn sidebar_view<Msg: 'static>(
                     }
                     (None, _) => "error: could not find transport unit".to_string(),
                     (_, None) => "error: could not find cargo unit".to_string(),
+                };
+
+                vec![Cell::from_str(vec![], msg.as_str())]
+            }
+            Animation::Replenish {
+                replenishing_unit_id,
+                units,
+            } => {
+                let mut unit_names_result: Result<Vec<String>, String> = Ok(vec![]);
+
+                for unit_id in units {
+                    match (&mut unit_names_result, unit_index.get(unit_id)) {
+                        (Ok(unit_names), Some(unit_model)) => {
+                            unit_names.push(
+                                unit_model
+                                    .name
+                                    .clone()
+                                    .unwrap_or_else(|| unit_model.unit.to_string()),
+                            );
+                        }
+                        (Err(_), _) => {}
+                        (_, None) => {
+                            unit_names_result = Err("error: could not find unit name".to_string());
+                        }
+                    }
+                }
+
+                let maybe_replenishing_unit_name: Option<String> =
+                    unit_index.get(replenishing_unit_id).map(|unit_model| {
+                        unit_model
+                            .name
+                            .clone()
+                            .unwrap_or_else(|| unit_model.unit.to_string())
+                    });
+
+                let msg = match (maybe_replenishing_unit_name, unit_names_result) {
+                    (Some(replenishing_unit_name), Ok(unit_names)) => {
+                        let mut m = String::new();
+
+                        m.push_str(replenishing_unit_name.as_str());
+
+                        m.push_str(" replenished ");
+
+                        if unit_names.len() == 1 {
+                            m.push_str(unit_names[0].as_str());
+                        } else {
+                            let mut unit_names_peek = unit_names.into_iter().peekable();
+
+                            while let Some(unit_name) = unit_names_peek.next() {
+                                if unit_names_peek.peek().is_none() {
+                                    m.push_str(" and ");
+                                    m.push_str(unit_name.as_str());
+                                } else {
+                                    m.push_str(unit_name.as_str());
+                                    m.push_str(", ");
+                                }
+                            }
+                        }
+
+                        m
+                    }
+                    (None, _) => "error: could not find replenishing unit name".to_string(),
+                    (_, Err(err)) => err,
                 };
 
                 vec![Cell::from_str(vec![], msg.as_str())]

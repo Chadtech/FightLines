@@ -1,5 +1,6 @@
 use crate::facing_direction::FacingDirection;
 use crate::game::unit_index;
+use crate::id::Id;
 use crate::located::Located;
 use crate::unit;
 use crate::unit::{Place, UnitId};
@@ -17,6 +18,37 @@ impl Index {
 
     pub fn iter(&self) -> Iter<'_, Located<()>, Vec<(UnitId, FacingDirection, unit::Model)>> {
         self.0.iter()
+    }
+
+    pub fn get_replenishable_units<'a>(
+        &'a self,
+        viewer_id: &'a Id,
+        loc: &Located<()>,
+    ) -> Option<Vec<UnitId>> {
+        self.0.get(loc).and_then(|units| {
+            let filtered_units = units
+                .iter()
+                .filter_map(|(unit_id, _, unit_model)| {
+                    let has_less_than_max_supplies =
+                        unit_model.supplies < unit_model.unit.max_supplies();
+
+                    if unit_model.owner == *viewer_id
+                        && unit_model.unit.replenishable()
+                        && has_less_than_max_supplies
+                    {
+                        Some(unit_id.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<UnitId>>();
+
+            if filtered_units.is_empty() {
+                None
+            } else {
+                Some(filtered_units)
+            }
+        })
     }
 }
 

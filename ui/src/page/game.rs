@@ -371,6 +371,12 @@ pub fn init(
 
                     moves_index_ret.insert(cargo_unit_id, action.clone());
                 }
+                Action::Replenish {
+                    replenishing_unit_id,
+                    ..
+                } => {
+                    moves_index_ret.insert(replenishing_unit_id.clone(), action.clone());
+                }
             }
         }
 
@@ -543,7 +549,7 @@ pub fn update(
             handle_group_selected_sidebar_msg(global, model, sub_msg)
         }
         Msg::MovingFlyout(sub_msg) => {
-            if let Err(error) = handle_moving_flyout_msg(model, sub_msg) {
+            if let Err(error) = handle_moving_flyout_msg(&global.viewer_id(), model, sub_msg) {
                 global.toast_error(error)
             }
         }
@@ -728,7 +734,11 @@ fn handle_rendered_first_frame(model: &mut Model, viewer_id: Id) -> Result<(), E
     draw(&viewer_id, model)
 }
 
-fn handle_moving_flyout_msg(model: &mut Model, msg: mode::moving::ClickMsg) -> Result<(), Error> {
+fn handle_moving_flyout_msg(
+    viewer_id: &Id,
+    model: &mut Model,
+    msg: mode::moving::ClickMsg,
+) -> Result<(), Error> {
     let sub_model = if let Stage::TakingTurn(stage::taking_turn::Model {
         mode: Mode::MovingUnit(sub_model),
         ..
@@ -790,6 +800,52 @@ fn handle_moving_flyout_msg(model: &mut Model, msg: mode::moving::ClickMsg) -> R
 
             model.travel_unit(unit_id, path, arrows)
         }
+        mode::moving::ClickMsg::Replenish => {
+            let viewer_id = viewer_id.clone();
+
+            let error_title = "replenish units".to_string();
+            let unit_model = match model.game.indices.by_id.get(&sub_model.unit_id) {
+                Some(u) => u,
+                None => {
+                    model.clear_mode()?;
+                    return Err(Error::new(
+                        error_title,
+                        "could not find replenishing unit".to_string(),
+                    ));
+                }
+            };
+
+            let unit_pos = match &unit_model.place {
+                Place::OnMap(loc) => loc.with_value(()),
+                Place::InUnit(_) => {
+                    model.clear_mode()?;
+                    return Err(Error::new(
+                        error_title,
+                        "replenishing unit not on map".to_string(),
+                    ));
+                }
+            };
+
+            let maybe_units_to_replenish: Option<Vec<UnitId>> = model
+                .game
+                .indices
+                .by_location
+                .get_replenishable_units(&viewer_id, &unit_pos);
+
+            if let Some(replenished_units) = maybe_units_to_replenish {
+                let unit_id = sub_model.unit_id.clone();
+
+                model.moves_index_by_unit.insert(
+                    unit_id.clone(),
+                    Action::Replenish {
+                        replenishing_unit_id: unit_id,
+                        units: replenished_units,
+                    },
+                );
+            }
+
+            model.clear_mode()
+        }
     }
 }
 
@@ -841,7 +897,7 @@ fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl 
                 path,
                 dismounted_from,
                 ..
-            } => game::action::Action::Traveled {
+            } => game::action::Action::Travel {
                 unit_id: unit_id.clone(),
                 path: path.clone(),
                 dismounted_from: dismounted_from.clone(),
@@ -853,7 +909,7 @@ fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl 
                 load_into: load_into.clone(),
                 path: path.clone(),
             },
-            Action::PickUp { cargo_id, path, .. } => game::action::Action::PickedUp {
+            Action::PickUp { cargo_id, path, .. } => game::action::Action::PickUp {
                 unit_id: unit_id.clone(),
                 cargo_id: cargo_id.clone(),
                 path: path.clone(),
@@ -864,6 +920,13 @@ fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl 
             } => game::action::Action::DropOff {
                 cargo_unit_loc: loc.clone(),
                 transport_id: transport_id.clone(),
+            },
+            Action::Replenish {
+                replenishing_unit_id,
+                units,
+            } => game::action::Action::Replenish {
+                replenishing_unit_id: replenishing_unit_id.clone(),
+                units: units.clone(),
             },
         })
         .collect();
@@ -959,12 +1022,12 @@ fn handle_click_on_screen_when_move_mode(
 
         let unit_id = moving_model.unit_id.clone();
 
-        let unit = match model.game.get_unit(&unit_id) {
+        let unit_model = match model.game.get_unit(&unit_id) {
             Some(unit_model) => unit_model,
             None => return Error::throw(error_title, "could not get unit".to_string()),
         };
 
-        let unit_pos = match &unit.place {
+        let unit_pos = match &unit_model.place {
             Place::OnMap(loc) => Some(loc.to_unit()),
             Place::InUnit(_) => None,
         };
@@ -983,9 +1046,11 @@ fn handle_click_on_screen_when_move_mode(
 
         let mut ride_options = vec![];
 
-        if let Some(rideable_units) = model
-            .game
-            .get_rideable_units_by_location(&viewer_id, &unit.unit, mouse_loc)
+        // The ride options for loading into another unit, like a truck
+        if let Some(rideable_units) =
+            model
+                .game
+                .get_rideable_units_by_location(&viewer_id, &unit_model.unit, mouse_loc)
         {
             let mut rideable_unit_options = rideable_units
                 .iter()
@@ -1003,12 +1068,13 @@ fn handle_click_on_screen_when_move_mode(
             ride_options.append(&mut rideable_unit_options);
         }
 
+        // The ride options for picking up a unit, like a supply crate
         let visibility = model
             .game
             .get_players_visibility(&viewer_id)
             .map_err(|err| Error::new(error_title, err.to_string()))?;
 
-        if unit.unit.can_pick_up_supply_crates() && visibility.contains(mouse_loc) {
+        if unit_model.unit.can_pick_up_supply_crates() && visibility.contains(mouse_loc) {
             if let Some(supply_crates) = model.game.get_supply_crates_by_location(mouse_loc) {
                 ride_options.append(
                     &mut supply_crates
@@ -1024,6 +1090,18 @@ fn handle_click_on_screen_when_move_mode(
                         })
                         .collect::<Vec<mode::moving::RideOption>>(),
                 )
+            }
+        }
+
+        // the option to replenish troops
+        if let Some(cargo) = model.game.indices.by_transport.get(&unit_id) {
+            let crates = cargo
+                .iter()
+                .filter(|(_, cargo_unit_model)| cargo_unit_model.unit.is_supply_crate())
+                .collect::<Vec<_>>();
+
+            if !crates.is_empty() {
+                ride_options.push(mode::moving::RideOption::Replenish)
             }
         }
 
@@ -1412,6 +1490,7 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                         draw_arrows(&ctx, model, game_pos, arrows);
                     }
                     Action::DropOff { .. } => {}
+                    Action::Replenish { .. } => {}
                 };
             }
         };
@@ -2139,7 +2218,7 @@ fn game_moves_to_page_actions(moves: Vec<game::action::Action>) -> Vec<Action> {
 
     for action in moves {
         match action {
-            game::action::Action::Traveled {
+            game::action::Action::Travel {
                 unit_id,
                 path,
                 dismounted_from,
@@ -2165,7 +2244,7 @@ fn game_moves_to_page_actions(moves: Vec<game::action::Action>) -> Vec<Action> {
                 let mut more_moves_ret = game_moves_to_page_actions(more_moves);
                 moves_ret.append(&mut more_moves_ret);
             }
-            game::action::Action::PickedUp {
+            game::action::Action::PickUp {
                 unit_id,
                 path,
                 cargo_id,
@@ -2184,6 +2263,13 @@ fn game_moves_to_page_actions(moves: Vec<game::action::Action>) -> Vec<Action> {
             } => moves_ret.push(Action::DropOff {
                 cargo_unit_loc: loc.clone(),
                 transport_id: transport_id.clone(),
+            }),
+            game::action::Action::Replenish {
+                replenishing_unit_id,
+                units,
+            } => moves_ret.push(Action::Replenish {
+                replenishing_unit_id: replenishing_unit_id,
+                units: units.clone(),
             }),
         }
     }
