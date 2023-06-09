@@ -2,7 +2,7 @@ use crate::page::game::animation::Animation;
 use crate::view::cell::Cell;
 use shared::facing_direction::FacingDirection;
 use shared::game::day::Time;
-use shared::game::unit_index::Indices;
+use shared::game::unit_index::Indexes;
 use shared::game::{calculate_player_visibility, unit_index};
 use shared::id::Id;
 use shared::located::Located;
@@ -12,7 +12,7 @@ use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct Model {
-    pub indices: Indices,
+    pub indices: Indexes,
     animations: Vec<Animation>,
     pub visibility: HashSet<Located<()>>,
     pub day: Time,
@@ -20,7 +20,7 @@ pub struct Model {
 
 impl Model {
     pub fn init(
-        indices: Indices,
+        indices: Indexes,
         animations: Vec<Animation>,
         visibility: HashSet<Located<()>>,
         day: Time,

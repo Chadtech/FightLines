@@ -40,6 +40,7 @@ pub enum Outcome {
     Replenished {
         replenishing_unit_id: UnitId,
         units: Vec<(UnitId, i16)>,
+        depleted_supply_crates: Vec<(UnitId, i16)>,
     },
 }
 
@@ -114,6 +115,7 @@ fn outcomes_from_action(action: &Action) -> Vec<Outcome> {
         Action::Replenish {
             replenishing_unit_id,
             units,
+            depleted_supply_crates,
         } => {
             todo!("Make replenishment outcome")
         }

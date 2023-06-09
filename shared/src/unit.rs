@@ -1,5 +1,3 @@
-pub mod action;
-
 use crate::facing_direction::FacingDirection;
 use crate::id::Id;
 use crate::located::Located;
@@ -24,6 +22,17 @@ pub struct Model {
 impl Model {
     pub fn supplies_percent(&self) -> f32 {
         (self.supplies as f32) / (self.unit.max_supplies() as f32)
+    }
+
+    pub fn new(unit: Unit, owner_id: &Id, place: Place, color: &TeamColor) -> Model {
+        Model {
+            unit: unit.clone(),
+            owner: owner_id.clone(),
+            place,
+            color: color.clone(),
+            name: None,
+            supplies: unit.max_supplies(),
+        }
     }
 }
 
@@ -80,6 +89,10 @@ impl UnitId {
         let id = Id::new(rng);
 
         UnitId(id)
+    }
+
+    pub fn test(s: &str) -> UnitId {
+        UnitId(Id::from_string(s.to_string(), true).unwrap())
     }
 }
 impl ToString for UnitId {
