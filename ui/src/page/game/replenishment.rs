@@ -192,4 +192,68 @@ mod test_replenishment {
 
         assert_eq!(got, want)
     }
+
+    #[test]
+    fn two_units_one_crate() {
+        let red_player_id = Id::from_string("red".to_string(), true).unwrap();
+
+        let red_infantry_1_id = UnitId::test("red infantry 1");
+        let red_infantry_2_id = UnitId::test("red infantry 2");
+        let red_infantry = {
+            let mut u = unit::Model::new(
+                Unit::Infantry,
+                &red_player_id,
+                Place::OnMap(Located {
+                    x: 1,
+                    y: 1,
+                    value: FacingDirection::Right,
+                }),
+                &TeamColor::Red,
+            );
+
+            u.supplies = 1;
+
+            u
+        };
+
+        let red_truck_id = UnitId::test("red truck");
+        let red_truck = unit::Model::new(
+            Unit::Truck,
+            &red_player_id,
+            Place::OnMap(Located {
+                x: 1,
+                y: 1,
+                value: FacingDirection::Right,
+            }),
+            &TeamColor::Red,
+        );
+
+        let supply_crate_id = UnitId::test("supply crate");
+
+        let units = vec![
+            (red_infantry_1_id.clone(), red_infantry.clone()),
+            (red_infantry_2_id.clone(), red_infantry),
+            (red_truck_id.clone(), red_truck),
+            (
+                supply_crate_id.clone(),
+                unit::Model::new(
+                    Unit::SupplyCrate,
+                    &red_player_id,
+                    Place::InUnit(red_truck_id.clone()),
+                    &TeamColor::Red,
+                ),
+            ),
+        ];
+
+        let indexes = Indexes::make(units);
+
+        let got = Replenishment::calculate(&red_player_id, &red_truck_id, &indexes).unwrap();
+
+        let want = Replenishment {
+            replenished_units: vec![(red_infantry_1_id, 1023), (red_infantry_2_id, 1023)],
+            depleted_supply_crates: vec![(supply_crate_id, 2046)],
+        };
+
+        assert_eq!(got, want)
+    }
 }
