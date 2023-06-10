@@ -3,6 +3,7 @@ use rand::distributions::uniform::{SampleBorrow, SampleUniform, UniformInt, Unif
 use rand::distributions::{Distribution, Standard};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Types //
@@ -155,6 +156,18 @@ impl UniformSampler for UniformId {
 
 impl SampleUniform for Id {
     type Sampler = UniformId;
+}
+
+impl PartialOrd<Self> for Id {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Id {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.to_string().cmp(&other.to_string())
+    }
 }
 
 #[cfg(test)]

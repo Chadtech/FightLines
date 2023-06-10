@@ -4,6 +4,7 @@ use crate::located::Located;
 use crate::rng::RandGen;
 use crate::team_color::TeamColor;
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 
 ///////////////////////////////////////////////////////////////
 // Types
@@ -95,9 +96,22 @@ impl UnitId {
         UnitId(Id::from_string(s.to_string(), true).unwrap())
     }
 }
+
 impl ToString for UnitId {
     fn to_string(&self) -> String {
         self.0.to_string()
+    }
+}
+
+impl PartialOrd<Self> for UnitId {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for UnitId {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.cmp(&other.0)
     }
 }
 

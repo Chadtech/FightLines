@@ -3,6 +3,7 @@ use shared::id::Id;
 use shared::unit;
 use shared::unit::{Place, UnitId};
 use std::cmp;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 
 #[derive(PartialEq, Clone, Debug)]
@@ -35,7 +36,10 @@ impl Replenishment {
             .by_location
             .get_replenishable_units(&viewer_id, &replenishing_unit_pos)
         {
-            Some(u) => u,
+            Some(mut u) => {
+                u.sort();
+                u
+            }
             None => {
                 return Err("no units to replenish".to_string());
             }
@@ -44,7 +48,7 @@ impl Replenishment {
         let mut supply_crates: Vec<(UnitId, i16)> =
             match unit_indexes.by_transport.get(&replenishing_unit_id) {
                 Some(cargo) => {
-                    let supply_crates = cargo
+                    let mut supply_crates = cargo
                         .iter()
                         .filter_map(|(unit_id, unit_model)| {
                             if unit_model.unit.is_supply_crate() {
@@ -53,11 +57,18 @@ impl Replenishment {
                                 None
                             }
                         })
-                        .collect::<Vec<_>>();
+                        .collect::<Vec<(UnitId, i16)>>();
 
                     if supply_crates.is_empty() {
                         return Err("no supply crates".to_string());
                     } else {
+                        supply_crates.sort_by(|(fst_id, fst_supplies), (snd_id, snd_supplies)| {
+                            match fst_supplies.cmp(&snd_supplies) {
+                                Ordering::Equal => fst_id.cmp(snd_id),
+                                ordering => ordering,
+                            }
+                        });
+
                         supply_crates
                     }
                 }
@@ -85,6 +96,7 @@ impl Replenishment {
             let (crate_id, crate_supplies) = supply_crates.get_mut(crate_index).unwrap();
 
             let supplies_per_unit = crate_supplies.clone() / units_in_need_of_supplies;
+            let mut remainder = crate_supplies.clone() % units_in_need_of_supplies;
 
             for (unit_id, unit_model) in units_to_replenish.clone() {
                 let adjustment = unit_adjustments.entry(unit_id).or_insert(0);
@@ -96,7 +108,10 @@ impl Replenishment {
                     units_in_need_of_supplies -= 1;
                 }
 
-                let delta = cmp::min(supplies_per_unit, capacity);
+                let remainder_delta = cmp::min(1, remainder);
+                let delta = cmp::min(supplies_per_unit, capacity) + remainder_delta;
+
+                remainder -= remainder_delta;
 
                 *adjustment += delta;
 
@@ -110,11 +125,19 @@ impl Replenishment {
             }
         }
 
+        let mut replenished_units = unit_adjustments.into_iter().collect::<Vec<(UnitId, i16)>>();
+
+        replenished_units.sort_by(|(fst_id, _), (snd_id, _)| fst_id.cmp(&snd_id));
+
+        let mut depleted_supply_crates = supply_crate_depletions
+            .into_iter()
+            .collect::<Vec<(UnitId, i16)>>();
+
+        depleted_supply_crates.sort_by(|(fst_id, _), (snd_id, _)| fst_id.cmp(&snd_id));
+
         Ok(Replenishment {
-            replenished_units: unit_adjustments.into_iter().collect::<Vec<(UnitId, i16)>>(),
-            depleted_supply_crates: supply_crate_depletions
-                .into_iter()
-                .collect::<Vec<(UnitId, i16)>>(),
+            replenished_units,
+            depleted_supply_crates,
         })
     }
 }
@@ -194,6 +217,68 @@ mod test_replenishment {
     }
 
     #[test]
+    fn one_unit_one_crate_already_depleted() {
+        let red_player_id = Id::from_string("red".to_string(), true).unwrap();
+
+        let red_infantry_id = UnitId::test("red infantry");
+        let red_infantry = {
+            let mut u = unit::Model::new(
+                Unit::Infantry,
+                &red_player_id,
+                Place::OnMap(Located {
+                    x: 1,
+                    y: 1,
+                    value: FacingDirection::Right,
+                }),
+                &TeamColor::Red,
+            );
+
+            u.supplies = 1;
+
+            u
+        };
+
+        let red_truck_id = UnitId::test("red truck");
+        let red_truck = unit::Model::new(
+            Unit::Truck,
+            &red_player_id,
+            Place::OnMap(Located {
+                x: 1,
+                y: 1,
+                value: FacingDirection::Right,
+            }),
+            &TeamColor::Red,
+        );
+
+        let supply_crate_id = UnitId::test("supply crate");
+        let mut supply_crate = unit::Model::new(
+            Unit::SupplyCrate,
+            &red_player_id,
+            Place::InUnit(red_truck_id.clone()),
+            &TeamColor::Red,
+        );
+
+        supply_crate.supplies = 500;
+
+        let units = vec![
+            (red_infantry_id.clone(), red_infantry),
+            (red_truck_id.clone(), red_truck),
+            (supply_crate_id.clone(), supply_crate),
+        ];
+
+        let indexes = Indexes::make(units);
+
+        let got = Replenishment::calculate(&red_player_id, &red_truck_id, &indexes).unwrap();
+
+        let want = Replenishment {
+            replenished_units: vec![(red_infantry_id, 500)],
+            depleted_supply_crates: vec![(supply_crate_id, 500)],
+        };
+
+        assert_eq!(got, want)
+    }
+
+    #[test]
     fn two_units_one_crate() {
         let red_player_id = Id::from_string("red".to_string(), true).unwrap();
 
@@ -252,6 +337,391 @@ mod test_replenishment {
         let want = Replenishment {
             replenished_units: vec![(red_infantry_1_id, 1023), (red_infantry_2_id, 1023)],
             depleted_supply_crates: vec![(supply_crate_id, 2046)],
+        };
+
+        assert_eq!(got, want)
+    }
+
+    #[test]
+    fn two_units_one_crate_already_depleted() {
+        let red_player_id = Id::from_string("red".to_string(), true).unwrap();
+
+        let red_infantry_1_id = UnitId::test("red infantry 1");
+        let red_infantry_2_id = UnitId::test("red infantry 2");
+        let red_infantry = {
+            let mut u = unit::Model::new(
+                Unit::Infantry,
+                &red_player_id,
+                Place::OnMap(Located {
+                    x: 1,
+                    y: 1,
+                    value: FacingDirection::Right,
+                }),
+                &TeamColor::Red,
+            );
+
+            u.supplies = 1;
+
+            u
+        };
+
+        let red_truck_id = UnitId::test("red truck");
+        let red_truck = unit::Model::new(
+            Unit::Truck,
+            &red_player_id,
+            Place::OnMap(Located {
+                x: 1,
+                y: 1,
+                value: FacingDirection::Right,
+            }),
+            &TeamColor::Red,
+        );
+
+        let supply_crate_id = UnitId::test("supply crate");
+        let mut supply_crate = unit::Model::new(
+            Unit::SupplyCrate,
+            &red_player_id,
+            Place::InUnit(red_truck_id.clone()),
+            &TeamColor::Red,
+        );
+
+        supply_crate.supplies = 500;
+
+        let units = vec![
+            (red_infantry_1_id.clone(), red_infantry.clone()),
+            (red_infantry_2_id.clone(), red_infantry),
+            (red_truck_id.clone(), red_truck),
+            (supply_crate_id.clone(), supply_crate),
+        ];
+
+        let indexes = Indexes::make(units);
+
+        let got = Replenishment::calculate(&red_player_id, &red_truck_id, &indexes).unwrap();
+
+        let want = Replenishment {
+            replenished_units: vec![(red_infantry_1_id, 250), (red_infantry_2_id, 250)],
+            depleted_supply_crates: vec![(supply_crate_id, 500)],
+        };
+
+        assert_eq!(got, want)
+    }
+
+    #[test]
+    fn two_units_one_crate_already_depleted_uneven_amount() {
+        let red_player_id = Id::from_string("red".to_string(), true).unwrap();
+
+        let red_infantry_1_id = UnitId::test("red infantry 1");
+        let red_infantry_2_id = UnitId::test("red infantry 2");
+        let red_infantry = {
+            let mut u = unit::Model::new(
+                Unit::Infantry,
+                &red_player_id,
+                Place::OnMap(Located {
+                    x: 1,
+                    y: 1,
+                    value: FacingDirection::Right,
+                }),
+                &TeamColor::Red,
+            );
+
+            u.supplies = 1;
+
+            u
+        };
+
+        let red_truck_id = UnitId::test("red truck");
+        let red_truck = unit::Model::new(
+            Unit::Truck,
+            &red_player_id,
+            Place::OnMap(Located {
+                x: 1,
+                y: 1,
+                value: FacingDirection::Right,
+            }),
+            &TeamColor::Red,
+        );
+
+        let supply_crate_id = UnitId::test("supply crate");
+        let mut supply_crate = unit::Model::new(
+            Unit::SupplyCrate,
+            &red_player_id,
+            Place::InUnit(red_truck_id.clone()),
+            &TeamColor::Red,
+        );
+
+        supply_crate.supplies = 501;
+
+        let units = vec![
+            (red_infantry_1_id.clone(), red_infantry.clone()),
+            (red_infantry_2_id.clone(), red_infantry),
+            (red_truck_id.clone(), red_truck),
+            (supply_crate_id.clone(), supply_crate),
+        ];
+
+        let indexes = Indexes::make(units);
+
+        let got = Replenishment::calculate(&red_player_id, &red_truck_id, &indexes).unwrap();
+
+        let want = Replenishment {
+            replenished_units: vec![(red_infantry_1_id, 251), (red_infantry_2_id, 250)],
+            depleted_supply_crates: vec![(supply_crate_id, 501)],
+        };
+
+        assert_eq!(got, want)
+    }
+
+    #[test]
+    fn uneven_unit_supplies() {
+        let red_player_id = Id::from_string("red".to_string(), true).unwrap();
+
+        let red_infantry_1_id = UnitId::test("red infantry 1");
+        let red_infantry_1 = {
+            let mut u = unit::Model::new(
+                Unit::Infantry,
+                &red_player_id,
+                Place::OnMap(Located {
+                    x: 1,
+                    y: 1,
+                    value: FacingDirection::Right,
+                }),
+                &TeamColor::Red,
+            );
+
+            u.supplies = 924;
+
+            u
+        };
+
+        let red_infantry_2_id = UnitId::test("red infantry 2");
+        let red_infantry_2 = {
+            let mut u = unit::Model::new(
+                Unit::Infantry,
+                &red_player_id,
+                Place::OnMap(Located {
+                    x: 1,
+                    y: 1,
+                    value: FacingDirection::Right,
+                }),
+                &TeamColor::Red,
+            );
+
+            u.supplies = 1;
+
+            u
+        };
+
+        let red_truck_id = UnitId::test("red truck");
+        let red_truck = unit::Model::new(
+            Unit::Truck,
+            &red_player_id,
+            Place::OnMap(Located {
+                x: 1,
+                y: 1,
+                value: FacingDirection::Right,
+            }),
+            &TeamColor::Red,
+        );
+
+        let supply_crate_id = UnitId::test("supply crate");
+        let mut supply_crate = unit::Model::new(
+            Unit::SupplyCrate,
+            &red_player_id,
+            Place::InUnit(red_truck_id.clone()),
+            &TeamColor::Red,
+        );
+
+        let units = vec![
+            (red_infantry_1_id.clone(), red_infantry_1),
+            (red_infantry_2_id.clone(), red_infantry_2),
+            (red_truck_id.clone(), red_truck),
+            (supply_crate_id.clone(), supply_crate),
+        ];
+
+        let indexes = Indexes::make(units);
+
+        let got = Replenishment::calculate(&red_player_id, &red_truck_id, &indexes).unwrap();
+
+        let want = Replenishment {
+            replenished_units: vec![(red_infantry_1_id, 101), (red_infantry_2_id, 1023)],
+            depleted_supply_crates: vec![(supply_crate_id, 1124)],
+        };
+
+        assert_eq!(got, want)
+    }
+
+    #[test]
+    fn two_units_two_crates() {
+        let red_player_id = Id::from_string("red".to_string(), true).unwrap();
+
+        let red_infantry_1_id = UnitId::test("red infantry 1");
+        let red_infantry_1 = {
+            let mut u = unit::Model::new(
+                Unit::Infantry,
+                &red_player_id,
+                Place::OnMap(Located {
+                    x: 1,
+                    y: 1,
+                    value: FacingDirection::Right,
+                }),
+                &TeamColor::Red,
+            );
+
+            u.supplies = 1;
+
+            u
+        };
+
+        let red_infantry_2_id = UnitId::test("red infantry 2");
+        let red_infantry_2 = {
+            let mut u = unit::Model::new(
+                Unit::Infantry,
+                &red_player_id,
+                Place::OnMap(Located {
+                    x: 1,
+                    y: 1,
+                    value: FacingDirection::Right,
+                }),
+                &TeamColor::Red,
+            );
+
+            u.supplies = 1;
+
+            u
+        };
+
+        let red_truck_id = UnitId::test("red truck");
+        let red_truck = unit::Model::new(
+            Unit::Truck,
+            &red_player_id,
+            Place::OnMap(Located {
+                x: 1,
+                y: 1,
+                value: FacingDirection::Right,
+            }),
+            &TeamColor::Red,
+        );
+
+        let supply_crate_1_id = UnitId::test("supply crate 1");
+        let mut supply_crate_1 = unit::Model::new(
+            Unit::SupplyCrate,
+            &red_player_id,
+            Place::InUnit(red_truck_id.clone()),
+            &TeamColor::Red,
+        );
+
+        let supply_crate_2_id = UnitId::test("supply crate 2");
+        let mut supply_crate_2 = unit::Model::new(
+            Unit::SupplyCrate,
+            &red_player_id,
+            Place::InUnit(red_truck_id.clone()),
+            &TeamColor::Red,
+        );
+
+        let units = vec![
+            (red_infantry_1_id.clone(), red_infantry_1),
+            (red_infantry_2_id.clone(), red_infantry_2),
+            (red_truck_id.clone(), red_truck),
+            (supply_crate_1_id.clone(), supply_crate_1),
+            (supply_crate_2_id.clone(), supply_crate_2),
+        ];
+
+        let indexes = Indexes::make(units);
+
+        let got = Replenishment::calculate(&red_player_id, &red_truck_id, &indexes).unwrap();
+
+        let want = Replenishment {
+            replenished_units: vec![(red_infantry_1_id, 1023), (red_infantry_2_id, 1023)],
+            depleted_supply_crates: vec![(supply_crate_1_id, 2046)],
+        };
+
+        assert_eq!(got, want)
+    }
+
+    #[test]
+    fn two_units_two_crates_partially_depleted() {
+        let red_player_id = Id::from_string("red".to_string(), true).unwrap();
+
+        let red_infantry_1_id = UnitId::test("red infantry 1");
+        let red_infantry_1 = {
+            let mut u = unit::Model::new(
+                Unit::Infantry,
+                &red_player_id,
+                Place::OnMap(Located {
+                    x: 1,
+                    y: 1,
+                    value: FacingDirection::Right,
+                }),
+                &TeamColor::Red,
+            );
+
+            u.supplies = 1;
+
+            u
+        };
+
+        let red_infantry_2_id = UnitId::test("red infantry 2");
+        let red_infantry_2 = {
+            let mut u = unit::Model::new(
+                Unit::Infantry,
+                &red_player_id,
+                Place::OnMap(Located {
+                    x: 1,
+                    y: 1,
+                    value: FacingDirection::Right,
+                }),
+                &TeamColor::Red,
+            );
+
+            u.supplies = 1;
+
+            u
+        };
+
+        let red_truck_id = UnitId::test("red truck");
+        let red_truck = unit::Model::new(
+            Unit::Truck,
+            &red_player_id,
+            Place::OnMap(Located {
+                x: 1,
+                y: 1,
+                value: FacingDirection::Right,
+            }),
+            &TeamColor::Red,
+        );
+
+        let supply_crate_1_id = UnitId::test("supply crate 1");
+        let mut supply_crate_1 = unit::Model::new(
+            Unit::SupplyCrate,
+            &red_player_id,
+            Place::InUnit(red_truck_id.clone()),
+            &TeamColor::Red,
+        );
+
+        supply_crate_1.supplies = 100;
+
+        let supply_crate_2_id = UnitId::test("supply crate 2");
+        let mut supply_crate_2 = unit::Model::new(
+            Unit::SupplyCrate,
+            &red_player_id,
+            Place::InUnit(red_truck_id.clone()),
+            &TeamColor::Red,
+        );
+
+        let units = vec![
+            (red_infantry_1_id.clone(), red_infantry_1),
+            (red_infantry_2_id.clone(), red_infantry_2),
+            (red_truck_id.clone(), red_truck),
+            (supply_crate_1_id.clone(), supply_crate_1),
+            (supply_crate_2_id.clone(), supply_crate_2),
+        ];
+
+        let indexes = Indexes::make(units);
+
+        let got = Replenishment::calculate(&red_player_id, &red_truck_id, &indexes).unwrap();
+
+        let want = Replenishment {
+            replenished_units: vec![(red_infantry_1_id, 1023), (red_infantry_2_id, 1023)],
+            depleted_supply_crates: vec![(supply_crate_1_id, 100), (supply_crate_2_id, 1946)],
         };
 
         assert_eq!(got, want)
