@@ -8,8 +8,8 @@ use std::collections::HashMap;
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct Replenishment {
-    replenished_units: Vec<(UnitId, i16)>,
-    depleted_supply_crates: Vec<(UnitId, i16)>,
+    pub replenished_units: Vec<(UnitId, i16)>,
+    pub depleted_supply_crates: Vec<(UnitId, i16)>,
 }
 
 impl Replenishment {

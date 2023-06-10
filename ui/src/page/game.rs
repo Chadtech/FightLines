@@ -803,130 +803,27 @@ fn handle_moving_flyout_msg(
             model.travel_unit(unit_id, path, arrows)
         }
         mode::moving::ClickMsg::Replenish => {
-            let replenishment_result =
-                Replenishment::calculate(viewer_id, &sub_model.unit_id, &model.game.indexes);
+            match Replenishment::calculate(viewer_id, &sub_model.unit_id, &model.game.indexes) {
+                Ok(replenishment) => {
+                    model.moves_index_by_unit.insert(
+                        sub_model.unit_id.clone(),
+                        Action::Replenish {
+                            replenishing_unit_id: sub_model.unit_id.clone(),
+                            units: replenishment.replenished_units,
+                            depleted_supply_crates: replenishment.depleted_supply_crates,
+                        },
+                    );
 
-            model.clear_mode()
-            // let viewer_id = viewer_id.clone();
-            //
-            // let error_title = "replenish units".to_string();
-            // let unit_model = match model.game.indices.by_id.get(&sub_model.unit_id) {
-            //     Some(u) => u,
-            //     None => {
-            //         model.clear_mode()?;
-            //         return Err(Error::new(
-            //             error_title,
-            //             "could not find replenishing unit".to_string(),
-            //         ));
-            //     }
-            // };
-            //
-            // let unit_pos = match &unit_model.place {
-            //     Place::OnMap(loc) => loc.with_value(()),
-            //     Place::InUnit(_) => {
-            //         model.clear_mode()?;
-            //         return Err(Error::new(
-            //             error_title,
-            //             "replenishing unit not on map".to_string(),
-            //         ));
-            //     }
-            // };
-            //
-            // let maybe_units_to_replenish: Option<Vec<UnitId>> = model
-            //     .game
-            //     .indices
-            //     .by_location
-            //     .get_replenishable_units(&viewer_id, &unit_pos);
-            //
-            // if let Some(units_to_replenish) = maybe_units_to_replenish {
-            //     let unit_id = sub_model.unit_id.clone();
-            //
-            //     let supply_crates: Vec<(UnitId, i16)> = match model
-            //         .game
-            //         .indices
-            //         .by_transport
-            //         .get(&unit_id)
-            //     {
-            //         Some(cargo) => {
-            //             let supply_crates = cargo
-            //                 .into_iter()
-            //                 .filter_map(|(unit_id, unit_model)| {
-            //                     if unit_model.unit.is_supply_crate() {
-            //                         Some((unit_id.clone(), unit_model.supplies))
-            //                     } else {
-            //                         None
-            //                     }
-            //                 })
-            //                 .collect::<Vec<_>>();
-            //
-            //             if supply_crates.is_empty() {
-            //                 model.clear_mode()?;
-            //                 return Err(Error::new(error_title, "no supply crates".to_string()));
-            //             } else {
-            //                 supply_crates
-            //             }
-            //         }
-            //         None => {
-            //             model.clear_mode()?;
-            //             return Err(Error::new(error_title, "could not find cargo".to_string()));
-            //         }
-            //     };
-            //
-            //     let units = units_to_replenish
-            //         .iter()
-            //         .filter_map(|unit_id| {
-            //             model
-            //                 .game
-            //                 .indices
-            //                 .by_id
-            //                 .get(unit_id)
-            //                 .map(|unit_model| (unit_id.clone(), unit_model))
-            //         })
-            //         .collect::<Vec<(UnitId, unit::Model)>>();
-            //
-            //     let mut supply_crate_resources: Vec<(UnitId, i16)> = supply_crates
-            //         .iter()
-            //         .map(|(unit_id, unit_model)| (unit_id.clone(), unit_model.supplies))
-            //         .collect::<Vec<(UnitId, i16)>>();
-            //     let mut units_in_need_of_supplies = units.len() as i16;
-            //     let mut unit_adjustments: HashMap<UnitId, i16> = HashMap::new();
-            //
-            //     let mut crate_index = 0;
-            //     while crate_index < supply_crate_resources.len() {
-            //         let (crate_id, crate_supplies) = &mut supply_crate_resources[crate_index];
-            //
-            //         let supplies_per_unit = crate_supplies / units_in_need_of_supplies;
-            //
-            //         for (unit_id, unit_model) in units {
-            //             let capacity = unit_model.unit.max_supplies() - unit_model.supplies;
-            //
-            //             let mut adjustment = unit_adjustments.entry(unit_id).or_insert(0);
-            //
-            //             if adjustment + supplies_per_unit > capacity {
-            //                 adjustment = capacity;
-            //             } else {
-            //                 adjustment += supplies_per_unit;
-            //             }
-            //         }
-            //     }
-            //
-            //     if units.len() < units_to_replenish.len() {
-            //         return Err(Error::new(error_title, "could not find unit".to_string()));
-            //     }
-            //
-            //     let depleted_supply_crates = todo!("Depleted supply crates");
-            //
-            //     model.moves_index_by_unit.insert(
-            //         unit_id.clone(),
-            //         Action::Replenish {
-            //             replenishing_unit_id: unit_id,
-            //             units,
-            //             depleted_supply_crates,
-            //         },
-            //     );
-            // }
-            //
-            // model.clear_mode()
+                    model.clear_mode()?;
+
+                    Ok(())
+                }
+                Err(err_msg) => {
+                    model.clear_mode()?;
+
+                    Err(Error::new("handle moving flyout msg".to_string(), err_msg))
+                }
+            }
         }
     }
 }

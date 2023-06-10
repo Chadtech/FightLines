@@ -117,7 +117,11 @@ fn outcomes_from_action(action: &Action) -> Vec<Outcome> {
             units,
             depleted_supply_crates,
         } => {
-            todo!("Make replenishment outcome")
+            vec![Outcome::Replenished {
+                replenishing_unit_id: replenishing_unit_id.clone(),
+                units: units.clone(),
+                depleted_supply_crates: depleted_supply_crates.clone(),
+            }]
         }
     }
 }
