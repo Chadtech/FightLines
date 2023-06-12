@@ -54,6 +54,10 @@ impl GameId {
             return Some(GameId::DisplayTest);
         }
 
+        if s == REPLENISH_TEST {
+            return Some(GameId::ReplenishTest);
+        }
+
         Id::from_string(s, false).map(GameId::GameId)
     }
 

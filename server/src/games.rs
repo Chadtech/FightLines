@@ -96,7 +96,7 @@ impl Games {
                 (
                     truck_id.clone(),
                     unit::Model::new(
-                        Unit::SupplyCrate,
+                        Unit::Truck,
                         &red_player_id,
                         Place::on_map(2, 4, FacingDirection::Right),
                         &TeamColor::Red,
@@ -116,7 +116,7 @@ impl Games {
             Game::try_from(game_init_flags).unwrap()
         };
 
-        games.insert(GameId::DisplayTest, replenish_test);
+        games.insert(GameId::ReplenishTest, replenish_test);
 
         let final_seed: RandSeed = RandSeed::next(&mut rng);
 
