@@ -31,6 +31,7 @@ use std::convert::TryFrom;
 pub enum GameId {
     GameId(Id),
     DisplayTest,
+    ReplenishTest,
 }
 
 impl ToString for GameId {
@@ -38,6 +39,7 @@ impl ToString for GameId {
         match self {
             GameId::GameId(id) => id.to_string(),
             GameId::DisplayTest => DISPLAY_TEST.to_string(),
+            GameId::ReplenishTest => REPLENISH_TEST.to_string(),
         }
     }
 }
@@ -59,6 +61,7 @@ impl GameId {
         match self {
             GameId::GameId(_) => false,
             GameId::DisplayTest => true,
+            GameId::ReplenishTest => true,
         }
     }
 }
@@ -124,6 +127,7 @@ pub enum FromLobbyError {
 }
 
 const DISPLAY_TEST: &str = "display-test";
+const REPLENISH_TEST: &str = "replenish-test";
 
 ////////////////////////////////////////////////////////////////////////////////
 // Api //
@@ -462,7 +466,32 @@ impl Game {
 
                     unit.place = Place::OnMap(cargo_unit_loc.with_value(facing_dir));
                 }
-                Outcome::Replenished { units, .. } => {
+                Outcome::Replenished {
+                    units,
+                    path,
+                    replenishing_unit_id,
+                    ..
+                } => {
+                    if let Some(loc_dir) = path.last_pos() {
+                        let facing_dir = match self
+                            .indexes
+                            .position_of_unit_or_transport(&replenishing_unit_id)
+                        {
+                            Ok(facing_dir_loc) => facing_dir_loc.value,
+                            Err(msg) => return Err(msg),
+                        };
+
+                        if let Some(unit_model) = self.get_mut_unit(&replenishing_unit_id) {
+                            unit_model.supplies -= path.supply_cost(&unit_model.unit);
+
+                            let new_facing_dir =
+                                FacingDirection::from_directions(path.clone().to_directions())
+                                    .unwrap_or(facing_dir);
+
+                            unit_model.place = Place::OnMap(loc_dir.with_value(new_facing_dir));
+                        }
+                    }
+
                     for (unit_id, supplies) in units {
                         if let Some(unit) = self.get_mut_unit(&unit_id) {
                             unit.supplies += supplies;
@@ -812,11 +841,35 @@ pub fn calculate_player_visibility(
     visible_spots
 }
 
-impl TryFrom<(Lobby, &mut RandGen)> for Game {
+pub struct GameInitFlags<'a> {
+    pub lobby: Lobby,
+    pub rng: &'a mut RandGen,
+    pub extra_units: Vec<(UnitId, unit::Model)>,
+}
+
+impl GameInitFlags<'_> {
+    pub fn new(lobby: Lobby, rng: &mut RandGen) -> GameInitFlags {
+        GameInitFlags {
+            lobby,
+            rng,
+            extra_units: vec![],
+        }
+    }
+
+    pub fn with_extra_units(&mut self, more_extra_units: &mut Vec<(UnitId, unit::Model)>) {
+        self.extra_units.append(more_extra_units);
+    }
+}
+
+impl TryFrom<GameInitFlags<'_>> for Game {
     type Error = FromLobbyError;
 
-    fn try_from(params: (Lobby, &mut RandGen)) -> Result<Self, Self::Error> {
-        let (lobby, rng) = params;
+    fn try_from(params: GameInitFlags) -> Result<Self, Self::Error> {
+        let GameInitFlags {
+            lobby,
+            rng,
+            extra_units,
+        } = params;
 
         let num_players = lobby.num_players();
         let guests: Vec<(Id, Player)> = lobby.guests.into_iter().collect();
@@ -885,7 +938,9 @@ impl TryFrom<(Lobby, &mut RandGen)> for Game {
                 );
 
                 let units: Vec<(UnitId, unit::Model)> = vec![
-                    vec![host_units, first_guest_units].concat().to_vec(),
+                    vec![host_units, first_guest_units, extra_units]
+                        .concat()
+                        .to_vec(),
                     remaining_guests_with_militaries,
                 ]
                 .concat()

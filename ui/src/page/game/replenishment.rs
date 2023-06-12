@@ -34,7 +34,7 @@ impl Replenishment {
 
         let unit_ids_to_replenish: Vec<UnitId> = match unit_indexes
             .by_location
-            .get_replenishable_units(&viewer_id, &replenishing_unit_pos)
+            .get_replenishable_units(viewer_id, &replenishing_unit_pos)
         {
             Some(mut u) => {
                 u.sort();
@@ -46,7 +46,7 @@ impl Replenishment {
         };
 
         let mut supply_crates: Vec<(UnitId, i16)> =
-            match unit_indexes.by_transport.get(&replenishing_unit_id) {
+            match unit_indexes.by_transport.get(replenishing_unit_id) {
                 Some(cargo) => {
                     let mut supply_crates = cargo
                         .iter()
@@ -63,7 +63,7 @@ impl Replenishment {
                         return Err("no supply crates".to_string());
                     } else {
                         supply_crates.sort_by(|(fst_id, fst_supplies), (snd_id, snd_supplies)| {
-                            match fst_supplies.cmp(&snd_supplies) {
+                            match fst_supplies.cmp(snd_supplies) {
                                 Ordering::Equal => fst_id.cmp(snd_id),
                                 ordering => ordering,
                             }
@@ -95,14 +95,13 @@ impl Replenishment {
         while crate_index < supply_crates.len() && units_in_need_of_supplies > 0 {
             let (crate_id, crate_supplies) = supply_crates.get_mut(crate_index).unwrap();
 
-            let supplies_per_unit = crate_supplies.clone() / units_in_need_of_supplies;
-            let mut remainder = crate_supplies.clone() % units_in_need_of_supplies;
+            let supplies_per_unit = *crate_supplies / units_in_need_of_supplies;
+            let mut remainder = *crate_supplies % units_in_need_of_supplies;
 
             for (unit_id, unit_model) in units_to_replenish.clone() {
                 let adjustment = unit_adjustments.entry(unit_id).or_insert(0);
 
-                let capacity =
-                    unit_model.unit.max_supplies() - (unit_model.supplies + adjustment.clone());
+                let capacity = unit_model.unit.max_supplies() - (unit_model.supplies + *adjustment);
 
                 if capacity == 0 {
                     units_in_need_of_supplies -= 1;
@@ -127,13 +126,13 @@ impl Replenishment {
 
         let mut replenished_units = unit_adjustments.into_iter().collect::<Vec<(UnitId, i16)>>();
 
-        replenished_units.sort_by(|(fst_id, _), (snd_id, _)| fst_id.cmp(&snd_id));
+        replenished_units.sort_by(|(fst_id, _), (snd_id, _)| fst_id.cmp(snd_id));
 
         let mut depleted_supply_crates = supply_crate_depletions
             .into_iter()
             .collect::<Vec<(UnitId, i16)>>();
 
-        depleted_supply_crates.sort_by(|(fst_id, _), (snd_id, _)| fst_id.cmp(&snd_id));
+        depleted_supply_crates.sort_by(|(fst_id, _), (snd_id, _)| fst_id.cmp(snd_id));
 
         Ok(Replenishment {
             replenished_units,

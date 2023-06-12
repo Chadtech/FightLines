@@ -12,7 +12,7 @@ use shared::api::endpoint::Endpoint;
 use shared::api::lobby::get as lobby_get;
 use shared::api::lobby::start as lobby_start;
 use shared::api::lobby::update as lobby_update;
-use shared::game::{FromLobbyError, Game, GameId};
+use shared::game::{FromLobbyError, Game, GameId, GameInitFlags};
 use shared::id::Id;
 use shared::lobby;
 use shared::lobby::{Lobby, LobbyId, MAX_GUESTS};
@@ -309,7 +309,7 @@ fn attempt_start_game(
 ) {
     let mut rand_gen = global.new_rand_gen();
 
-    match Game::try_from((model.lobby.clone(), &mut rand_gen)) {
+    match Game::try_from(GameInitFlags::new(model.lobby.clone(), &mut rand_gen)) {
         Ok(_) => {
             let req = lobby_start::Request {
                 player_id: global.viewer_id(),

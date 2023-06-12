@@ -33,5 +33,7 @@ pub enum Action {
         replenishing_unit_id: UnitId,
         units: Vec<(UnitId, i16)>,
         depleted_supply_crates: Vec<(UnitId, i16)>,
+        path: Path,
+        arrows: Vec<(Direction, Arrow)>,
     },
 }

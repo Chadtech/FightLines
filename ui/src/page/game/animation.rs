@@ -26,56 +26,65 @@ pub enum Animation {
 }
 
 impl Animation {
-    pub fn from_outcome(outcome: Outcome) -> Option<Animation> {
+    pub fn from_outcome(outcome: Outcome) -> Vec<Animation> {
         match outcome {
-            Outcome::Traveled { unit_id, path, .. } => Some(Animation::Travel {
+            Outcome::Traveled { unit_id, path, .. } => vec![Animation::Travel {
                 unit_id,
                 path,
                 loads_into: None,
                 picks_up: None,
-            }),
+            }],
             Outcome::LoadedInto {
                 unit_id,
                 path,
                 loaded_into,
                 ..
-            } => Some(Animation::Travel {
+            } => vec![Animation::Travel {
                 unit_id,
                 path,
                 loads_into: Some(loaded_into),
                 picks_up: None,
-            }),
-            Outcome::NamedUnit { .. } => None,
-            Outcome::Perished { unit_id } => Some(Animation::Perish { unit_id }),
-            Outcome::ConsumedSupplies { .. } => None,
+            }],
+            Outcome::NamedUnit { .. } => vec![],
+            Outcome::Perished { unit_id } => vec![Animation::Perish { unit_id }],
+            Outcome::ConsumedSupplies { .. } => vec![],
             Outcome::PickUp {
                 unit_id,
                 path,
                 cargo_id,
-            } => Some(Animation::Travel {
+            } => vec![Animation::Travel {
                 unit_id,
                 path,
                 loads_into: None,
                 picks_up: Some(cargo_id),
-            }),
+            }],
             Outcome::Placed {
                 cargo_unit_loc: loc,
                 transport_id,
-            } => Some(Animation::DropOff {
+            } => vec![Animation::DropOff {
                 cargo_unit: loc,
                 transport_id,
-            }),
+            }],
             Outcome::Replenished {
                 replenishing_unit_id,
                 units,
+                path,
                 ..
-            } => Some(Animation::Replenish {
-                units: units
-                    .iter()
-                    .map(|unit| unit.0.clone())
-                    .collect::<Vec<UnitId>>(),
-                replenishing_unit_id,
-            }),
+            } => vec![
+                Animation::Travel {
+                    unit_id: replenishing_unit_id.clone(),
+                    path,
+                    loads_into: None,
+                    picks_up: None,
+                },
+                Animation::Replenish {
+                    units: units
+                        .iter()
+                        .map(|unit| unit.0.clone())
+                        .collect::<Vec<UnitId>>(),
+                    replenishing_unit_id,
+                },
+            ],
         }
     }
 }

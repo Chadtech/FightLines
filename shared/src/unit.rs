@@ -80,6 +80,14 @@ impl Place {
             Place::InUnit(_) => false,
         }
     }
+
+    pub fn on_map(x: u16, y: u16, facing_direction: FacingDirection) -> Place {
+        Place::OnMap(Located {
+            x,
+            y,
+            value: facing_direction,
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Debug)]

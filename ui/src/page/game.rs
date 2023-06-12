@@ -751,14 +751,17 @@ fn handle_moving_flyout_msg(
         return Ok(());
     };
 
+    let error_title = "handle moving flyout msg".to_string();
+
+    let unit_id = &sub_model.unit_id.clone();
+
     match msg {
         mode::moving::ClickMsg::PickUp(cargo_unit_id) => {
-            let unit_id = &sub_model.unit_id.clone();
             let arrows = &sub_model.arrows.clone();
 
             let path = sub_model
                 .path(unit_id, &model.game)
-                .map_err(|err_msg| Error::new("handle moving flyout msg".to_string(), err_msg))?;
+                .map_err(|err_msg| Error::new(error_title, err_msg))?;
 
             model.moves_index_by_unit.insert(
                 sub_model.unit_id.clone(),
@@ -773,12 +776,11 @@ fn handle_moving_flyout_msg(
             model.clear_mode()
         }
         mode::moving::ClickMsg::LoadInto(rideable_unit_id) => {
-            let unit_id = &sub_model.unit_id.clone();
             let arrows = &sub_model.arrows.clone();
 
             let path = sub_model
                 .path(unit_id, &model.game)
-                .map_err(|err_msg| Error::new("handle moving flyout msg".to_string(), err_msg))?;
+                .map_err(|err_msg| Error::new(error_title, err_msg))?;
 
             model.moves_index_by_unit.insert(
                 sub_model.unit_id.clone(),
@@ -793,24 +795,31 @@ fn handle_moving_flyout_msg(
             model.clear_mode()
         }
         mode::moving::ClickMsg::MoveTo => {
-            let unit_id = &sub_model.unit_id.clone();
             let arrows = &sub_model.arrows.clone();
 
             let path = sub_model
                 .path(unit_id, &model.game)
-                .map_err(|err_msg| Error::new("handle moving flyout msg".to_string(), err_msg))?;
+                .map_err(|err_msg| Error::new(error_title, err_msg))?;
 
             model.travel_unit(unit_id, path, arrows)
         }
         mode::moving::ClickMsg::Replenish => {
             match Replenishment::calculate(viewer_id, &sub_model.unit_id, &model.game.indexes) {
                 Ok(replenishment) => {
+                    let arrows = &sub_model.arrows.clone();
+
+                    let path = sub_model
+                        .path(unit_id, &model.game)
+                        .map_err(|err_msg| Error::new(error_title, err_msg))?;
+
                     model.moves_index_by_unit.insert(
                         sub_model.unit_id.clone(),
                         Action::Replenish {
                             replenishing_unit_id: sub_model.unit_id.clone(),
                             units: replenishment.replenished_units,
                             depleted_supply_crates: replenishment.depleted_supply_crates,
+                            arrows: arrows.clone(),
+                            path,
                         },
                     );
 
@@ -821,7 +830,7 @@ fn handle_moving_flyout_msg(
                 Err(err_msg) => {
                     model.clear_mode()?;
 
-                    Err(Error::new("handle moving flyout msg".to_string(), err_msg))
+                    Err(Error::new(error_title, err_msg))
                 }
             }
         }
@@ -904,10 +913,13 @@ fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl 
                 replenishing_unit_id,
                 units,
                 depleted_supply_crates,
+                path,
+                ..
             } => game::action::Action::Replenish {
                 replenishing_unit_id: replenishing_unit_id.clone(),
                 units: units.clone(),
                 depleted_supply_crates: depleted_supply_crates.clone(),
+                path: path.clone(),
             },
         })
         .collect();
@@ -1053,7 +1065,7 @@ fn handle_click_on_screen_when_move_mode(
         let visibility = model
             .game
             .get_players_visibility(&viewer_id)
-            .map_err(|err| Error::new(error_title, err.to_string()))?;
+            .map_err(|err| Error::new(error_title, err))?;
 
         if unit_model.unit.can_pick_up_supply_crates() && visibility.contains(mouse_loc) {
             if let Some(supply_crates) = model.game.get_supply_crates_by_location(mouse_loc) {
@@ -1471,7 +1483,9 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                         draw_arrows(&ctx, model, game_pos, arrows);
                     }
                     Action::DropOff { .. } => {}
-                    Action::Replenish { .. } => {}
+                    Action::Replenish { arrows, .. } => {
+                        draw_arrows(&ctx, model, game_pos, arrows);
+                    }
                 };
             }
         };
@@ -2045,7 +2059,7 @@ fn calc_arrows(
 fn outcomes_to_animations(outcomes: Vec<Outcome>) -> Vec<Animation> {
     outcomes
         .into_iter()
-        .filter_map(Animation::from_outcome)
+        .flat_map(Animation::from_outcome)
         .collect::<Vec<Animation>>()
 }
 
@@ -2249,10 +2263,14 @@ fn game_moves_to_page_actions(moves: Vec<game::action::Action>) -> Vec<Action> {
                 replenishing_unit_id,
                 units,
                 depleted_supply_crates,
+                path,
+                ..
             } => moves_ret.push(Action::Replenish {
-                replenishing_unit_id: replenishing_unit_id,
+                replenishing_unit_id,
                 units: units.clone(),
                 depleted_supply_crates,
+                path: path.clone(),
+                arrows: path.with_arrows(),
             }),
         }
     }

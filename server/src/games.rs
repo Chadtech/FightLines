@@ -1,5 +1,5 @@
-use shared::game;
-use shared::game::{Game, GameId};
+use shared::facing_direction::FacingDirection;
+use shared::game::{Game, GameId, GameInitFlags};
 use shared::id::Id;
 use shared::lobby::Lobby;
 use shared::map::MapOpt;
@@ -7,6 +7,8 @@ use shared::name::Name;
 use shared::player::Player;
 use shared::rng::{RandGen, RandSeed};
 use shared::team_color::TeamColor;
+use shared::unit::{Place, Unit, UnitId};
+use shared::{game, unit};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::str::FromStr;
@@ -58,10 +60,63 @@ impl Games {
 
             let new_seed: RandSeed = RandSeed::next(&mut rng);
 
-            Game::try_from((lobby, &mut RandGen::from_seed(new_seed))).unwrap()
+            Game::try_from(GameInitFlags::new(lobby, &mut RandGen::from_seed(new_seed))).unwrap()
         };
 
         games.insert(GameId::DisplayTest, display_test);
+
+        let replenish_test: Game = {
+            let red_player_id = Id::from_string("red".to_string(), true).unwrap();
+            let mut lobby = Lobby::new(
+                red_player_id.clone(),
+                Player {
+                    name: Name::from_str("red").unwrap(),
+                    color: TeamColor::Red,
+                },
+            );
+
+            let _ = lobby.add_guest(
+                Id::Dev("blue".to_string()),
+                Player {
+                    name: Name::from_str("blue").unwrap(),
+                    color: TeamColor::Blue,
+                },
+            );
+
+            lobby.set_map_choice(MapOpt::ReplenishTest);
+
+            let new_seed: RandSeed = RandSeed::next(&mut rng);
+
+            let mut init_flags_rng = RandGen::from_seed(new_seed);
+
+            let mut game_init_flags = GameInitFlags::new(lobby, &mut init_flags_rng);
+
+            let truck_id = UnitId::test("truck");
+            game_init_flags.with_extra_units(&mut vec![
+                (
+                    truck_id.clone(),
+                    unit::Model::new(
+                        Unit::SupplyCrate,
+                        &red_player_id,
+                        Place::on_map(2, 4, FacingDirection::Right),
+                        &TeamColor::Red,
+                    ),
+                ),
+                (
+                    UnitId::test("supply crate"),
+                    unit::Model::new(
+                        Unit::SupplyCrate,
+                        &red_player_id,
+                        Place::InUnit(truck_id),
+                        &TeamColor::Red,
+                    ),
+                ),
+            ]);
+
+            Game::try_from(game_init_flags).unwrap()
+        };
+
+        games.insert(GameId::DisplayTest, replenish_test);
 
         let final_seed: RandSeed = RandSeed::next(&mut rng);
 
@@ -98,7 +153,7 @@ impl Games {
     pub fn new_game_from_lobby(&mut self, lobby: Lobby) -> Result<Game, game::FromLobbyError> {
         let mut rand_gen = RandGen::from_seed(self.random_seed.clone());
 
-        let game: Game = Game::try_from((lobby, &mut rand_gen))?;
+        let game: Game = Game::try_from(GameInitFlags::new(lobby, &mut rand_gen))?;
 
         let new_seed: RandSeed = RandSeed::next(&mut rand_gen);
 

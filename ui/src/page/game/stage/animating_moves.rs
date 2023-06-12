@@ -1,5 +1,6 @@
 use crate::page::game::animation::Animation;
 use crate::view::cell::Cell;
+use seed::log;
 use shared::facing_direction::FacingDirection;
 use shared::game::day::Time;
 use shared::game::unit_index::Indexes;
@@ -270,6 +271,8 @@ pub fn sidebar_view<Msg: 'static>(
                     (None, _) => "error: could not find replenishing unit name".to_string(),
                     (_, Err(err)) => err,
                 };
+
+                log!(msg);
 
                 vec![Cell::from_str(vec![], msg.as_str())]
             }

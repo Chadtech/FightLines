@@ -56,6 +56,19 @@ impl Map {
         .sync_grid()
     }
 
+    pub fn replenish_test() -> Map {
+        let features = HashMap::new();
+
+        Map {
+            base_tile: Tile::GrassPlain,
+            features,
+            grid: Vec::new(),
+            width: 16,
+            height: 16,
+        }
+        .sync_grid()
+    }
+
     pub fn terrain_test() -> Map {
         let mut features = HashMap::new();
 
@@ -122,6 +135,7 @@ pub enum MapOpt {
     GrassSquare,
     TerrainTest,
     DisplayTest,
+    ReplenishTest,
 }
 
 pub struct StartingUnits {
@@ -295,6 +309,31 @@ impl MapOpt {
                 ],
                 rest_players_militatries: vec![],
             },
+            MapOpt::ReplenishTest => StartingUnits {
+                first_player_military: vec![
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Right, Unit::Infantry),
+                        x: 2,
+                        y: 2,
+                    },
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Right, Unit::Infantry),
+                        x: 2,
+                        y: 2,
+                    },
+                    Located::<(FacingDirection, Unit)> {
+                        value: (FacingDirection::Right, Unit::Infantry),
+                        x: 2,
+                        y: 2,
+                    },
+                ],
+                second_player_military: vec![Located::<(FacingDirection, Unit)> {
+                    value: (FacingDirection::Right, Unit::Truck),
+                    x: 4,
+                    y: 8,
+                }],
+                rest_players_militatries: vec![],
+            },
         }
     }
 
@@ -307,6 +346,7 @@ impl MapOpt {
             MapOpt::GrassSquare => Map::grass_square(),
             MapOpt::TerrainTest => Map::terrain_test(),
             MapOpt::DisplayTest => Map::display_test(),
+            MapOpt::ReplenishTest => Map::replenish_test(),
         }
     }
 }

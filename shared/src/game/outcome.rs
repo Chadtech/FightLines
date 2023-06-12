@@ -41,6 +41,7 @@ pub enum Outcome {
         replenishing_unit_id: UnitId,
         units: Vec<(UnitId, i16)>,
         depleted_supply_crates: Vec<(UnitId, i16)>,
+        path: Path,
     },
 }
 
@@ -116,11 +117,13 @@ fn outcomes_from_action(action: &Action) -> Vec<Outcome> {
             replenishing_unit_id,
             units,
             depleted_supply_crates,
+            path,
         } => {
             vec![Outcome::Replenished {
                 replenishing_unit_id: replenishing_unit_id.clone(),
                 units: units.clone(),
                 depleted_supply_crates: depleted_supply_crates.clone(),
+                path: path.clone(),
             }]
         }
     }
