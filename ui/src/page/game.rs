@@ -804,8 +804,6 @@ fn handle_moving_flyout_msg(
             model.travel_unit(unit_id, path, arrows)
         }
         mode::moving::ClickMsg::Replenish => {
-            let error_title = error_title.clone();
-
             let path = sub_model
                 .path(unit_id, &model.game)
                 .map_err(|err_msg| Error::new(error_title.clone(), err_msg))?;

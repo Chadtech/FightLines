@@ -65,7 +65,7 @@ impl Games {
 
         games.insert(GameId::DisplayTest, display_test);
 
-        let mut replenish_test: Game = {
+        let replenish_test: Game = {
             let red_player_id = Id::from_string("red".to_string(), true).unwrap();
             let mut lobby = Lobby::new(
                 red_player_id.clone(),

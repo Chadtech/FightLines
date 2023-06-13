@@ -2,7 +2,7 @@ use shared::game::unit_index::Indexes;
 use shared::id::Id;
 use shared::located::Located;
 use shared::unit;
-use shared::unit::{Place, UnitId};
+use shared::unit::UnitId;
 use std::cmp;
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -97,7 +97,7 @@ impl Replenishment {
                 }
 
                 let remainder_delta = cmp::min(1, remainder);
-                let delta = cmp::min(supplies_per_unit, capacity) + remainder_delta;
+                let delta = cmp::min(supplies_per_unit + remainder_delta, capacity);
 
                 remainder -= remainder_delta;
 
@@ -533,7 +533,7 @@ mod test_replenishment {
         );
 
         let supply_crate_id = UnitId::test("supply crate");
-        let mut supply_crate = unit::Model::new(
+        let supply_crate = unit::Model::new(
             Unit::SupplyCrate,
             &red_player_id,
             Place::InUnit(red_truck_id.clone()),
@@ -618,7 +618,7 @@ mod test_replenishment {
         );
 
         let supply_crate_1_id = UnitId::test("supply crate 1");
-        let mut supply_crate_1 = unit::Model::new(
+        let supply_crate_1 = unit::Model::new(
             Unit::SupplyCrate,
             &red_player_id,
             Place::InUnit(red_truck_id.clone()),
@@ -626,7 +626,7 @@ mod test_replenishment {
         );
 
         let supply_crate_2_id = UnitId::test("supply crate 2");
-        let mut supply_crate_2 = unit::Model::new(
+        let supply_crate_2 = unit::Model::new(
             Unit::SupplyCrate,
             &red_player_id,
             Place::InUnit(red_truck_id.clone()),
@@ -722,7 +722,7 @@ mod test_replenishment {
         supply_crate_1.supplies = 100;
 
         let supply_crate_2_id = UnitId::test("supply crate 2");
-        let mut supply_crate_2 = unit::Model::new(
+        let supply_crate_2 = unit::Model::new(
             Unit::SupplyCrate,
             &red_player_id,
             Place::InUnit(red_truck_id.clone()),
@@ -820,7 +820,7 @@ mod test_replenishment {
         supply_crate_1.supplies = 100;
 
         let supply_crate_2_id = UnitId::test("supply crate 2");
-        let mut supply_crate_2 = unit::Model::new(
+        let supply_crate_2 = unit::Model::new(
             Unit::SupplyCrate,
             &red_player_id,
             Place::InUnit(red_truck_id.clone()),
@@ -847,7 +847,7 @@ mod test_replenishment {
                 (red_infantry_2_id, 1023),
                 (red_truck_id, 1948),
             ],
-            depleted_supply_crates: vec![(supply_crate_1_id, 100), (supply_crate_2_id, 3984)],
+            depleted_supply_crates: vec![(supply_crate_1_id, 100), (supply_crate_2_id, 3894)],
         };
 
         assert_eq!(got, want)
