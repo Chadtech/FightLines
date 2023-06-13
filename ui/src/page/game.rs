@@ -804,13 +804,30 @@ fn handle_moving_flyout_msg(
             model.travel_unit(unit_id, path, arrows)
         }
         mode::moving::ClickMsg::Replenish => {
-            match Replenishment::calculate(viewer_id, &sub_model.unit_id, &model.game.indexes) {
+            let error_title = error_title.clone();
+
+            let path = sub_model
+                .path(unit_id, &model.game)
+                .map_err(|err_msg| Error::new(error_title.clone(), err_msg))?;
+
+            let replenishment_pos = match path.last_pos() {
+                Some(p) => p,
+                None => {
+                    return Err(Error::new(
+                        error_title,
+                        "replenishing unit does not travel".to_string(),
+                    ));
+                }
+            };
+
+            match Replenishment::calculate(
+                viewer_id,
+                &sub_model.unit_id,
+                replenishment_pos,
+                &model.game.indexes,
+            ) {
                 Ok(replenishment) => {
                     let arrows = &sub_model.arrows.clone();
-
-                    let path = sub_model
-                        .path(unit_id, &model.game)
-                        .map_err(|err_msg| Error::new(error_title, err_msg))?;
 
                     model.moves_index_by_unit.insert(
                         sub_model.unit_id.clone(),

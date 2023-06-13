@@ -65,7 +65,7 @@ impl Games {
 
         games.insert(GameId::DisplayTest, display_test);
 
-        let replenish_test: Game = {
+        let mut replenish_test: Game = {
             let red_player_id = Id::from_string("red".to_string(), true).unwrap();
             let mut lobby = Lobby::new(
                 red_player_id.clone(),
@@ -91,17 +91,27 @@ impl Games {
 
             let mut game_init_flags = GameInitFlags::new(lobby, &mut init_flags_rng);
 
+            let mut infantry = unit::Model::new(
+                Unit::Infantry,
+                &red_player_id,
+                Place::on_map(2, 2, FacingDirection::Right),
+                &TeamColor::Red,
+            );
+
+            infantry.supplies = Unit::Infantry.max_supplies() / 3;
+
+            let mut truck = unit::Model::new(
+                Unit::Truck,
+                &red_player_id,
+                Place::on_map(2, 4, FacingDirection::Right),
+                &TeamColor::Red,
+            );
+
+            truck.supplies = Unit::Truck.max_supplies() / 2;
+
             let truck_id = UnitId::test("truck");
             game_init_flags.with_extra_units(&mut vec![
-                (
-                    truck_id.clone(),
-                    unit::Model::new(
-                        Unit::Truck,
-                        &red_player_id,
-                        Place::on_map(2, 4, FacingDirection::Right),
-                        &TeamColor::Red,
-                    ),
-                ),
+                (truck_id.clone(), truck),
                 (
                     UnitId::test("supply crate"),
                     unit::Model::new(
@@ -111,6 +121,8 @@ impl Games {
                         &TeamColor::Red,
                     ),
                 ),
+                (UnitId::test("infantry 1"), infantry.clone()),
+                (UnitId::test("infantry 2"), infantry),
             ]);
 
             Game::try_from(game_init_flags).unwrap()

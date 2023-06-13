@@ -310,23 +310,7 @@ impl MapOpt {
                 rest_players_militatries: vec![],
             },
             MapOpt::ReplenishTest => StartingUnits {
-                first_player_military: vec![
-                    Located::<(FacingDirection, Unit)> {
-                        value: (FacingDirection::Right, Unit::Infantry),
-                        x: 2,
-                        y: 2,
-                    },
-                    Located::<(FacingDirection, Unit)> {
-                        value: (FacingDirection::Right, Unit::Infantry),
-                        x: 2,
-                        y: 2,
-                    },
-                    Located::<(FacingDirection, Unit)> {
-                        value: (FacingDirection::Right, Unit::Infantry),
-                        x: 2,
-                        y: 2,
-                    },
-                ],
+                first_player_military: vec![],
                 second_player_military: vec![Located::<(FacingDirection, Unit)> {
                     value: (FacingDirection::Right, Unit::Truck),
                     x: 4,

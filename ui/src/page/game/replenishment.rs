@@ -1,5 +1,6 @@
 use shared::game::unit_index::Indexes;
 use shared::id::Id;
+use shared::located::Located;
 use shared::unit;
 use shared::unit::{Place, UnitId};
 use std::cmp;
@@ -16,27 +17,15 @@ impl Replenishment {
     pub fn calculate(
         viewer_id: &Id,
         replenishing_unit_id: &UnitId,
+        loc_of_replenishment: Located<()>,
         unit_indexes: &Indexes,
     ) -> Result<Replenishment, String> {
-        let replenishing_unit_model = match unit_indexes.by_id.get(replenishing_unit_id) {
-            Some(u) => u,
-            None => {
-                return Err("could not find replenishing unit".to_string());
-            }
-        };
-
-        let replenishing_unit_pos = match &replenishing_unit_model.place {
-            Place::OnMap(loc) => loc.with_value(()),
-            Place::InUnit(_) => {
-                return Err("replenishing unit not on map".to_string());
-            }
-        };
-
         let unit_ids_to_replenish: Vec<UnitId> = match unit_indexes
             .by_location
-            .get_replenishable_units(viewer_id, &replenishing_unit_pos)
+            .get_replenishable_units(viewer_id, &loc_of_replenishment)
         {
             Some(mut u) => {
+                u.push(replenishing_unit_id.clone());
                 u.sort();
                 u
             }
@@ -150,8 +139,8 @@ mod test_replenishment {
     use shared::id::Id;
     use shared::located::Located;
     use shared::team_color::TeamColor;
-    use shared::unit;
     use shared::unit::{Place, Unit, UnitId};
+    use shared::{located, unit};
 
     #[test]
     fn one_unit_one_crate() {
@@ -205,10 +194,12 @@ mod test_replenishment {
 
         let indexes = Indexes::make(units);
 
-        let got = Replenishment::calculate(&red_player_id, &red_truck_id, &indexes).unwrap();
+        let got =
+            Replenishment::calculate(&red_player_id, &red_truck_id, located::unit(1, 1), &indexes)
+                .unwrap();
 
         let want = Replenishment {
-            replenished_units: vec![(red_infantry_id, 1023)],
+            replenished_units: vec![(red_infantry_id, 1023), (red_truck_id, 0)],
             depleted_supply_crates: vec![(supply_crate_id, 1023)],
         };
 
@@ -267,10 +258,12 @@ mod test_replenishment {
 
         let indexes = Indexes::make(units);
 
-        let got = Replenishment::calculate(&red_player_id, &red_truck_id, &indexes).unwrap();
+        let got =
+            Replenishment::calculate(&red_player_id, &red_truck_id, located::unit(1, 1), &indexes)
+                .unwrap();
 
         let want = Replenishment {
-            replenished_units: vec![(red_infantry_id, 500)],
+            replenished_units: vec![(red_infantry_id, 500), (red_truck_id, 0)],
             depleted_supply_crates: vec![(supply_crate_id, 500)],
         };
 
@@ -331,10 +324,16 @@ mod test_replenishment {
 
         let indexes = Indexes::make(units);
 
-        let got = Replenishment::calculate(&red_player_id, &red_truck_id, &indexes).unwrap();
+        let got =
+            Replenishment::calculate(&red_player_id, &red_truck_id, located::unit(1, 1), &indexes)
+                .unwrap();
 
         let want = Replenishment {
-            replenished_units: vec![(red_infantry_1_id, 1023), (red_infantry_2_id, 1023)],
+            replenished_units: vec![
+                (red_infantry_1_id, 1023),
+                (red_infantry_2_id, 1023),
+                (red_truck_id, 0),
+            ],
             depleted_supply_crates: vec![(supply_crate_id, 2046)],
         };
 
@@ -395,10 +394,16 @@ mod test_replenishment {
 
         let indexes = Indexes::make(units);
 
-        let got = Replenishment::calculate(&red_player_id, &red_truck_id, &indexes).unwrap();
+        let got =
+            Replenishment::calculate(&red_player_id, &red_truck_id, located::unit(1, 1), &indexes)
+                .unwrap();
 
         let want = Replenishment {
-            replenished_units: vec![(red_infantry_1_id, 250), (red_infantry_2_id, 250)],
+            replenished_units: vec![
+                (red_infantry_1_id, 250),
+                (red_infantry_2_id, 250),
+                (red_truck_id, 0),
+            ],
             depleted_supply_crates: vec![(supply_crate_id, 500)],
         };
 
@@ -459,10 +464,16 @@ mod test_replenishment {
 
         let indexes = Indexes::make(units);
 
-        let got = Replenishment::calculate(&red_player_id, &red_truck_id, &indexes).unwrap();
+        let got =
+            Replenishment::calculate(&red_player_id, &red_truck_id, located::unit(1, 1), &indexes)
+                .unwrap();
 
         let want = Replenishment {
-            replenished_units: vec![(red_infantry_1_id, 251), (red_infantry_2_id, 250)],
+            replenished_units: vec![
+                (red_infantry_1_id, 251),
+                (red_infantry_2_id, 250),
+                (red_truck_id, 0),
+            ],
             depleted_supply_crates: vec![(supply_crate_id, 501)],
         };
 
@@ -538,11 +549,17 @@ mod test_replenishment {
 
         let indexes = Indexes::make(units);
 
-        let got = Replenishment::calculate(&red_player_id, &red_truck_id, &indexes).unwrap();
+        let got =
+            Replenishment::calculate(&red_player_id, &red_truck_id, located::unit(1, 1), &indexes)
+                .unwrap();
 
         let want = Replenishment {
-            replenished_units: vec![(red_infantry_1_id, 101), (red_infantry_2_id, 1023)],
-            depleted_supply_crates: vec![(supply_crate_id, 1124)],
+            replenished_units: vec![
+                (red_infantry_1_id, 100),
+                (red_infantry_2_id, 1023),
+                (red_truck_id, 0),
+            ],
+            depleted_supply_crates: vec![(supply_crate_id, 1123)],
         };
 
         assert_eq!(got, want)
@@ -626,10 +643,16 @@ mod test_replenishment {
 
         let indexes = Indexes::make(units);
 
-        let got = Replenishment::calculate(&red_player_id, &red_truck_id, &indexes).unwrap();
+        let got =
+            Replenishment::calculate(&red_player_id, &red_truck_id, located::unit(1, 1), &indexes)
+                .unwrap();
 
         let want = Replenishment {
-            replenished_units: vec![(red_infantry_1_id, 1023), (red_infantry_2_id, 1023)],
+            replenished_units: vec![
+                (red_infantry_1_id, 1023),
+                (red_infantry_2_id, 1023),
+                (red_truck_id, 0),
+            ],
             depleted_supply_crates: vec![(supply_crate_1_id, 2046)],
         };
 
@@ -716,11 +739,115 @@ mod test_replenishment {
 
         let indexes = Indexes::make(units);
 
-        let got = Replenishment::calculate(&red_player_id, &red_truck_id, &indexes).unwrap();
+        let got =
+            Replenishment::calculate(&red_player_id, &red_truck_id, located::unit(1, 1), &indexes)
+                .unwrap();
 
         let want = Replenishment {
-            replenished_units: vec![(red_infantry_1_id, 1023), (red_infantry_2_id, 1023)],
+            replenished_units: vec![
+                (red_infantry_1_id, 1023),
+                (red_infantry_2_id, 1023),
+                (red_truck_id, 0),
+            ],
             depleted_supply_crates: vec![(supply_crate_1_id, 100), (supply_crate_2_id, 1946)],
+        };
+
+        assert_eq!(got, want)
+    }
+
+    #[test]
+    fn truck_replenished_too() {
+        let red_player_id = Id::from_string("red".to_string(), true).unwrap();
+
+        let red_infantry_1_id = UnitId::test("red infantry 1");
+        let red_infantry_1 = {
+            let mut u = unit::Model::new(
+                Unit::Infantry,
+                &red_player_id,
+                Place::OnMap(Located {
+                    x: 1,
+                    y: 1,
+                    value: FacingDirection::Right,
+                }),
+                &TeamColor::Red,
+            );
+
+            u.supplies = 1;
+
+            u
+        };
+
+        let red_infantry_2_id = UnitId::test("red infantry 2");
+        let red_infantry_2 = {
+            let mut u = unit::Model::new(
+                Unit::Infantry,
+                &red_player_id,
+                Place::OnMap(Located {
+                    x: 1,
+                    y: 1,
+                    value: FacingDirection::Right,
+                }),
+                &TeamColor::Red,
+            );
+
+            u.supplies = 1;
+
+            u
+        };
+
+        let red_truck_id = UnitId::test("red truck");
+        let mut red_truck = unit::Model::new(
+            Unit::Truck,
+            &red_player_id,
+            Place::OnMap(Located {
+                x: 1,
+                y: 1,
+                value: FacingDirection::Right,
+            }),
+            &TeamColor::Red,
+        );
+
+        red_truck.supplies = 100;
+
+        let supply_crate_1_id = UnitId::test("supply crate 1");
+        let mut supply_crate_1 = unit::Model::new(
+            Unit::SupplyCrate,
+            &red_player_id,
+            Place::InUnit(red_truck_id.clone()),
+            &TeamColor::Red,
+        );
+
+        supply_crate_1.supplies = 100;
+
+        let supply_crate_2_id = UnitId::test("supply crate 2");
+        let mut supply_crate_2 = unit::Model::new(
+            Unit::SupplyCrate,
+            &red_player_id,
+            Place::InUnit(red_truck_id.clone()),
+            &TeamColor::Red,
+        );
+
+        let units = vec![
+            (red_infantry_1_id.clone(), red_infantry_1),
+            (red_infantry_2_id.clone(), red_infantry_2),
+            (red_truck_id.clone(), red_truck),
+            (supply_crate_1_id.clone(), supply_crate_1),
+            (supply_crate_2_id.clone(), supply_crate_2),
+        ];
+
+        let indexes = Indexes::make(units);
+
+        let got =
+            Replenishment::calculate(&red_player_id, &red_truck_id, located::unit(1, 1), &indexes)
+                .unwrap();
+
+        let want = Replenishment {
+            replenished_units: vec![
+                (red_infantry_1_id, 1023),
+                (red_infantry_2_id, 1023),
+                (red_truck_id, 1948),
+            ],
+            depleted_supply_crates: vec![(supply_crate_1_id, 100), (supply_crate_2_id, 3984)],
         };
 
         assert_eq!(got, want)
