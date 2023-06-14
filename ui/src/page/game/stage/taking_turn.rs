@@ -1,5 +1,6 @@
 use crate::page::game::mode::Mode;
 use crate::page::game::{group_selected, unit_selected};
+use shared::located::Located;
 
 #[derive(Debug)]
 pub struct Model {
@@ -35,5 +36,15 @@ impl Model {
 
     fn clear_mode(&mut self) {
         self.mode = Mode::None;
+    }
+}
+
+impl Sidebar {
+    pub fn is_group_at(&self, loc: Located<()>) -> bool {
+        if let Sidebar::GroupSelected(sub_model) = self {
+            sub_model.loc == loc
+        } else {
+            false
+        }
     }
 }

@@ -3,6 +3,7 @@ use crate::page::game::view::unit_row;
 use crate::style::Style;
 use crate::view::cell::Cell;
 use shared::game::Game;
+use shared::located::Located;
 use shared::unit::UnitId;
 use std::collections::HashMap;
 
@@ -13,11 +14,12 @@ use std::collections::HashMap;
 #[derive(Clone, Debug)]
 pub struct Model {
     pub units: Vec<UnitId>,
+    pub loc: Located<()>,
 }
 
 impl Model {
-    pub fn init(units: Vec<UnitId>) -> Model {
-        Model { units }
+    pub fn init(units: Vec<UnitId>, loc: Located<()>) -> Model {
+        Model { units, loc }
     }
 }
 

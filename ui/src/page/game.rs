@@ -60,31 +60,31 @@ fn wait_for_game_reload_timeout(orders: &mut impl Orders<Msg>) -> CmdHandle {
     orders.perform_cmd_with_handle(cmds::timeout(4096, || Msg::GameReloadTimeExpired))
 }
 
-fn set_to_moving_unit_mode(global: &mut global::Model, model: &mut Model, unit_id: UnitId) {
+fn set_to_moving_unit_mode(model: &mut Model, unit_id: UnitId) -> Result<(), Error> {
     if let Stage::TakingTurn(sub_model) = &mut model.stage {
         let unit_model: &unit::Model = match model.game.get_unit(&unit_id) {
             Some(u) => u,
             None => {
-                return;
+                return Ok(());
             }
         };
 
-        match model.game.get_units_mobility(&unit_id.clone()) {
+        return match model.game.get_units_mobility(&unit_id.clone()) {
             Ok(mobility) => {
                 if !unit_model.unit.is_supply_crate() {
                     sub_model.mode = Mode::MovingUnit(mode::moving::Model::init(unit_id, mobility));
                 }
 
-                if let Err(error) = draw_mode(model) {
-                    global.toast_error(error);
-                }
+                draw_mode(model)
             }
-            Err(err_msg) => global.toast_error(Error::new(
+            Err(err_msg) => Err(Error::new(
                 "could not get mobility range of unit".to_string(),
                 err_msg,
             )),
-        }
+        };
     }
+
+    Ok(())
 }
 
 const MIN_RENDER_TIME: u32 = 256;
@@ -438,11 +438,13 @@ pub fn update(
         Msg::MouseDownOnScreen(_page_pos) => {}
         Msg::MouseUpOnScreen(page_pos) => {
             if let Stage::TakingTurn { .. } = model.stage {
-                handle_click_on_screen_during_turn(
-                    global,
+                if let Err(error) = handle_click_on_screen_during_turn(
+                    global.viewer_id(),
                     model,
                     mouse_screen_pos_to_game_pos(page_pos, model),
-                );
+                ) {
+                    global.toast_error(error);
+                }
             }
         }
         Msg::MouseMoveOnScreen(page_pos) => {
@@ -538,10 +540,14 @@ pub fn update(
             });
         }
         Msg::UnitSelectedSidebar(sub_msg) => {
-            handle_unit_selected_sidebar_msg(global, model, sub_msg);
+            if let Err(error) = handle_unit_selected_sidebar_msg(model, sub_msg) {
+                global.toast_error(error);
+            }
         }
         Msg::GroupSelectedSidebar(sub_msg) => {
-            handle_group_selected_sidebar_msg(global, model, sub_msg)
+            if let Err(error) = handle_group_selected_sidebar_msg(model, sub_msg) {
+                global.toast_error(error);
+            }
         }
         Msg::MovingFlyout(sub_msg) => {
             if let Err(error) = handle_moving_flyout_msg(&global.viewer_id(), model, sub_msg) {
@@ -595,26 +601,25 @@ pub fn update(
 }
 
 fn handle_group_selected_sidebar_msg(
-    global: &mut global::Model,
     model: &mut Model,
     msg: group_selected::Msg,
-) {
+) -> Result<(), Error> {
     match msg {
         group_selected::Msg::UnitRow(view::unit_row::Msg::Clicked(unit_id)) => {
             if model.get_units_move(&unit_id).is_some() {
-                return;
+                return Ok(());
             }
 
             let taking_turn_model = if let Stage::TakingTurn(m) = &mut model.stage {
                 m
             } else {
-                return;
+                return Ok(());
             };
 
             let sub_model = if let Sidebar::GroupSelected(m) = &mut taking_turn_model.sidebar {
                 m
             } else {
-                return;
+                return Ok(());
             };
 
             taking_turn_model.sidebar = Sidebar::UnitSelected(unit_selected::Model::init(
@@ -623,27 +628,28 @@ fn handle_group_selected_sidebar_msg(
             ));
 
             if let Stage::TakingTurn { .. } = &mut model.stage {
-                set_to_moving_unit_mode(global, model, unit_id)
+                return set_to_moving_unit_mode(model, unit_id);
             }
+
+            Ok(())
         }
     }
 }
 
 fn handle_unit_selected_sidebar_msg(
-    global: &mut global::Model,
     model: &mut Model,
     msg: unit_selected::Msg,
-) {
+) -> Result<(), Error> {
     let taking_turn_model = if let Stage::TakingTurn(m) = &mut model.stage {
         m
     } else {
-        return;
+        return Ok(());
     };
 
     let sub_model = if let Sidebar::UnitSelected(m) = &mut taking_turn_model.sidebar {
         m
     } else {
-        return;
+        return Ok(());
     };
 
     match msg {
@@ -670,14 +676,14 @@ fn handle_unit_selected_sidebar_msg(
                     let unit_model = match model.game.get_unit(&sub_model.unit_id) {
                         Some(u) => u,
                         None => {
-                            return;
+                            return Ok(());
                         }
                     };
 
                     let loc = match unit_model.place.clone() {
                         Place::OnMap(l) => l,
                         Place::InUnit(_) => {
-                            return;
+                            return Ok(());
                         }
                     };
 
@@ -693,11 +699,13 @@ fn handle_unit_selected_sidebar_msg(
                         },
                     );
                 } else {
-                    set_to_moving_unit_mode(global, model, cargo_unit_id);
+                    return set_to_moving_unit_mode(model, cargo_unit_id);
                 }
             }
         }
     }
+
+    Ok(())
 }
 
 fn handle_mouse_move_on_screen(model: &mut Model, page_pos: Point<i16>) -> Result<(), Error> {
@@ -972,37 +980,35 @@ fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl 
 }
 
 fn handle_click_on_screen_during_turn(
-    global: &mut global::Model,
+    viewer_id: Id,
     model: &mut Model,
     mouse_pos: Point<i16>,
-) {
+) -> Result<(), Error> {
     let Point { x, y } = mouse_pos;
 
     if !(x >= 0 && y >= 0) {
-        return;
+        return Ok(());
     }
 
     let x = x as u16;
     let y = y as u16;
 
     if let Stage::TakingTurn(stage::taking_turn::Model { mode, .. }) = &mut model.stage {
-        match mode {
-            Mode::None => handle_click_on_screen_when_no_mode(global, model, x, y),
+        return match mode {
+            Mode::None => handle_click_on_screen_when_no_mode(viewer_id, model, x, y),
             Mode::MovingUnit(moving_model) => {
                 let mouse_loc = located::unit(x, y);
 
                 if moving_model.mobility.contains(&mouse_loc) {
-                    if let Err(error) =
-                        handle_click_on_screen_when_move_mode(global.viewer_id(), model, &mouse_loc)
-                    {
-                        global.toast_error(error)
-                    }
-                } else if let Err(error) = model.clear_mode_and_sidebar() {
-                    global.toast_error(error);
+                    handle_click_on_screen_when_move_mode(viewer_id, model, &mouse_loc)
+                } else {
+                    model.clear_mode_and_sidebar()
                 }
             }
-        }
+        };
     }
+
+    Ok(())
 }
 
 fn handle_click_on_screen_when_move_mode(
@@ -1115,35 +1121,35 @@ fn handle_click_on_screen_when_move_mode(
 }
 
 fn handle_click_on_screen_when_no_mode(
-    global: &mut global::Model,
+    viewer_id: Id,
     model: &mut Model,
     x: u16,
     y: u16,
-) {
+) -> Result<(), Error> {
     let taking_turn_model = match &mut model.stage {
         Stage::TakingTurn(m) => m,
         _ => {
-            return;
+            return Ok(());
         }
     };
 
     let units_at_pos = match model.game.get_units_by_location(&located::unit(x, y)) {
         Some(units) => units,
         None => {
-            return;
+            return Ok(());
         }
     };
 
     let (first, rest) = match units_at_pos.split_first() {
         Some(s) => s,
         None => {
-            return;
+            return Ok(());
         }
     };
     let (first_unit_id, _, unit_model) = first;
 
-    if unit_model.owner != global.viewer_id() {
-        return;
+    if unit_model.owner != viewer_id {
+        return Ok(());
     }
 
     if rest.is_empty() {
@@ -1152,7 +1158,7 @@ fn handle_click_on_screen_when_no_mode(
             None::<group_selected::Model>,
         ));
 
-        set_to_moving_unit_mode(global, model, first_unit_id.clone());
+        set_to_moving_unit_mode(model, first_unit_id.clone())
     } else {
         let mut units = vec![];
 
@@ -1162,7 +1168,13 @@ fn handle_click_on_screen_when_no_mode(
             units.push(unit_id.clone());
         }
 
-        taking_turn_model.sidebar = Sidebar::GroupSelected(group_selected::Model::init(units));
+        taking_turn_model.sidebar = if taking_turn_model.sidebar.is_group_at(located::unit(x, y)) {
+            Sidebar::None
+        } else {
+            Sidebar::GroupSelected(group_selected::Model::init(units, located::unit(x, y)))
+        };
+
+        Ok(())
     }
 }
 
