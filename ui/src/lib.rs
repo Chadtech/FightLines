@@ -396,7 +396,7 @@ fn view(model: &Model) -> Node<Msg> {
                     .collect(),
                 Page::Game(sub_model) => vec![Row::from_cells(
                     vec![],
-                    game::view(&model.global, sub_model)
+                    game::view(model.global.viewer_id(), sub_model)
                         .into_iter()
                         .map(|cell| cell.map_msg(Msg::Game))
                         .collect(),

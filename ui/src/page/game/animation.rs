@@ -1,5 +1,7 @@
 use shared::facing_direction::FacingDirection;
 use shared::game::outcome::Outcome;
+use shared::game::unit_index;
+use shared::id::Id;
 use shared::located::Located;
 use shared::path::Path;
 use shared::unit::UnitId;
@@ -26,6 +28,29 @@ pub enum Animation {
 }
 
 impl Animation {
+    fn subject_unit_id(self) -> UnitId {
+        match self {
+            Animation::Travel { unit_id, .. } => unit_id,
+            Animation::Perish { unit_id } => unit_id,
+            Animation::DropOff { transport_id, .. } => transport_id,
+            Animation::Replenish {
+                replenishing_unit_id,
+                ..
+            } => replenishing_unit_id,
+        }
+    }
+    pub fn sidebar_can_list_for_user(
+        self,
+        player_id: Id,
+        unit_index: &unit_index::by_id::Index,
+    ) -> Result<bool, String> {
+        let unit_id = self.subject_unit_id();
+
+        match unit_index.get(&unit_id) {
+            Some(unit_model) => Ok(unit_model.owner == player_id),
+            None => Err("could not find unit".to_string()),
+        }
+    }
     pub fn from_outcome(outcome: Outcome) -> Vec<Animation> {
         match outcome {
             Outcome::Traveled { unit_id, path, .. } => vec![Animation::Travel {

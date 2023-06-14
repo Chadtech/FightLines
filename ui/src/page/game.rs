@@ -1726,7 +1726,7 @@ fn draw_terrain(model: &Model) {
 // View
 ///////////////////////////////////////////////////////////////
 
-pub fn view(global: &global::Model, model: &Model) -> Vec<Cell<Msg>> {
+pub fn view(viewer_id: Id, model: &Model) -> Vec<Cell<Msg>> {
     let canvases = Cell::group(
         vec![
             Style::Absolute,
@@ -1769,7 +1769,7 @@ pub fn view(global: &global::Model, model: &Model) -> Vec<Cell<Msg>> {
     });
 
     vec![
-        sidebar_view(global, model),
+        sidebar_view(viewer_id, model),
         canvases,
         snackbar_view(model),
         day_view(model),
@@ -1896,12 +1896,12 @@ fn click_screen(model: &Model) -> Cell<Msg> {
         })
 }
 
-fn sidebar_view(global: &global::Model, model: &Model) -> Cell<Msg> {
+fn sidebar_view(viewer_id: Id, model: &Model) -> Cell<Msg> {
     let submit_button = {
         let label = "submit turn";
 
         Button::simple(label)
-            .set_primary(model.all_units_moved(global.viewer_id()))
+            .set_primary(model.all_units_moved(viewer_id.clone()))
             .disable(!model.is_ready() || model.is_waiting_stage())
             .on_click(|_| Msg::ClickedSubmitTurn)
     };
@@ -1921,14 +1921,14 @@ fn sidebar_view(global: &global::Model, model: &Model) -> Cell<Msg> {
         vec![
             Cell::group(
                 vec![Style::Grow, Style::FlexCol, Style::G4],
-                sidebar_content(model),
+                sidebar_content(viewer_id, model),
             ),
             submit_button.cell(),
         ],
     )
 }
 
-fn sidebar_content(model: &Model) -> Vec<Cell<Msg>> {
+fn sidebar_content(viewer_id: Id, model: &Model) -> Vec<Cell<Msg>> {
     match &model.stage {
         Stage::TakingTurn(taking_turn_model) => match &taking_turn_model.sidebar {
             Sidebar::None => {
@@ -1960,7 +1960,7 @@ fn sidebar_content(model: &Model) -> Vec<Cell<Msg>> {
             vec![]
         }
         Stage::AnimatingMoves(sub_model) => {
-            animating_moves::sidebar_view(&model.game.indexes.by_id, sub_model)
+            animating_moves::sidebar_view(viewer_id, &model.game.indexes.by_id, sub_model)
         }
     }
 }
