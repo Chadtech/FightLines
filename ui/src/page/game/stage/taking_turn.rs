@@ -22,7 +22,18 @@ impl Model {
         }
     }
 
-    pub fn clear_mode(&mut self) {
+    pub fn move_completed(&mut self) {
+        self.clear_mode();
+
+        if let Sidebar::UnitSelected(unit_selected_model) = &mut self.sidebar {
+            self.sidebar = match &unit_selected_model.from_group {
+                None => Sidebar::None,
+                Some(group_selected_model) => Sidebar::GroupSelected(group_selected_model.clone()),
+            };
+        }
+    }
+
+    fn clear_mode(&mut self) {
         self.mode = Mode::None;
     }
 }

@@ -173,17 +173,10 @@ impl Model {
 
         self.moves_index_by_unit.insert(unit_id.clone(), action);
 
-        taking_turn_model.clear_mode();
+        taking_turn_model.move_completed();
 
         clear_canvas(&self.mode_canvas, &self.game_pixel_size)
             .map_err(|msg| Error::new("clear mode canvas".to_string(), msg))?;
-
-        if let Sidebar::UnitSelected(unit_selected_model) = &mut taking_turn_model.sidebar {
-            taking_turn_model.sidebar = match &unit_selected_model.from_group {
-                None => Sidebar::None,
-                Some(group_selected_model) => Sidebar::GroupSelected(group_selected_model.clone()),
-            };
-        }
 
         Ok(())
     }
@@ -192,9 +185,9 @@ impl Model {
         self.moves_index_by_unit.get(unit_id)
     }
 
-    fn clear_mode(&mut self) -> Result<(), Error> {
+    fn clear_mode_and_sidebar(&mut self) -> Result<(), Error> {
         if let Stage::TakingTurn(sub_model) = &mut self.stage {
-            sub_model.clear_mode();
+            sub_model.move_completed();
 
             clear_canvas(&self.mode_canvas, &self.game_pixel_size)
                 .map_err(|msg| Error::new("clear mode canvas".to_string(), msg))?
@@ -773,7 +766,7 @@ fn handle_moving_flyout_msg(
                 },
             );
 
-            model.clear_mode()
+            model.clear_mode_and_sidebar()
         }
         mode::moving::ClickMsg::LoadInto(rideable_unit_id) => {
             let arrows = &sub_model.arrows.clone();
@@ -792,7 +785,7 @@ fn handle_moving_flyout_msg(
                 },
             );
 
-            model.clear_mode()
+            model.clear_mode_and_sidebar()
         }
         mode::moving::ClickMsg::MoveTo => {
             let arrows = &sub_model.arrows.clone();
@@ -838,16 +831,12 @@ fn handle_moving_flyout_msg(
                         },
                     );
 
-                    model.clear_mode()?;
-
                     Ok(())
                 }
-                Err(err_msg) => {
-                    model.clear_mode()?;
+                Err(err_msg) => Err(Error::new(error_title, err_msg)),
+            }?;
 
-                    Err(Error::new(error_title, err_msg))
-                }
-            }
+            model.clear_mode_and_sidebar()
         }
     }
 }
@@ -1008,7 +997,7 @@ fn handle_click_on_screen_during_turn(
                     {
                         global.toast_error(error)
                     }
-                } else if let Err(error) = model.clear_mode() {
+                } else if let Err(error) = model.clear_mode_and_sidebar() {
                     global.toast_error(error);
                 }
             }
@@ -1043,7 +1032,7 @@ fn handle_click_on_screen_when_move_mode(
         // If the user clicks back on the unit we should
         // exit out of the move mode
         if unit_pos == Some(mouse_loc.clone()) {
-            return model.clear_mode();
+            return model.clear_mode_and_sidebar();
         }
 
         // If the unit clicks a unit that can carry it, we
