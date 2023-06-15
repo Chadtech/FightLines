@@ -83,7 +83,7 @@ pub struct RideOptionsModel {
 pub enum RideOption {
     LoadInto { unit_id: UnitId, unit_label: String },
     PickUp { unit_id: UnitId, unit_label: String },
-    Replenish,
+    Replenish { only_self: bool },
 }
 
 impl RideOption {
@@ -111,7 +111,13 @@ impl RideOption {
             RideOption::PickUp { unit_label, .. } => {
                 format!("pick up {}", unit_label)
             }
-            RideOption::Replenish => "replenish units".to_string(),
+            RideOption::Replenish { only_self } => {
+                if *only_self {
+                    "replenish self".to_string()
+                } else {
+                    "replenish units".to_string()
+                }
+            }
         }
     }
 }
@@ -152,7 +158,7 @@ pub fn flyout_view(model: &Model, game_screen_pos: &Point<i16>) -> Cell<ClickMsg
                 let msg = match ride_option {
                     RideOption::LoadInto { unit_id, .. } => ClickMsg::LoadInto(unit_id.clone()),
                     RideOption::PickUp { unit_id, .. } => ClickMsg::PickUp(unit_id.clone()),
-                    RideOption::Replenish => ClickMsg::Replenish,
+                    RideOption::Replenish { .. } => ClickMsg::Replenish,
                 };
 
                 let button = Button::simple(ride_option.label().as_str())

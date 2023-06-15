@@ -1030,14 +1030,16 @@ fn handle_click_on_screen_when_move_mode(
             None => return Error::throw(error_title, "could not get unit".to_string()),
         };
 
-        let unit_pos = match &unit_model.place {
-            Place::OnMap(loc) => Some(loc.to_unit()),
-            Place::InUnit(_) => None,
+        let unit_pos: Located<()> = match &unit_model.place {
+            Place::OnMap(loc) => loc.to_unit(),
+            Place::InUnit(_) => {
+                return model.clear_mode_and_sidebar();
+            }
         };
 
         // If the user clicks back on the unit we should
         // exit out of the move mode
-        if unit_pos == Some(mouse_loc.clone()) {
+        if unit_pos == mouse_loc.clone() {
             return model.clear_mode_and_sidebar();
         }
 
@@ -1104,7 +1106,24 @@ fn handle_click_on_screen_when_move_mode(
                 .collect::<Vec<_>>();
 
             if !crates.is_empty() {
-                ride_options.push(mode::moving::RideOption::Replenish)
+                let loc_of_replenishment: Located<()> = path.last_pos().unwrap_or(unit_pos);
+
+                ride_options.push(mode::moving::RideOption::Replenish {
+                    only_self: model
+                        .game
+                        .indexes
+                        .by_location
+                        .get(&loc_of_replenishment)
+                        .map(|units| {
+                            let filtered_units = units
+                                .iter()
+                                .map(|(_, _, unit_model)| !unit_model.unit.is_supply_crate())
+                                .collect::<Vec<_>>();
+
+                            filtered_units.is_empty()
+                        })
+                        .unwrap_or(true),
+                })
             }
         }
 
