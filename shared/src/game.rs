@@ -1,5 +1,6 @@
 pub mod action;
 pub mod day;
+pub mod mobility;
 pub mod outcome;
 pub mod unit_index;
 
@@ -588,121 +589,117 @@ impl Game {
         ret_guest_visibility
     }
 
-    pub fn position_of_unit_or_transport(
-        &self,
-        unit_id: &UnitId,
-    ) -> Result<Located<FacingDirection>, String> {
-        self.indexes.position_of_unit_or_transport(unit_id)
-    }
-
     pub fn get_units_mobility(&self, unit_id: &UnitId) -> Result<HashSet<Located<()>>, String> {
-        let maybe_unit = self.get_unit(unit_id);
-
-        match maybe_unit {
-            None => Err("unit not found when getting units mobility".to_string()),
-            Some(unit_model) => {
-                let mut mobility = HashSet::new();
-
-                let loc = self.position_of_unit_or_transport(unit_id)?;
-                let budget = unit_model.unit.mobility_budget();
-
-                let mut search: HashMap<Located<()>, f32> = HashMap::new();
-
-                if !unit_model.unit.is_supply_crate() {
-                    search.insert(located::unit(loc.x, loc.y), budget);
-                }
-
-                let map = &self.map;
-
-                while !search.is_empty() {
-                    for (search_loc, spot_budget) in search.clone().into_iter() {
-                        mobility.insert(search_loc.clone());
-                        search.remove(&search_loc);
-
-                        let x = search_loc.x;
-                        let y = search_loc.y;
-
-                        if y > 0 {
-                            let north_loc = located::unit(x, y - 1);
-                            let north_tile = map.get_tile(&north_loc);
-
-                            let cost = north_tile.mobility_cost(&unit_model.unit);
-
-                            let budget_at_tile = spot_budget - cost;
-
-                            if budget_at_tile > 0.0 {
-                                search
-                                    .entry(north_loc)
-                                    .and_modify(|existing_budget| {
-                                        if budget_at_tile > *existing_budget {
-                                            *existing_budget = budget_at_tile;
-                                        }
-                                    })
-                                    .or_insert(budget_at_tile);
-                            }
-                        }
-
-                        if x > 0 {
-                            let west_loc = located::unit(x - 1, y);
-                            let west_tile = map.get_tile(&west_loc);
-
-                            let cost = west_tile.mobility_cost(&unit_model.unit);
-
-                            let budget_at_tile = spot_budget - cost;
-
-                            if budget_at_tile > 0.0 {
-                                search
-                                    .entry(west_loc)
-                                    .and_modify(|existing_budget| {
-                                        if budget_at_tile > *existing_budget {
-                                            *existing_budget = budget_at_tile;
-                                        }
-                                    })
-                                    .or_insert(budget_at_tile);
-                            }
-                        }
-
-                        let south_loc = located::unit(x, y + 1);
-                        let south_tile = map.get_tile(&south_loc);
-
-                        let cost = south_tile.mobility_cost(&unit_model.unit);
-
-                        let budget_at_tile = spot_budget - cost;
-
-                        if budget_at_tile > 0.0 {
-                            search
-                                .entry(south_loc)
-                                .and_modify(|existing_budget| {
-                                    if budget_at_tile > *existing_budget {
-                                        *existing_budget = budget_at_tile;
-                                    }
-                                })
-                                .or_insert(budget_at_tile);
-                        }
-
-                        let east_loc = located::unit(x + 1, y);
-                        let east_tile = map.get_tile(&east_loc);
-
-                        let cost = east_tile.mobility_cost(&unit_model.unit);
-
-                        let budget_at_tile = spot_budget - cost;
-
-                        if budget_at_tile > 0.0 {
-                            search
-                                .entry(east_loc)
-                                .and_modify(|existing_budget| {
-                                    if budget_at_tile > *existing_budget {
-                                        *existing_budget = budget_at_tile;
-                                    }
-                                })
-                                .or_insert(budget_at_tile);
-                        }
-                    }
-                }
-
-                Ok(mobility)
-            }
-        }
+        // let maybe_unit = self.get_unit(unit_id);
+        //
+        // match maybe_unit {
+        //     None => Err("unit not found when getting units mobility".to_string()),
+        //     Some(unit_model) => {
+        //         let mut mobility = HashSet::new();
+        //
+        //         let loc = self.indexes.position_of_unit_or_transport(unit_id)?;
+        //
+        //         let mut search: HashMap<Located<()>, f32> = HashMap::new();
+        //
+        //         if !unit_model.unit.is_supply_crate() {
+        //             search.insert(
+        //                 located::unit(loc.x, loc.y),
+        //                 unit_model.unit.mobility_budget(),
+        //             );
+        //         }
+        //
+        //         let map = &self.map;
+        //
+        //         while !search.is_empty() {
+        //             for (search_loc, mobility_budget) in search.clone().into_iter() {
+        //                 mobility.insert(search_loc.clone());
+        //                 search.remove(&search_loc);
+        //
+        //                 let x = search_loc.x;
+        //                 let y = search_loc.y;
+        //
+        //                 if y > 0 {
+        //                     let north_loc = located::unit(x, y - 1);
+        //                     let north_tile = map.get_tile(&north_loc);
+        //
+        //                     let cost = north_tile.mobility_cost(&unit_model.unit);
+        //
+        //                     let budget_at_tile = mobility_budget - cost;
+        //
+        //                     if budget_at_tile > 0.0 {
+        //                         search
+        //                             .entry(north_loc)
+        //                             .and_modify(|existing_budget| {
+        //                                 if budget_at_tile > *existing_budget {
+        //                                     *existing_budget = budget_at_tile;
+        //                                 }
+        //                             })
+        //                             .or_insert(budget_at_tile);
+        //                     }
+        //                 }
+        //
+        //                 if x > 0 {
+        //                     let west_loc = located::unit(x - 1, y);
+        //                     let west_tile = map.get_tile(&west_loc);
+        //
+        //                     let cost = west_tile.mobility_cost(&unit_model.unit);
+        //
+        //                     let budget_at_tile = mobility_budget - cost;
+        //
+        //                     if budget_at_tile > 0.0 {
+        //                         search
+        //                             .entry(west_loc)
+        //                             .and_modify(|existing_budget| {
+        //                                 if budget_at_tile > *existing_budget {
+        //                                     *existing_budget = budget_at_tile;
+        //                                 }
+        //                             })
+        //                             .or_insert(budget_at_tile);
+        //                     }
+        //                 }
+        //
+        //                 let south_loc = located::unit(x, y + 1);
+        //                 let south_tile = map.get_tile(&south_loc);
+        //
+        //                 let cost = south_tile.mobility_cost(&unit_model.unit);
+        //
+        //                 let budget_at_tile = mobility_budget - cost;
+        //
+        //                 if budget_at_tile > 0.0 {
+        //                     search
+        //                         .entry(south_loc)
+        //                         .and_modify(|existing_budget| {
+        //                             if budget_at_tile > *existing_budget {
+        //                                 *existing_budget = budget_at_tile;
+        //                             }
+        //                         })
+        //                         .or_insert(budget_at_tile);
+        //                 }
+        //
+        //                 let east_loc = located::unit(x + 1, y);
+        //                 let east_tile = map.get_tile(&east_loc);
+        //
+        //                 let cost = east_tile.mobility_cost(&unit_model.unit);
+        //
+        //                 let budget_at_tile = mobility_budget - cost;
+        //
+        //                 if budget_at_tile > 0.0 {
+        //                     search
+        //                         .entry(east_loc)
+        //                         .and_modify(|existing_budget| {
+        //                             if budget_at_tile > *existing_budget {
+        //                                 *existing_budget = budget_at_tile;
+        //                             }
+        //                         })
+        //                         .or_insert(budget_at_tile);
+        //                 }
+        //             }
+        //         }
+        //
+        //         Ok(mobility)
+        //     }
+        // }
+        mobility::get_units_mobility(&self.map, unit_id, &self.indexes)
     }
 
     pub fn waiting_on_player(&self, player_id: &Id) -> bool {

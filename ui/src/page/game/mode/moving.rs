@@ -4,7 +4,7 @@ use crate::view::cell::Cell;
 use shared::arrow::Arrow;
 use shared::direction::Direction;
 use shared::facing_direction::FacingDirection;
-use shared::game::Game;
+use shared::game::unit_index;
 use shared::located::Located;
 use shared::path::Path;
 use shared::point::Point;
@@ -55,8 +55,12 @@ impl Model {
         self
     }
 
-    pub fn path(&self, unit_id: &UnitId, game: &Game) -> Result<Path, String> {
-        let loc = game.position_of_unit_or_transport(unit_id)?;
+    pub fn path(
+        &self,
+        unit_id: &UnitId,
+        unit_indexes: &unit_index::Indexes,
+    ) -> Result<Path, String> {
+        let loc = unit_indexes.position_of_unit_or_transport(unit_id)?;
 
         let path = Path::from_directions_test_only::<FacingDirection>(
             &loc,

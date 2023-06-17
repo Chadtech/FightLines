@@ -761,7 +761,7 @@ fn handle_moving_flyout_msg(
             let arrows = &sub_model.arrows.clone();
 
             let path = sub_model
-                .path(unit_id, &model.game)
+                .path(unit_id, &model.game.indexes)
                 .map_err(|err_msg| Error::new(error_title, err_msg))?;
 
             model.moves_index_by_unit.insert(
@@ -780,7 +780,7 @@ fn handle_moving_flyout_msg(
             let arrows = &sub_model.arrows.clone();
 
             let path = sub_model
-                .path(unit_id, &model.game)
+                .path(unit_id, &model.game.indexes)
                 .map_err(|err_msg| Error::new(error_title, err_msg))?;
 
             model.moves_index_by_unit.insert(
@@ -799,14 +799,14 @@ fn handle_moving_flyout_msg(
             let arrows = &sub_model.arrows.clone();
 
             let path = sub_model
-                .path(unit_id, &model.game)
+                .path(unit_id, &model.game.indexes)
                 .map_err(|err_msg| Error::new(error_title, err_msg))?;
 
             model.travel_unit(unit_id, path, arrows)
         }
         mode::moving::ClickMsg::Replenish => {
             let path = sub_model
-                .path(unit_id, &model.game)
+                .path(unit_id, &model.game.indexes)
                 .map_err(|err_msg| Error::new(error_title.clone(), err_msg))?;
 
             let replenishment_pos = match path.last_pos() {
@@ -1046,7 +1046,7 @@ fn handle_click_on_screen_when_move_mode(
         // If the unit clicks a unit that can carry it, we
         // need to bring up menu options to select
         let path = moving_model
-            .path(&moving_model.unit_id, &model.game)
+            .path(&moving_model.unit_id, &model.game.indexes)
             .map_err(|err_msg| Error::new(error_title.clone(), err_msg))?;
 
         let mut ride_options = vec![];
@@ -1222,6 +1222,7 @@ fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Resu
 
                 let loc = model
                     .game
+                    .indexes
                     .position_of_unit_or_transport(&moving_model.unit_id)
                     .map_err(|err| Error::new(error_title, err))?;
 
@@ -1331,6 +1332,7 @@ fn draw_mode(model: &Model) -> Result<(), Error> {
 
             let loc = model
                 .game
+                .indexes
                 .position_of_unit_or_transport(&moving_model.unit_id)
                 .map_err(|err| Error::new(error_title.clone(), err))?;
 
