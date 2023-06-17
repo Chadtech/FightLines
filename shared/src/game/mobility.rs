@@ -5,9 +5,10 @@ use crate::map::Map;
 use crate::unit::UnitId;
 use std::collections::{HashMap, HashSet};
 
+#[derive(Clone)]
 struct Budget {
-    distance_budget: f32,
-    supply_budget: i16,
+    mobility: f32,
+    supply: i16,
 }
 
 pub fn get_units_mobility(
@@ -22,115 +23,249 @@ pub fn get_units_mobility(
 
             let loc = unit_indexes.position_of_unit_or_transport(unit_id)?;
 
-            let mut search: HashMap<Located<()>, f32> = HashMap::new();
+            let mut search: HashMap<Located<()>, Budget> = HashMap::new();
 
             if !unit_model.unit.is_supply_crate() {
                 search.insert(
                     located::unit(loc.x, loc.y),
-                    unit_model.unit.mobility_budget(),
+                    Budget {
+                        mobility: unit_model.unit.mobility_budget(),
+                        supply: unit_model.supplies,
+                    },
                 );
             }
 
-            // let add_to_search = |budget_at_tile: f32, loc: Located<()>| {
-            //     if budget_at_tile > 0.0 {
-            //         search
-            //             .entry(loc)
-            //             .and_modify(|existing_budget| {
-            //                 if budget_at_tile > *existing_budget {
-            //                     *existing_budget = budget_at_tile;
-            //                 }
-            //             })
-            //             .or_insert(budget_at_tile);
-            //     }
-            // };
-
             while !search.is_empty() {
-                for (search_loc, mobility_budget) in search.into_iter() {
+                for (search_loc, budget) in search.clone().into_iter() {
                     mobility.insert(search_loc.clone());
                     search.remove(&search_loc);
+
+                    let mobility_budget = budget.mobility;
+                    let supply_budget = budget.supply;
 
                     let x = search_loc.x;
                     let y = search_loc.y;
 
+                    // north
                     if y > 0 {
                         let north_loc = located::unit(x, y - 1);
                         let north_tile = map.get_tile(&north_loc);
 
-                        let cost = north_tile.mobility_cost(&unit_model.unit);
+                        let mobility_cost = north_tile.mobility_cost(&unit_model.unit);
+                        let supply_budget_cost = north_tile.travel_supply_cost(&unit_model.unit);
 
-                        let budget_at_tile = mobility_budget - cost;
+                        let mobility_budget_at_tile = mobility_budget - mobility_cost;
+                        let supply_budget_at_tile = supply_budget - supply_budget_cost;
 
-                        if budget_at_tile > 0.0 {
+                        if mobility_budget_at_tile > 0.0 && supply_budget_at_tile > 0 {
                             search
                                 .entry(north_loc)
                                 .and_modify(|existing_budget| {
-                                    if budget_at_tile > *existing_budget {
-                                        *existing_budget = budget_at_tile;
+                                    if mobility_budget_at_tile > existing_budget.mobility {
+                                        existing_budget.mobility = mobility_budget_at_tile;
+                                    }
+
+                                    if supply_budget_at_tile > existing_budget.supply {
+                                        existing_budget.supply = supply_budget_at_tile;
                                     }
                                 })
-                                .or_insert(budget_at_tile);
+                                .or_insert(Budget {
+                                    mobility: mobility_budget_at_tile,
+                                    supply: supply_budget_at_tile,
+                                });
                         }
                     }
 
+                    // west
                     if x > 0 {
                         let west_loc = located::unit(x - 1, y);
                         let west_tile = map.get_tile(&west_loc);
 
-                        let cost = west_tile.mobility_cost(&unit_model.unit);
+                        let mobility_cost = west_tile.mobility_cost(&unit_model.unit);
+                        let supply_budget_cost = west_tile.travel_supply_cost(&unit_model.unit);
 
-                        let budget_at_tile = mobility_budget - cost;
+                        let mobility_budget_at_tile = mobility_budget - mobility_cost;
+                        let supply_budget_at_tile = supply_budget - supply_budget_cost;
 
-                        if budget_at_tile > 0.0 {
+                        if mobility_budget_at_tile > 0.0 && supply_budget_at_tile > 0 {
                             search
                                 .entry(west_loc)
                                 .and_modify(|existing_budget| {
-                                    if budget_at_tile > *existing_budget {
-                                        *existing_budget = budget_at_tile;
+                                    if mobility_budget_at_tile > existing_budget.mobility {
+                                        existing_budget.mobility = mobility_budget_at_tile;
+                                    }
+
+                                    if supply_budget_at_tile > existing_budget.supply {
+                                        existing_budget.supply = supply_budget_at_tile;
                                     }
                                 })
-                                .or_insert(budget_at_tile);
+                                .or_insert(Budget {
+                                    mobility: mobility_budget_at_tile,
+                                    supply: supply_budget_at_tile,
+                                });
                         }
                     }
 
-                    let south_loc = located::unit(x, y + 1);
-                    let south_tile = map.get_tile(&south_loc);
+                    // south
+                    {
+                        let south_loc = located::unit(x, y + 1);
+                        let south_tile = map.get_tile(&south_loc);
 
-                    let cost = south_tile.mobility_cost(&unit_model.unit);
+                        let mobility_cost = south_tile.mobility_cost(&unit_model.unit);
+                        let supply_budget_cost = south_tile.travel_supply_cost(&unit_model.unit);
 
-                    let budget_at_tile = mobility_budget - cost;
+                        let mobility_budget_at_tile = mobility_budget - mobility_cost;
+                        let supply_budget_at_tile = supply_budget - supply_budget_cost;
 
-                    if budget_at_tile > 0.0 {
-                        search
-                            .entry(south_loc)
-                            .and_modify(|existing_budget| {
-                                if budget_at_tile > *existing_budget {
-                                    *existing_budget = budget_at_tile;
-                                }
-                            })
-                            .or_insert(budget_at_tile);
+                        if mobility_budget_at_tile > 0.0 && supply_budget_at_tile > 0 {
+                            search
+                                .entry(south_loc)
+                                .and_modify(|existing_budget| {
+                                    if mobility_budget_at_tile > existing_budget.mobility {
+                                        existing_budget.mobility = mobility_budget_at_tile;
+                                    }
+
+                                    if supply_budget_at_tile > existing_budget.supply {
+                                        existing_budget.supply = supply_budget_at_tile;
+                                    }
+                                })
+                                .or_insert(Budget {
+                                    mobility: mobility_budget_at_tile,
+                                    supply: supply_budget_at_tile,
+                                });
+                        }
                     }
 
-                    let east_loc = located::unit(x + 1, y);
-                    let east_tile = map.get_tile(&east_loc);
+                    // east
+                    {
+                        let east_loc = located::unit(x + 1, y);
+                        let east_tile = map.get_tile(&east_loc);
 
-                    let cost = east_tile.mobility_cost(&unit_model.unit);
+                        let mobility_cost = east_tile.mobility_cost(&unit_model.unit);
+                        let supply_budget_cost = east_tile.travel_supply_cost(&unit_model.unit);
 
-                    let budget_at_tile = mobility_budget - cost;
+                        let mobility_budget_at_tile = mobility_budget - mobility_cost;
+                        let supply_budget_at_tile = supply_budget - supply_budget_cost;
 
-                    if budget_at_tile > 0.0 {
-                        search
-                            .entry(east_loc)
-                            .and_modify(|existing_budget| {
-                                if budget_at_tile > *existing_budget {
-                                    *existing_budget = budget_at_tile;
-                                }
-                            })
-                            .or_insert(budget_at_tile);
+                        if mobility_budget_at_tile > 0.0 && supply_budget_at_tile > 0 {
+                            search
+                                .entry(east_loc)
+                                .and_modify(|existing_budget| {
+                                    if mobility_budget_at_tile > existing_budget.mobility {
+                                        existing_budget.mobility = mobility_budget_at_tile;
+                                    }
+
+                                    if supply_budget_at_tile > existing_budget.supply {
+                                        existing_budget.supply = supply_budget_at_tile;
+                                    }
+                                })
+                                .or_insert(Budget {
+                                    mobility: mobility_budget_at_tile,
+                                    supply: supply_budget_at_tile,
+                                });
+                        }
                     }
                 }
             }
 
             Ok(mobility)
         }
+    }
+}
+
+#[cfg(test)]
+mod test_replenishment {
+    use crate::facing_direction::FacingDirection;
+    use crate::game::mobility::get_units_mobility;
+    use crate::game::unit_index::Indexes;
+    use crate::id::Id;
+    use crate::located::Located;
+    use crate::map::Map;
+    use crate::team_color::TeamColor;
+    use crate::unit;
+    use crate::unit::{Place, Unit, UnitId};
+    use pretty_assertions::assert_eq;
+    use std::collections::HashSet;
+
+    #[test]
+    fn simple() {
+        let player_id = Id::from_string("red".to_string(), true).unwrap();
+
+        let unit_id = UnitId::test("red infantry");
+
+        let infantry = unit::Model::new(
+            Unit::Infantry,
+            &player_id,
+            Place::OnMap(Located {
+                x: 8,
+                y: 8,
+                value: FacingDirection::Right,
+            }),
+            &TeamColor::Red,
+        );
+
+        let indexes = Indexes::make(vec![(unit_id.clone(), infantry)]);
+
+        let got = get_units_mobility(&Map::grass_square(), &unit_id, &indexes).unwrap();
+
+        let wanted_pos: Vec<(u16, u16)> = vec![
+            (6, 8),
+            //
+            (7, 9),
+            (7, 7),
+            (7, 8),
+            //
+            (8, 6),
+            (8, 7),
+            (8, 8),
+            (8, 9),
+            (8, 10),
+            //
+            (9, 7),
+            (9, 8),
+            (9, 9),
+            //
+            (10, 8),
+        ];
+
+        let want = wanted_pos
+            .into_iter()
+            .map(|tuple| tuple.into())
+            .collect::<HashSet<Located<()>>>();
+
+        assert_eq!(got, want);
+    }
+
+    #[test]
+    fn low_supplies() {
+        let player_id = Id::from_string("red".to_string(), true).unwrap();
+
+        let unit_id = UnitId::test("red infantry");
+
+        let mut infantry = unit::Model::new(
+            Unit::Infantry,
+            &player_id,
+            Place::OnMap(Located {
+                x: 8,
+                y: 8,
+                value: FacingDirection::Right,
+            }),
+            &TeamColor::Red,
+        );
+
+        infantry.supplies = 16;
+
+        let indexes = Indexes::make(vec![(unit_id.clone(), infantry)]);
+
+        let got = get_units_mobility(&Map::grass_square(), &unit_id, &indexes).unwrap();
+
+        let wanted_pos: Vec<(u16, u16)> = vec![(7, 8), (8, 7), (8, 8), (8, 9), (9, 8)];
+
+        let want = wanted_pos
+            .into_iter()
+            .map(|tuple| tuple.into())
+            .collect::<HashSet<Located<()>>>();
+
+        assert_eq!(got, want);
     }
 }

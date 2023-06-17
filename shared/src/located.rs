@@ -65,3 +65,9 @@ impl<T: Clone> Iterator for Located<T> {
 pub fn unit(x: u16, y: u16) -> Located<()> {
     Located { x, y, value: () }
 }
+
+impl From<(u16, u16)> for Located<()> {
+    fn from(value: (u16, u16)) -> Self {
+        unit(value.0, value.1)
+    }
+}
