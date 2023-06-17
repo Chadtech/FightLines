@@ -100,6 +100,16 @@ impl Games {
 
             infantry.supplies = Unit::Infantry.max_supplies() / 3;
 
+            let mut depleted_infantry = unit::Model::new(
+                Unit::Infantry,
+                &red_player_id,
+                Place::on_map(2, 6, FacingDirection::Right),
+                &TeamColor::Red,
+            );
+
+            depleted_infantry.supplies =
+                (Unit::Infantry.active_supply_cost().unwrap() * 1.5).ceil() as i16;
+
             let mut truck = unit::Model::new(
                 Unit::Truck,
                 &red_player_id,
@@ -123,6 +133,7 @@ impl Games {
                 ),
                 (UnitId::test("infantry 1"), infantry.clone()),
                 (UnitId::test("infantry 2"), infantry),
+                (UnitId::test("depleted infantry"), depleted_infantry),
             ]);
 
             Game::try_from(game_init_flags).unwrap()
