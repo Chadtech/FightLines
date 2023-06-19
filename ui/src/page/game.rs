@@ -7,6 +7,7 @@ mod stage;
 mod unit_selected;
 mod view;
 
+use crate::assets::MiscSpriteRow;
 use crate::error::Error;
 use crate::page::game::action::Action;
 use crate::page::game::animation::Animation;
@@ -33,7 +34,7 @@ use shared::facing_direction::FacingDirection;
 use shared::frame_count::FrameCount;
 use shared::game::outcome::Outcome;
 use shared::game::unit_index::Indexes;
-use shared::game::{calculate_player_visibility, Game, GameId, Turn};
+use shared::game::{calculate_player_visibility, mobility, Game, GameId, Turn};
 use shared::id::Id;
 use shared::located::Located;
 use shared::path::Path;
@@ -69,7 +70,11 @@ fn set_to_moving_unit_mode(model: &mut Model, unit_id: UnitId) -> Result<(), Err
             }
         };
 
-        return match model.game.get_units_mobility(&unit_id.clone()) {
+        return match mobility::get_units_mobility(
+            &model.game.map,
+            &unit_id.clone(),
+            &model.game.indexes,
+        ) {
             Ok(mobility) => {
                 if !unit_model.unit.is_supply_crate() {
                     sub_model.mode = Mode::MovingUnit(mode::moving::Model::init(unit_id, mobility));
@@ -310,7 +315,7 @@ pub fn init(
         }
     }));
 
-    let assets = assets::init()?;
+    let assets = assets::Model::init()?;
 
     let game = flags.game;
 
@@ -1316,18 +1321,12 @@ fn draw_mode(model: &Model) -> Result<(), Error> {
         Mode::MovingUnit(moving_model) => {
             let error_title = "rendering mobility range".to_string();
             for mobility_space in moving_model.mobility.iter() {
-                let _ = ctx
-                    .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                        &model.assets.sheet,
-                        MISC_SPRITE_SHEET_COLUMN,
-                        48.0,
-                        tile::PIXEL_WIDTH_FL,
-                        tile::PIXEL_HEIGHT_FL,
-                        mobility_space.x as f64 * tile::PIXEL_WIDTH_FL,
-                        mobility_space.y as f64 * tile::PIXEL_HEIGHT_FL,
-                        tile::PIXEL_WIDTH_FL,
-                        tile::PIXEL_HEIGHT_FL,
-                    );
+                let _ = model.assets.draw_misc_sprite(
+                    &ctx,
+                    MiscSpriteRow::MobilitySpace,
+                    mobility_space.x,
+                    mobility_space.y,
+                );
             }
 
             let loc = model
@@ -1390,7 +1389,7 @@ fn draw_arrow(
 
     let _ = ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
         &model.assets.sheet,
-        MISC_SPRITE_SHEET_COLUMN,
+        assets::MISC_SPRITE_SHEET_COLUMN,
         sheet_row,
         tile::PIXEL_WIDTH_FL,
         tile::PIXEL_HEIGHT_FL,
@@ -1419,7 +1418,7 @@ fn draw_cursor(model: &Model) -> Result<(), String> {
     if let Some(mouse_game_pos) = &model.mouse_game_position {
         ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
             &model.assets.sheet,
-            MISC_SPRITE_SHEET_COLUMN,
+            assets::MISC_SPRITE_SHEET_COLUMN,
             32.0,
             tile::PIXEL_WIDTH_FL,
             tile::PIXEL_HEIGHT_FL,
@@ -1459,7 +1458,7 @@ fn draw_visibility(visibility: &HashSet<Located<()>>, model: &Model) {
             if !visibility.contains(&loc) {
                 let sheet = &model.assets.sheet;
 
-                let sx = MISC_SPRITE_SHEET_COLUMN;
+                let sx = assets::MISC_SPRITE_SHEET_COLUMN;
                 let sy = 16.0;
 
                 let x_fl = (x * tile::PIXEL_WIDTH) as f64;
@@ -1536,66 +1535,79 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
         };
 
         if visibility.contains(&location) {
-            let x = (game_pos.x * tile::PIXEL_WIDTH) as f64;
-            let y = (game_pos.y * tile::PIXEL_HEIGHT) as f64;
+            let x_u16 = game_pos.x * tile::PIXEL_WIDTH;
+            let y_u16 = game_pos.y * tile::PIXEL_HEIGHT;
+
+            let x = x_u16 as f64;
+            let y = y_u16 as f64;
+
+            fn sprite_sheet_coords(
+                frame_count: &FrameCount,
+                facing_dir: &FacingDirection,
+                unit_moved: bool,
+                unit_model: &unit::Model,
+            ) -> (f64, f64) {
+                let mut sx = {
+                    let sprite_sheet_x = match frame_count {
+                        FrameCount::F1 => 0.0,
+                        FrameCount::F2 => 1.0,
+                        FrameCount::F3 => 2.0,
+                        FrameCount::F4 => 3.0,
+                    };
+                    match facing_dir {
+                        FacingDirection::Left => assets::SPRITE_SHEET_WIDTH - sprite_sheet_x - 1.0,
+                        FacingDirection::Right => sprite_sheet_x,
+                    }
+                };
+
+                // if maybe_units_move.is_some() {
+                if unit_moved {
+                    match facing_dir {
+                        FacingDirection::Left => {
+                            sx -= 4.0;
+                        }
+                        FacingDirection::Right => {
+                            sx += 4.0;
+                        }
+                    }
+                }
+
+                let mut sy = match unit_model.unit {
+                    Unit::Infantry => 0.0,
+                    Unit::Tank => 2.0,
+                    Unit::Truck => 4.0,
+                    Unit::SupplyCrate => 6.0,
+                };
+
+                if unit_model.color == TeamColor::Blue {
+                    sy += 1.0;
+                };
+
+                let sx_px = sx * tile::PIXEL_WIDTH_FL;
+                let sy_px = sy * tile::PIXEL_HEIGHT_FL;
+
+                (sx_px, sy_px)
+            }
 
             if units.len() == 1 {
-                let (unit_id, facing_direction, unit_model) = units.get(0).unwrap();
+                let (unit_id, facing_dir, unit_model) = units.get(0).unwrap();
 
-                let sheet_for_unit_draw = match facing_direction {
-                    FacingDirection::Left => &model.assets.sheet_flipped,
-                    FacingDirection::Right => &model.assets.sheet,
-                };
+                let sheet_for_unit_draw = model.assets.sheet_from_facing_dir(facing_dir);
 
                 let maybe_units_move = model.get_units_move(unit_id);
 
-                let (sx, sy) = {
-                    let mut sx = {
-                        let sprite_sheet_x = match model.frame_count {
-                            FrameCount::F1 => 0.0,
-                            FrameCount::F2 => 1.0,
-                            FrameCount::F3 => 2.0,
-                            FrameCount::F4 => 3.0,
-                        };
-                        match facing_direction {
-                            FacingDirection::Left => SPRITE_SHEET_WIDTH - sprite_sheet_x - 1.0,
-                            FacingDirection::Right => sprite_sheet_x,
-                        }
-                    };
-
-                    if maybe_units_move.is_some() {
-                        match facing_direction {
-                            FacingDirection::Left => {
-                                sx -= 4.0;
-                            }
-                            FacingDirection::Right => {
-                                sx += 4.0;
-                            }
-                        }
-                    }
-
-                    let mut sy = match unit_model.unit {
-                        Unit::Infantry => 0.0,
-                        Unit::Tank => 2.0,
-                        Unit::Truck => 4.0,
-                        Unit::SupplyCrate => 6.0,
-                    };
-
-                    if unit_model.color == TeamColor::Blue {
-                        sy += 1.0;
-                    };
-
-                    let sx_px = sx * tile::PIXEL_WIDTH_FL;
-                    let sy_px = sy * tile::PIXEL_HEIGHT_FL;
-
-                    (sx_px, sy_px)
-                };
+                let (sprite_sheet_x, sprite_sheet_y) = sprite_sheet_coords(
+                    &model.frame_count,
+                    facing_dir,
+                    maybe_units_move.is_some(),
+                    unit_model,
+                );
 
                 let _ = ctx
                     .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
                         sheet_for_unit_draw,
-                        sx,
-                        sy,
+                        sprite_sheet_x,
+                        sprite_sheet_y,
                         tile::PIXEL_WIDTH_FL,
                         tile::PIXEL_HEIGHT_FL,
                         x,
@@ -1617,7 +1629,7 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                     let _ = ctx
                         .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
                             &model.assets.sheet,
-                            MISC_SPRITE_SHEET_COLUMN,
+                            assets::MISC_SPRITE_SHEET_COLUMN,
                             misc_sheet_row * tile::PIXEL_HEIGHT_FL,
                             tile::PIXEL_WIDTH_FL,
                             tile::PIXEL_HEIGHT_FL,
@@ -1640,7 +1652,7 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                             let _ = ctx
                             .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
                                 &model.assets.sheet,
-                                MISC_SPRITE_SHEET_COLUMN,
+                                assets::MISC_SPRITE_SHEET_COLUMN,
                                 27.0 * tile::PIXEL_WIDTH_FL,
                                 tile::PIXEL_WIDTH_FL,
                                 tile::PIXEL_HEIGHT_FL,
@@ -1652,6 +1664,41 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                         }
                     }
                     _ => {}
+                }
+            } else if units.len() < 5 {
+                for (index, (unit_id, facing_dir, unit_model)) in units.iter().enumerate() {
+                    let col = (index % 2) as u16;
+                    let row = (index / 2) as u16;
+
+                    let sheet_for_unit_draw = model.assets.sheet_from_facing_dir(facing_dir);
+
+                    let maybe_units_move = model.get_units_move(unit_id);
+
+                    let (sprite_sheet_x, sprite_sheet_y) = sprite_sheet_coords(
+                        &model.frame_count,
+                        facing_dir,
+                        maybe_units_move.is_some(),
+                        unit_model,
+                    );
+
+                    let half_size_w = tile::PIXEL_WIDTH / 2;
+                    let half_size_h = tile::PIXEL_HEIGHT / 2;
+
+                    let mini_x = (x_u16 + (col * half_size_w)) as f64;
+                    let mini_y = (y_u16 + (row * half_size_h)) as f64;
+
+                    let _ = ctx
+                        .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+                            sheet_for_unit_draw,
+                            sprite_sheet_x,
+                            sprite_sheet_y,
+                            tile::PIXEL_WIDTH_FL,
+                            tile::PIXEL_HEIGHT_FL,
+                            mini_x,
+                            mini_y,
+                            half_size_w as f64,
+                            half_size_h as f64,
+                        );
                 }
             } else {
                 let mut colors = HashSet::new();
@@ -1718,27 +1765,12 @@ fn draw_terrain(model: &Model) {
 
     for row in grid {
         for loc_tile in row {
-            let x = (loc_tile.x * tile::PIXEL_WIDTH) as f64;
-            let y = (loc_tile.y * tile::PIXEL_HEIGHT) as f64;
-
-            let sheet_row = match loc_tile.value {
-                Tile::GrassPlain => 0.0,
-                Tile::Hills => 24.0,
-                Tile::Forest => 25.0,
-            };
-
-            let _ = ctx
-                .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                    &model.assets.sheet,
-                    MISC_SPRITE_SHEET_COLUMN,
-                    sheet_row * tile::PIXEL_HEIGHT_FL,
-                    tile::PIXEL_WIDTH_FL,
-                    tile::PIXEL_HEIGHT_FL,
-                    x,
-                    y,
-                    tile::PIXEL_WIDTH_FL,
-                    tile::PIXEL_HEIGHT_FL,
-                );
+            let _ = model.assets.draw_misc_sprite(
+                &ctx,
+                (&loc_tile.value).into(),
+                loc_tile.x,
+                loc_tile.y,
+            );
         }
     }
 }
@@ -1844,6 +1876,24 @@ fn map_canvas_cell(model: &Model) -> Cell<Msg> {
 }
 
 fn game_canvas(model: &Model, r: &ElRef<HtmlCanvasElement>, html_id: String) -> Node<Msg> {
+    canvas![
+        C![Style::Absolute.css_classes().concat()],
+        attrs! {
+            At::Width => px_u16(model.game_pixel_size.width).as_str(),
+            At::Height => px_u16(model.game_pixel_size.height).as_str()
+            At::Id => html_id.as_str()
+        },
+        style! {
+            St::Left => px_i16(model.game_pos.x).as_str(),
+            St::Top => px_i16(model.game_pos.y).as_str(),
+            St::Width => px_u16(model.game_pixel_size.width * 2).as_str(),
+            St::Height => px_u16(model.game_pixel_size.height * 2).as_str()
+        },
+        el_ref(r)
+    ]
+}
+
+fn mini_game_canvas(model: &Model, r: &ElRef<HtmlCanvasElement>, html_id: String) -> Node<Msg> {
     canvas![
         C![Style::Absolute.css_classes().concat()],
         attrs! {
@@ -2079,9 +2129,6 @@ fn snackbar_view(model: &Model) -> Cell<Msg> {
         )
     }
 }
-
-const MISC_SPRITE_SHEET_COLUMN: f64 = 128.0;
-const SPRITE_SHEET_WIDTH: f64 = 10.0;
 
 fn calc_arrows(
     mouse_pos: Point<i32>,
