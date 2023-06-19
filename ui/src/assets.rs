@@ -12,9 +12,11 @@ use web_sys::HtmlImageElement;
 ///////////////////////////////////////////////////////////////
 
 pub struct Model {
-    pub sheet: HtmlImageElement,
-    pub sheet_flipped: HtmlImageElement,
+    pub sheet: Sheet,
+    pub sheet_flipped: Sheet,
 }
+
+pub struct Sheet(HtmlImageElement);
 
 pub enum MiscSpriteRow {
     GrassPlain,
@@ -51,6 +53,33 @@ const SHEET_FLIPPED_HTML_ID: &str = "sheet-flipped";
 pub const MISC_SPRITE_SHEET_COLUMN: f64 = 128.0;
 pub const SPRITE_SHEET_WIDTH: f64 = 10.0;
 
+impl Sheet {
+    pub fn to_html(&self) -> &HtmlImageElement {
+        &self.0
+    }
+
+    pub fn draw(
+        &self,
+        ctx: &web_sys::CanvasRenderingContext2d,
+        sx: f64,
+        sy: f64,
+        x: f64,
+        y: f64,
+    ) -> Result<(), JsValue> {
+        ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+            self.to_html(),
+            sx,
+            sy,
+            tile::PIXEL_WIDTH_FL,
+            tile::PIXEL_HEIGHT_FL,
+            x,
+            y,
+            tile::PIXEL_WIDTH_FL,
+            tile::PIXEL_HEIGHT_FL,
+        )
+    }
+}
+
 impl Model {
     pub fn init() -> Result<Model, String> {
         let window = web_sys::window().ok_or_else(|| "Cannot find window".to_string())?;
@@ -74,12 +103,19 @@ impl Model {
         }?;
 
         Ok(Model {
-            sheet,
-            sheet_flipped,
+            sheet: Sheet(sheet),
+            sheet_flipped: Sheet(sheet_flipped),
         })
     }
 
-    pub fn sheet_from_facing_dir(&self, facing_dir: &FacingDirection) -> &HtmlImageElement {
+    pub fn sheet_html_from_facing_dir(&self, facing_dir: &FacingDirection) -> &HtmlImageElement {
+        match facing_dir {
+            FacingDirection::Left => &self.sheet_flipped.0,
+            FacingDirection::Right => &self.sheet.0,
+        }
+    }
+
+    pub fn sheet_from_facing_dir(&self, facing_dir: &FacingDirection) -> &Sheet {
         match facing_dir {
             FacingDirection::Left => &self.sheet_flipped,
             FacingDirection::Right => &self.sheet,
@@ -94,7 +130,7 @@ impl Model {
         y: u16,
     ) -> Result<(), JsValue> {
         ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-            &self.sheet,
+            &self.sheet.0,
             MISC_SPRITE_SHEET_COLUMN,
             misc_sprite_row.row_number() * tile::PIXEL_HEIGHT_FL,
             tile::PIXEL_WIDTH_FL,

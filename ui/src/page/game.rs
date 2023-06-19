@@ -1560,18 +1560,20 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                     unit_model,
                 );
 
-                let _ = ctx
-                    .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                        sheet_for_unit_draw,
-                        sprite_sheet_x,
-                        sprite_sheet_y,
-                        tile::PIXEL_WIDTH_FL,
-                        tile::PIXEL_HEIGHT_FL,
-                        x,
-                        y,
-                        tile::PIXEL_WIDTH_FL,
-                        tile::PIXEL_HEIGHT_FL,
-                    );
+                let _ = sheet_for_unit_draw.draw(&ctx, sprite_sheet_x, sprite_sheet_y, x, y);
+
+                // let _ = ctx
+                //     .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+                //         sheet_for_unit_draw,
+                //         sprite_sheet_x,
+                //         sprite_sheet_y,
+                //         tile::PIXEL_WIDTH_FL,
+                //         tile::PIXEL_HEIGHT_FL,
+                //         x,
+                //         y,
+                //         tile::PIXEL_WIDTH_FL,
+                //         tile::PIXEL_HEIGHT_FL,
+                //     );
 
                 draw_units_move(maybe_units_move);
 
@@ -1613,7 +1615,7 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                     let col = (index % 2) as u16;
                     let row = (index / 2) as u16;
 
-                    let sheet_for_unit_draw = model.assets.sheet_from_facing_dir(facing_dir);
+                    let sheet_for_unit_draw = model.assets.sheet_html_from_facing_dir(facing_dir);
 
                     let maybe_units_move = model.get_units_move(unit_id);
 
@@ -1665,18 +1667,23 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                     todo!("Sprite for game pos with multiple teams on it")
                 };
 
-                let _ = ctx
-                    .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                        &model.assets.sheet,
-                        9.0 * tile::PIXEL_WIDTH_FL,
-                        sy,
-                        tile::PIXEL_WIDTH_FL,
-                        tile::PIXEL_HEIGHT_FL,
-                        x,
-                        y,
-                        tile::PIXEL_WIDTH_FL,
-                        tile::PIXEL_HEIGHT_FL,
-                    );
+                let _ = model
+                    .assets
+                    .sheet
+                    .draw(&ctx, 9.0 * tile::PIXEL_WIDTH_FL, sy, x, y);
+
+                // let _ = ctx
+                //     .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+                //         &model.assets.sheet.to_html(),
+                //         9.0 * tile::PIXEL_WIDTH_FL,
+                //         sy,
+                //         tile::PIXEL_WIDTH_FL,
+                //         tile::PIXEL_HEIGHT_FL,
+                //         x,
+                //         y,
+                //         tile::PIXEL_WIDTH_FL,
+                //         tile::PIXEL_HEIGHT_FL,
+                //     );
 
                 for (unit_id, _, _) in units {
                     draw_units_move(model.get_units_move(unit_id));
