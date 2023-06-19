@@ -1,6 +1,7 @@
 use crate::view::cell::Cell;
 use crate::Style;
 use seed::prelude::{El, JsValue, Node, Tag};
+use shared::arrow::Arrow;
 use shared::facing_direction::FacingDirection;
 use shared::tile;
 use shared::tile::Tile;
@@ -20,16 +21,25 @@ pub enum MiscSpriteRow {
     Hills,
     Forest,
     MobilitySpace,
-    ArrowEndLeft,
-    ArrowEndDown,
-    ArrowEndRight,
-    ArrowEndUp,
-    ArrowX,
-    ArrowY,
-    ArrowRightUp,
-    ArrowRightDown,
-    ArrowLeftUp,
-    ArrowLeftDown,
+    Arrow { arrow: ArrowRow, moved: bool },
+    Cursor,
+    PartiallyLoadedCargoIndicator,
+    FullyLoadedCargoIndicator,
+    LowSuppliesIndicator,
+    FogOfWar,
+}
+
+pub enum ArrowRow {
+    EndLeft,
+    EndDown,
+    EndRight,
+    EndUp,
+    X,
+    Y,
+    RightUp,
+    RightDown,
+    LeftUp,
+    LeftDown,
 }
 
 #[derive(Clone)]
@@ -104,7 +114,58 @@ impl MiscSpriteRow {
             MiscSpriteRow::Hills => 24.0,
             MiscSpriteRow::Forest => 25.0,
             MiscSpriteRow::MobilitySpace => 3.0,
+            MiscSpriteRow::Arrow { arrow, moved } => {
+                let mut r = match arrow {
+                    ArrowRow::EndLeft => 6.0,
+                    ArrowRow::EndDown => 9.0,
+                    ArrowRow::EndRight => 4.0,
+                    ArrowRow::EndUp => 7.0,
+                    ArrowRow::X => 5.0,
+                    ArrowRow::Y => 8.0,
+                    ArrowRow::RightUp => 10.0,
+                    ArrowRow::RightDown => 11.0,
+                    ArrowRow::LeftUp => 12.0,
+                    ArrowRow::LeftDown => 13.0,
+                };
+
+                if *moved {
+                    r += 10.0
+                }
+
+                r
+            }
+            MiscSpriteRow::Cursor => 2.0,
+            MiscSpriteRow::PartiallyLoadedCargoIndicator => 26.0,
+            MiscSpriteRow::FullyLoadedCargoIndicator => 28.0,
+            MiscSpriteRow::LowSuppliesIndicator => 27.0,
+            MiscSpriteRow::FogOfWar => 1.0,
         }
+    }
+}
+
+pub struct ArrowParams<'a> {
+    pub arrow: &'a Arrow,
+    pub moved: bool,
+}
+
+impl<'a> From<ArrowParams<'a>> for MiscSpriteRow {
+    fn from(value: ArrowParams<'a>) -> Self {
+        let ArrowParams { arrow, moved } = value;
+
+        let r = match arrow {
+            Arrow::EndLeft => ArrowRow::EndLeft,
+            Arrow::EndDown => ArrowRow::EndDown,
+            Arrow::EndRight => ArrowRow::EndRight,
+            Arrow::EndUp => ArrowRow::EndUp,
+            Arrow::X => ArrowRow::X,
+            Arrow::Y => ArrowRow::Y,
+            Arrow::RightUp => ArrowRow::RightUp,
+            Arrow::RightDown => ArrowRow::RightDown,
+            Arrow::LeftUp => ArrowRow::LeftUp,
+            Arrow::LeftDown => ArrowRow::LeftDown,
+        };
+
+        MiscSpriteRow::Arrow { arrow: r, moved }
     }
 }
 

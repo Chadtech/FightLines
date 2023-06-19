@@ -40,7 +40,6 @@ use shared::located::Located;
 use shared::path::Path;
 use shared::point::Point;
 use shared::team_color::TeamColor;
-use shared::tile::Tile;
 use shared::unit::{Place, Unit, UnitId};
 use shared::{game, located, tile, unit};
 use std::cmp;
@@ -116,7 +115,7 @@ pub struct Model {
     moves_index_by_unit: HashMap<UnitId, Action>,
     moves: Vec<Action>,
     changes: Vec<Change>,
-    mouse_game_position: Option<Point<u32>>,
+    mouse_game_position: Option<Point<u16>>,
     stage: Stage,
     dialog: Option<Dialog>,
     status: Status,
@@ -728,8 +727,8 @@ fn handle_mouse_move_on_screen(model: &mut Model, page_pos: Point<i16>) -> Resul
         handle_mouse_move_for_mode(model, mouse_loc)?;
 
         Some(Point {
-            x: x as u32,
-            y: y as u32,
+            x: x as u16,
+            y: y as u16,
         })
     };
 
@@ -1370,33 +1369,11 @@ fn draw_arrow(
 ) {
     dir.adjust_coord(arrow_x, arrow_y);
 
-    let mut sheet_row = match arrow {
-        Arrow::EndLeft => 96.0,
-        Arrow::EndDown => 144.0,
-        Arrow::EndRight => 64.0,
-        Arrow::EndUp => 112.0,
-        Arrow::X => 80.0,
-        Arrow::Y => 128.0,
-        Arrow::RightUp => 160.0,
-        Arrow::RightDown => 176.0,
-        Arrow::LeftUp => 192.0,
-        Arrow::LeftDown => 208.0,
-    };
-
-    if moved {
-        sheet_row += 160.0;
-    }
-
-    let _ = ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-        &model.assets.sheet,
-        assets::MISC_SPRITE_SHEET_COLUMN,
-        sheet_row,
-        tile::PIXEL_WIDTH_FL,
-        tile::PIXEL_HEIGHT_FL,
-        *arrow_x as f64 * tile::PIXEL_WIDTH_FL,
-        *arrow_y as f64 * tile::PIXEL_HEIGHT_FL,
-        tile::PIXEL_WIDTH_FL,
-        tile::PIXEL_HEIGHT_FL,
+    let _ = model.assets.draw_misc_sprite(
+        ctx,
+        assets::ArrowParams { arrow, moved }.into(),
+        *arrow_x,
+        *arrow_y,
     );
 }
 
@@ -1416,18 +1393,15 @@ fn draw_cursor(model: &Model) -> Result<(), String> {
     );
 
     if let Some(mouse_game_pos) = &model.mouse_game_position {
-        ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-            &model.assets.sheet,
-            assets::MISC_SPRITE_SHEET_COLUMN,
-            32.0,
-            tile::PIXEL_WIDTH_FL,
-            tile::PIXEL_HEIGHT_FL,
-            mouse_game_pos.x as f64 * tile::PIXEL_WIDTH_FL,
-            mouse_game_pos.y as f64 * tile::PIXEL_HEIGHT_FL,
-            tile::PIXEL_WIDTH_FL,
-            tile::PIXEL_HEIGHT_FL,
-        )
-        .map_err(|_| "Could not draw cursor image on canvas".to_string())?;
+        model
+            .assets
+            .draw_misc_sprite(
+                &ctx,
+                MiscSpriteRow::Cursor,
+                mouse_game_pos.x,
+                mouse_game_pos.y,
+            )
+            .map_err(|_| "Could not draw cursor image on canvas".to_string())?;
     }
 
     Ok(())
@@ -1456,26 +1430,9 @@ fn draw_visibility(visibility: &HashSet<Located<()>>, model: &Model) {
             let loc = located::unit(x, y);
 
             if !visibility.contains(&loc) {
-                let sheet = &model.assets.sheet;
-
-                let sx = assets::MISC_SPRITE_SHEET_COLUMN;
-                let sy = 16.0;
-
-                let x_fl = (x * tile::PIXEL_WIDTH) as f64;
-                let y_fl = (y * tile::PIXEL_HEIGHT) as f64;
-
-                let _ = ctx
-                    .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                        sheet,
-                        sx,
-                        sy,
-                        tile::PIXEL_WIDTH_FL,
-                        tile::PIXEL_HEIGHT_FL,
-                        x_fl,
-                        y_fl,
-                        tile::PIXEL_WIDTH_FL,
-                        tile::PIXEL_HEIGHT_FL,
-                    );
+                let _ = model
+                    .assets
+                    .draw_misc_sprite(&ctx, MiscSpriteRow::FogOfWar, x, y);
             }
         }
     }
@@ -1621,23 +1578,15 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                 if let Some(loaded_units) = indices.by_transport.get(unit_id) {
                     let misc_sheet_row =
                         if loaded_units.len() >= unit_model.unit.carrying_capacity() {
-                            28.0
+                            MiscSpriteRow::FullyLoadedCargoIndicator
                         } else {
-                            26.0
+                            MiscSpriteRow::PartiallyLoadedCargoIndicator
                         };
 
-                    let _ = ctx
-                        .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                            &model.assets.sheet,
-                            assets::MISC_SPRITE_SHEET_COLUMN,
-                            misc_sheet_row * tile::PIXEL_HEIGHT_FL,
-                            tile::PIXEL_WIDTH_FL,
-                            tile::PIXEL_HEIGHT_FL,
-                            x,
-                            y,
-                            tile::PIXEL_WIDTH_FL,
-                            tile::PIXEL_HEIGHT_FL,
-                        );
+                    let _ =
+                        model
+                            .assets
+                            .draw_misc_sprite(&ctx, misc_sheet_row, game_pos.x, game_pos.y);
 
                     for (loaded_unit_id, _) in loaded_units {
                         draw_units_move(model.get_units_move(loaded_unit_id));
@@ -1649,17 +1598,11 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                 match model.frame_count {
                     FrameCount::F1 | FrameCount::F2 => {
                         if supplies_below_25_percent {
-                            let _ = ctx
-                            .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                                &model.assets.sheet,
-                                assets::MISC_SPRITE_SHEET_COLUMN,
-                                27.0 * tile::PIXEL_WIDTH_FL,
-                                tile::PIXEL_WIDTH_FL,
-                                tile::PIXEL_HEIGHT_FL,
-                                x,
-                                y,
-                                tile::PIXEL_WIDTH_FL,
-                                tile::PIXEL_HEIGHT_FL,
+                            let _ = model.assets.draw_misc_sprite(
+                                &ctx,
+                                MiscSpriteRow::LowSuppliesIndicator,
+                                game_pos.x,
+                                game_pos.y,
                             );
                         }
                     }
