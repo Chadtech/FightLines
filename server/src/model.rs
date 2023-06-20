@@ -1,7 +1,7 @@
-use crate::flags;
 use crate::games::Games;
 use crate::lobbies::Lobbies;
 use crate::setting::Setting;
+use crate::{flags, games};
 use shared::rng::{RandGen, RandSeed};
 use std::sync::Mutex;
 
@@ -41,11 +41,11 @@ impl Model {
         let lobbies_seed: RandSeed = RandSeed::next(&mut rand_gen);
         let games_seed: RandSeed = RandSeed::next(&mut rand_gen);
 
-        let games = if flags.dev_mode {
-            Games::init_dev(games_seed)
-        } else {
-            Games::init(games_seed)
-        };
+        let games: Games = games::Flags {
+            dev: flags.dev_mode,
+            rand_seed: games_seed,
+        }
+        .into();
 
         Model {
             ip_address: flags.ip_address,

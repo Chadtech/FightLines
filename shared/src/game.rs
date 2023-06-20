@@ -31,19 +31,52 @@ use std::convert::TryFrom;
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum GameId {
     GameId(Id),
+    Dev(DevGameId),
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Debug)]
+pub enum DevGameId {
     DisplayTest,
     ReplenishTest,
+    ArrowTest,
 }
 
 impl ToString for GameId {
     fn to_string(&self) -> String {
         match self {
             GameId::GameId(id) => id.to_string(),
-            GameId::DisplayTest => DISPLAY_TEST.to_string(),
-            GameId::ReplenishTest => REPLENISH_TEST.to_string(),
+            GameId::Dev(dev_id) => dev_id.to_string(),
         }
     }
 }
+
+impl ToString for DevGameId {
+    fn to_string(&self) -> String {
+        match self {
+            DevGameId::DisplayTest => DISPLAY_TEST.to_string(),
+            DevGameId::ReplenishTest => REPLENISH_TEST.to_string(),
+            DevGameId::ArrowTest => ARROW_TEST.to_string(),
+        }
+    }
+}
+
+impl From<DevGameId> for GameId {
+    fn from(value: DevGameId) -> Self {
+        GameId::Dev(value)
+    }
+}
+
+impl From<&DevGameId> for GameId {
+    fn from(value: &DevGameId) -> Self {
+        GameId::Dev(value.clone())
+    }
+}
+
+pub const ALL_DEV_IDS: &[DevGameId] = &[
+    DevGameId::DisplayTest,
+    DevGameId::ReplenishTest,
+    DevGameId::ArrowTest,
+];
 
 impl GameId {
     pub fn from_lobby_id(lobby_id: LobbyId) -> GameId {
@@ -52,11 +85,15 @@ impl GameId {
 
     pub fn from_string(s: String) -> Option<GameId> {
         if s == DISPLAY_TEST {
-            return Some(GameId::DisplayTest);
+            return Some(DevGameId::DisplayTest.into());
         }
 
         if s == REPLENISH_TEST {
-            return Some(GameId::ReplenishTest);
+            return Some(DevGameId::ReplenishTest.into());
+        }
+
+        if s == ARROW_TEST {
+            return Some(DevGameId::ArrowTest.into());
         }
 
         Id::from_string(s, false).map(GameId::GameId)
@@ -65,8 +102,7 @@ impl GameId {
     pub fn is_dev(&self) -> bool {
         match self {
             GameId::GameId(_) => false,
-            GameId::DisplayTest => true,
-            GameId::ReplenishTest => true,
+            GameId::Dev(_) => true,
         }
     }
 }
@@ -133,6 +169,7 @@ pub enum FromLobbyError {
 
 const DISPLAY_TEST: &str = "display-test";
 const REPLENISH_TEST: &str = "replenish-test";
+const ARROW_TEST: &str = "arrow-test";
 
 ////////////////////////////////////////////////////////////////////////////////
 // Api //
