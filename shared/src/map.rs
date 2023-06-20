@@ -4,7 +4,8 @@ use crate::tile::Tile;
 use crate::unit::Unit;
 use crate::{located, tile};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::convert::{TryFrom, TryInto};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct Map {
@@ -136,6 +137,7 @@ pub enum MapOpt {
     TerrainTest,
     DisplayTest,
     ReplenishTest,
+    ArrowTest,
 }
 
 pub struct StartingUnits {
@@ -318,6 +320,15 @@ impl MapOpt {
                 }],
                 rest_players_militatries: vec![],
             },
+            MapOpt::ArrowTest => StartingUnits {
+                first_player_military: vec![],
+                second_player_military: vec![Located::<(FacingDirection, Unit)> {
+                    value: (FacingDirection::Right, Unit::Truck),
+                    x: 4,
+                    y: 8,
+                }],
+                rest_players_militatries: vec![],
+            },
         }
     }
 
@@ -331,6 +342,92 @@ impl MapOpt {
             MapOpt::TerrainTest => Map::terrain_test(),
             MapOpt::DisplayTest => Map::display_test(),
             MapOpt::ReplenishTest => Map::replenish_test(),
+            MapOpt::ArrowTest => DevFlags {
+                base_tile: Tile::GrassPlain,
+                src: r#"
+FFFFFFFFFFFFFFFF
+F      FF      F
+F      FF      F
+F      FF      F
+F      FF      F
+F              F
+F      FF      F
+F      FF      F
+F      FF      F
+F      FF      F
+F      FF      F
+F      FF      F
+F      FF      F
+F      FF      F
+F      FF      F
+FFFFFFFFFFFFFFFF
+                    "#
+                .to_string(),
+            }
+            .try_into()
+            .unwrap(),
         }
+    }
+}
+
+pub struct DevFlags {
+    pub base_tile: Tile,
+    pub src: String,
+}
+
+impl TryFrom<DevFlags> for Map {
+    type Error = String;
+
+    fn try_from(flags: DevFlags) -> Result<Self, Self::Error> {
+        let rows = flags
+            .src
+            .trim()
+            .to_string()
+            .split('\n')
+            .map(|str| str.to_string())
+            .collect::<Vec<String>>();
+
+        let row_lengths = rows
+            .iter()
+            .map(|row| row.len())
+            .collect::<HashSet<usize>>()
+            .into_iter()
+            .collect::<Vec<usize>>();
+
+        if row_lengths.len() != 1 {
+            return Err("not all rows are the same length".to_string());
+        }
+
+        let width = row_lengths.first().unwrap();
+
+        let mut features = HashMap::new();
+        for (ri, row) in rows.iter().enumerate() {
+            for (ci, col) in row.chars().enumerate() {
+                let tile = match col {
+                    ' ' => flags.base_tile.clone(),
+                    'G' => Tile::GrassPlain,
+                    'H' => Tile::Hills,
+                    'F' => Tile::Forest,
+                    _ => {
+                        let mut err_msg = "unrecognized char for making dev map: ".to_string();
+
+                        err_msg.push(col);
+
+                        return Err(err_msg);
+                    }
+                };
+
+                features.insert(located::unit(ci as u16, ri as u16), tile);
+            }
+        }
+
+        Ok(Map {
+            base_tile: flags.base_tile,
+            features,
+            grid: vec![],
+            width: *width as u16,
+            height: rows.len() as u16,
+        }
+        .sync_grid())
     }
 }

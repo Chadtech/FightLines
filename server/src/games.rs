@@ -203,15 +203,17 @@ impl Games {
                         },
                     );
 
+                    let blue_player_id = Id::from_string("blue".to_string(), true).unwrap();
+
                     let _ = lobby.add_guest(
-                        Id::Dev("blue".to_string()),
+                        blue_player_id.clone(),
                         Player {
                             name: Name::from_str("blue").unwrap(),
                             color: TeamColor::Blue,
                         },
                     );
 
-                    lobby.set_map_choice(MapOpt::ReplenishTest);
+                    lobby.set_map_choice(MapOpt::ArrowTest);
 
                     let new_seed: RandSeed = RandSeed::next(&mut rng);
 
@@ -219,49 +221,23 @@ impl Games {
 
                     let mut game_init_flags = GameInitFlags::new(lobby, &mut init_flags_rng);
 
-                    let mut infantry = unit::Model::new(
-                        Unit::Infantry,
-                        &red_player_id,
-                        Place::on_map(2, 2, FacingDirection::Right),
-                        &TeamColor::Red,
-                    );
-
-                    infantry.supplies = Unit::Infantry.max_supplies() / 3;
-
-                    let mut depleted_infantry = unit::Model::new(
-                        Unit::Infantry,
-                        &red_player_id,
-                        Place::on_map(2, 6, FacingDirection::Right),
-                        &TeamColor::Red,
-                    );
-
-                    depleted_infantry.supplies =
-                        (Unit::Infantry.active_supply_cost().unwrap() * 1.5).ceil() as i16;
-
-                    let mut truck = unit::Model::new(
+                    let truck = unit::Model::new(
                         Unit::Truck,
                         &red_player_id,
-                        Place::on_map(2, 4, FacingDirection::Right),
+                        Place::on_map(6, 6, FacingDirection::Right),
                         &TeamColor::Red,
                     );
 
-                    truck.supplies = Unit::Truck.max_supplies() / 2;
+                    let blue_truck = unit::Model::new(
+                        Unit::Truck,
+                        &blue_player_id,
+                        Place::on_map(6, 8, FacingDirection::Right),
+                        &TeamColor::Blue,
+                    );
 
-                    let truck_id = UnitId::test("truck");
                     game_init_flags.with_extra_units(&mut vec![
-                        (truck_id.clone(), truck),
-                        (
-                            UnitId::test("supply crate"),
-                            unit::Model::new(
-                                Unit::SupplyCrate,
-                                &red_player_id,
-                                Place::InUnit(truck_id),
-                                &TeamColor::Red,
-                            ),
-                        ),
-                        (UnitId::test("infantry 1"), infantry.clone()),
-                        (UnitId::test("infantry 2"), infantry),
-                        (UnitId::test("depleted infantry"), depleted_infantry),
+                        (UnitId::test("red truck"), truck),
+                        (UnitId::test("blue truck"), blue_truck),
                     ]);
 
                     Game::try_from(game_init_flags).unwrap()
