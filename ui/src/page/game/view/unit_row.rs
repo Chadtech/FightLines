@@ -1,4 +1,5 @@
 use crate::page::game::action::Action;
+use crate::page::game::unit_change::UnitChange;
 use crate::style::Style;
 use crate::view::cell::Cell;
 use shared::api::endpoint::Endpoint;
@@ -23,12 +24,16 @@ pub fn view(
     unit_id: &UnitId,
     unit_model: &unit::Model,
     moves_index: &HashMap<UnitId, Action>,
+    unit_changes: &HashMap<UnitId, UnitChange>,
 ) -> Cell<Msg> {
-    let label = unit_model
-        .name
-        .as_ref()
-        .cloned()
-        .unwrap_or_else(|| unit_model.unit.to_string());
+    let label = match unit_changes.get(unit_id) {
+        Some(UnitChange::Name { name }) => name.clone(),
+        _ => unit_model
+            .name
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| unit_model.unit.to_string()),
+    };
 
     let clicked_unit_id = unit_id.clone();
 

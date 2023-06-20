@@ -1,5 +1,6 @@
 use crate::page::game::action::Action;
 use crate::page::game::group_selected;
+use crate::page::game::unit_change::UnitChange;
 use crate::page::game::view::unit_row;
 use crate::style::Style;
 use crate::view::button::Button;
@@ -21,13 +22,20 @@ pub struct Model {
     pub from_group: Option<group_selected::Model>,
 }
 
-impl Model {
-    pub fn init(unit_id: UnitId, from_group: Option<group_selected::Model>) -> Model {
+pub struct Flags {
+    pub unit_id: UnitId,
+    pub existing_name: Option<String>,
+    pub name_already_submitted: bool,
+    pub from_group: Option<group_selected::Model>,
+}
+
+impl From<Flags> for Model {
+    fn from(flags: Flags) -> Self {
         Model {
-            unit_id,
-            name_field: String::new(),
-            name_submitted: false,
-            from_group,
+            unit_id: flags.unit_id,
+            name_field: flags.existing_name.unwrap_or_default(),
+            name_submitted: flags.name_already_submitted,
+            from_group: flags.from_group,
         }
     }
 }
@@ -50,6 +58,7 @@ pub fn sidebar_content(
     transport_index: &game::unit_index::by_transport::Index,
     unit_model: &unit::Model,
     moves_index: &HashMap<UnitId, Action>,
+    unit_changes: &HashMap<UnitId, UnitChange>,
     game: &Game,
 ) -> Vec<Cell<Msg>> {
     let back_button_row = match model.from_group {
@@ -93,7 +102,8 @@ pub fn sidebar_content(
             for (unit_id, _) in loaded_units {
                 if let Some(unit_model) = game.get_unit(unit_id) {
                     unit_rows.push(
-                        unit_row::view(unit_id, unit_model, moves_index).map_msg(Msg::UnitRow),
+                        unit_row::view(unit_id, unit_model, moves_index, unit_changes)
+                            .map_msg(Msg::UnitRow),
                     );
                 }
             }

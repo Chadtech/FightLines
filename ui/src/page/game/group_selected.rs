@@ -1,4 +1,5 @@
 use crate::page::game::action::Action;
+use crate::page::game::unit_change::UnitChange;
 use crate::page::game::view::unit_row;
 use crate::style::Style;
 use crate::view::cell::Cell;
@@ -35,13 +36,17 @@ pub enum Msg {
 pub fn sidebar_content(
     model: &Model,
     moves_index: &HashMap<UnitId, Action>,
+    unit_changes: &HashMap<UnitId, UnitChange>,
     game: &Game,
 ) -> Vec<Cell<Msg>> {
     let mut unit_rows = vec![];
 
     for unit_id in &model.units {
         if let Some(unit_model) = game.get_unit(unit_id) {
-            unit_rows.push(unit_row::view(unit_id, unit_model, moves_index).map_msg(Msg::UnitRow));
+            unit_rows.push(
+                unit_row::view(unit_id, unit_model, moves_index, unit_changes)
+                    .map_msg(Msg::UnitRow),
+            );
         }
     }
 

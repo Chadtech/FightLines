@@ -50,7 +50,7 @@ pub enum Msg {}
 const SHEET_HTML_ID: &str = "sheet";
 const SHEET_FLIPPED_HTML_ID: &str = "sheet-flipped";
 
-pub const MISC_SPRITE_SHEET_COLUMN: f64 = 128.0;
+const MISC_SPRITE_SHEET_COLUMN: f64 = 128.0;
 pub const SPRITE_SHEET_WIDTH: f64 = 10.0;
 
 impl Sheet {
@@ -106,13 +106,6 @@ impl Model {
             sheet: Sheet(sheet),
             sheet_flipped: Sheet(sheet_flipped),
         })
-    }
-
-    pub fn sheet_html_from_facing_dir(&self, facing_dir: &FacingDirection) -> &HtmlImageElement {
-        match facing_dir {
-            FacingDirection::Left => &self.sheet_flipped.0,
-            FacingDirection::Right => &self.sheet.0,
-        }
     }
 
     pub fn sheet_from_facing_dir(&self, facing_dir: &FacingDirection) -> &Sheet {

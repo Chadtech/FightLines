@@ -4,6 +4,7 @@ mod group_selected;
 mod mode;
 mod replenishment;
 mod stage;
+mod unit_change;
 mod unit_selected;
 mod view;
 
@@ -15,6 +16,7 @@ use crate::page::game::mode::Mode;
 use crate::page::game::replenishment::Replenishment;
 use crate::page::game::stage::animating_moves;
 use crate::page::game::stage::taking_turn::Sidebar;
+use crate::page::game::unit_change::UnitChange;
 use crate::view::button::Button;
 use crate::view::card::Card;
 use crate::view::cell::Cell;
@@ -33,8 +35,7 @@ use shared::direction::Direction;
 use shared::facing_direction::FacingDirection;
 use shared::frame_count::FrameCount;
 use shared::game::outcome::Outcome;
-use shared::game::unit_index::Indexes;
-use shared::game::{calculate_player_visibility, mobility, Game, GameId, Turn};
+use shared::game::{calculate_player_visibility, mobility, unit_index, Game, GameId, Turn};
 use shared::id::Id;
 use shared::located::Located;
 use shared::path::Path;
@@ -102,6 +103,7 @@ pub struct Model {
     game_id: GameId,
     map_canvas: ElRef<HtmlCanvasElement>,
     units_canvas: ElRef<HtmlCanvasElement>,
+    mini_units_canvas: ElRef<HtmlCanvasElement>,
     visibility_canvas: ElRef<HtmlCanvasElement>,
     mode_canvas: ElRef<HtmlCanvasElement>,
     cursor_canvas: ElRef<HtmlCanvasElement>,
@@ -114,7 +116,7 @@ pub struct Model {
     frame_count: FrameCount,
     moves_index_by_unit: HashMap<UnitId, Action>,
     moves: Vec<Action>,
-    changes: Vec<Change>,
+    unit_changes: HashMap<UnitId, UnitChange>,
     mouse_game_position: Option<Point<u16>>,
     stage: Stage,
     dialog: Option<Dialog>,
@@ -236,13 +238,8 @@ impl Model {
 #[derive(Debug)]
 enum Stage {
     TakingTurn(stage::taking_turn::Model),
-    Waiting { indices: Indexes },
+    Waiting { indices: unit_index::Indexes },
     AnimatingMoves(animating_moves::Model),
-}
-
-#[derive(PartialEq, Debug, Clone)]
-enum Change {
-    NameUnit { name: String, unit_id: UnitId },
 }
 
 #[derive(Clone, Debug)]
@@ -388,6 +385,7 @@ pub fn init(
         game_pixel_size,
         map_canvas: ElRef::<HtmlCanvasElement>::default(),
         units_canvas: ElRef::<HtmlCanvasElement>::default(),
+        mini_units_canvas: ElRef::<HtmlCanvasElement>::default(),
         visibility_canvas: ElRef::<HtmlCanvasElement>::default(),
         mode_canvas: ElRef::<HtmlCanvasElement>::default(),
         cursor_canvas: ElRef::<HtmlCanvasElement>::default(),
@@ -402,7 +400,7 @@ pub fn init(
         frame_count: FrameCount::F1,
         moves_index_by_unit,
         moves,
-        changes: Vec::new(),
+        unit_changes: HashMap::new(),
         mouse_game_position: None,
         stage,
         dialog: None,
@@ -421,6 +419,41 @@ fn mouse_screen_pos_to_game_pos(page_pos: Point<i16>, model: &Model) -> Point<i1
     let y = y_on_game / ((tile::PIXEL_HEIGHT * 2) as i16);
 
     Point { x, y }
+}
+
+///////////////////////////////////////////////////////////////
+// Helpers
+///////////////////////////////////////////////////////////////
+
+fn unit_selected_sidebar_flags(
+    unit_indexes: &unit_index::Indexes,
+    unit_changes: &HashMap<UnitId, UnitChange>,
+    unit_id: UnitId,
+    from_group: Option<group_selected::Model>,
+) -> Result<unit_selected::Flags, Error> {
+    let unit_model = match unit_indexes.by_id.get(&unit_id) {
+        Some(u) => u,
+        None => {
+            return Err(Error::new(
+                "init unit sidebar".to_string(),
+                "could not find unit".to_string(),
+            ));
+        }
+    };
+
+    let existing_name_change: Option<String> = match unit_changes.get(&unit_id) {
+        Some(UnitChange::Name { name }) => Some(name.to_string()),
+        _ => None,
+    };
+
+    let name_already_submitted = existing_name_change.is_some();
+
+    Ok(unit_selected::Flags {
+        unit_id: unit_id.clone(),
+        existing_name: existing_name_change.or_else(|| unit_model.name.clone()),
+        name_already_submitted,
+        from_group,
+    })
 }
 
 ///////////////////////////////////////////////////////////////
@@ -626,10 +659,15 @@ fn handle_group_selected_sidebar_msg(
                 return Ok(());
             };
 
-            taking_turn_model.sidebar = Sidebar::UnitSelected(unit_selected::Model::init(
-                unit_id.clone(),
-                Some(sub_model.clone()),
-            ));
+            taking_turn_model.sidebar = Sidebar::UnitSelected(
+                unit_selected_sidebar_flags(
+                    &model.game.indexes,
+                    &model.unit_changes,
+                    unit_id.clone(),
+                    Some(sub_model.clone()),
+                )?
+                .into(),
+            );
 
             if let Stage::TakingTurn { .. } = &mut model.stage {
                 return set_to_moving_unit_mode(model, unit_id);
@@ -663,10 +701,12 @@ fn handle_unit_selected_sidebar_msg(
         unit_selected::Msg::ClickedSetName => {
             if !sub_model.name_submitted {
                 sub_model.name_submitted = true;
-                model.changes.push(Change::NameUnit {
-                    name: sub_model.name_field.clone(),
-                    unit_id: sub_model.unit_id.clone(),
-                })
+                model.unit_changes.insert(
+                    sub_model.unit_id.clone(),
+                    UnitChange::Name {
+                        name: sub_model.name_field.clone(),
+                    },
+                );
             }
         }
         unit_selected::Msg::ClickedBackToGroup => {
@@ -944,10 +984,10 @@ fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl 
     game::action::order(&mut rng, &mut req_moves);
 
     let req_changes: Vec<game::Change> = model
-        .changes
+        .unit_changes
         .iter()
-        .map(|change| match change {
-            Change::NameUnit { unit_id, name } => game::Change::NameUnit {
+        .map(|(unit_id, change)| match change {
+            UnitChange::Name { name } => game::Change::NameUnit {
                 unit_id: unit_id.clone(),
                 name: name.clone(),
             },
@@ -1176,10 +1216,15 @@ fn handle_click_on_screen_when_no_mode(
     }
 
     if rest.is_empty() {
-        taking_turn_model.sidebar = Sidebar::UnitSelected(unit_selected::Model::init(
-            first_unit_id.clone(),
-            None::<group_selected::Model>,
-        ));
+        taking_turn_model.sidebar = Sidebar::UnitSelected(
+            unit_selected_sidebar_flags(
+                &model.game.indexes,
+                &model.unit_changes,
+                first_unit_id.clone(),
+                None,
+            )?
+            .into(),
+        );
 
         set_to_moving_unit_mode(model, first_unit_id.clone())
     } else {
@@ -1455,6 +1500,22 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
         model.game_pixel_size.height_fl,
     );
 
+    let mini_units = match model.mini_units_canvas.get() {
+        Some(c) => c,
+        None => {
+            return;
+        }
+    };
+    let mini_units_ctx = seed::canvas_context_2d(&mini_units);
+
+    mini_units_ctx.begin_path();
+    mini_units_ctx.clear_rect(
+        0.,
+        0.,
+        model.game_pixel_size.width_fl,
+        model.game_pixel_size.height_fl,
+    );
+
     let indices = match &model.stage {
         Stage::AnimatingMoves(sub_model) => &sub_model.indices,
         _ => &model.game.indexes,
@@ -1562,19 +1623,6 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
 
                 let _ = sheet_for_unit_draw.draw(&ctx, sprite_sheet_x, sprite_sheet_y, x, y);
 
-                // let _ = ctx
-                //     .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                //         sheet_for_unit_draw,
-                //         sprite_sheet_x,
-                //         sprite_sheet_y,
-                //         tile::PIXEL_WIDTH_FL,
-                //         tile::PIXEL_HEIGHT_FL,
-                //         x,
-                //         y,
-                //         tile::PIXEL_WIDTH_FL,
-                //         tile::PIXEL_HEIGHT_FL,
-                //     );
-
                 draw_units_move(maybe_units_move);
 
                 if let Some(loaded_units) = indices.by_transport.get(unit_id) {
@@ -1615,7 +1663,7 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                     let col = (index % 2) as u16;
                     let row = (index / 2) as u16;
 
-                    let sheet_for_unit_draw = model.assets.sheet_html_from_facing_dir(facing_dir);
+                    let sheet_for_unit_draw = model.assets.sheet_from_facing_dir(facing_dir);
 
                     let maybe_units_move = model.get_units_move(unit_id);
 
@@ -1626,24 +1674,19 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                         unit_model,
                     );
 
-                    let half_size_w = tile::PIXEL_WIDTH / 2;
-                    let half_size_h = tile::PIXEL_HEIGHT / 2;
+                    let half_size_w = tile::PIXEL_WIDTH;
+                    let half_size_h = tile::PIXEL_HEIGHT;
 
-                    let mini_x = (x_u16 + (col * half_size_w)) as f64;
-                    let mini_y = (y_u16 + (row * half_size_h)) as f64;
+                    let mini_x = ((x_u16 * 2) + (col * half_size_w)) as f64;
+                    let mini_y = ((y_u16 * 2) + (row * half_size_h)) as f64;
 
-                    let _ = ctx
-                        .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                            sheet_for_unit_draw,
-                            sprite_sheet_x,
-                            sprite_sheet_y,
-                            tile::PIXEL_WIDTH_FL,
-                            tile::PIXEL_HEIGHT_FL,
-                            mini_x,
-                            mini_y,
-                            half_size_w as f64,
-                            half_size_h as f64,
-                        );
+                    let _ = sheet_for_unit_draw.draw(
+                        &mini_units_ctx,
+                        sprite_sheet_x,
+                        sprite_sheet_y,
+                        mini_x,
+                        mini_y,
+                    );
                 }
             } else {
                 let mut colors = HashSet::new();
@@ -1671,19 +1714,6 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                     .assets
                     .sheet
                     .draw(&ctx, 9.0 * tile::PIXEL_WIDTH_FL, sy, x, y);
-
-                // let _ = ctx
-                //     .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                //         &model.assets.sheet.to_html(),
-                //         9.0 * tile::PIXEL_WIDTH_FL,
-                //         sy,
-                //         tile::PIXEL_WIDTH_FL,
-                //         tile::PIXEL_HEIGHT_FL,
-                //         x,
-                //         y,
-                //         tile::PIXEL_WIDTH_FL,
-                //         tile::PIXEL_HEIGHT_FL,
-                //     );
 
                 for (unit_id, _, _) in units {
                     draw_units_move(model.get_units_move(unit_id));
@@ -1742,6 +1772,7 @@ pub fn view(viewer_id: Id, model: &Model) -> Vec<Cell<Msg>> {
         vec![
             map_canvas_cell(model),
             units_canvas_cell(model),
+            mini_units_canvas_cell(model),
             visibility_canvas_cell(model),
             mode_canvas_cell(model),
             cursor_canvas_cell(model),
@@ -1818,6 +1849,17 @@ fn units_canvas_cell(model: &Model) -> Cell<Msg> {
     )
 }
 
+fn mini_units_canvas_cell(model: &Model) -> Cell<Msg> {
+    Cell::from_html(
+        vec![],
+        vec![mini_game_canvas(
+            model,
+            &model.mini_units_canvas,
+            "mini units".to_string(),
+        )],
+    )
+}
+
 fn map_canvas_cell(model: &Model) -> Cell<Msg> {
     Cell::from_html(
         vec![],
@@ -1847,8 +1889,8 @@ fn mini_game_canvas(model: &Model, r: &ElRef<HtmlCanvasElement>, html_id: String
     canvas![
         C![Style::Absolute.css_classes().concat()],
         attrs! {
-            At::Width => px_u16(model.game_pixel_size.width).as_str(),
-            At::Height => px_u16(model.game_pixel_size.height).as_str()
+            At::Width => px_u16(model.game_pixel_size.width * 2).as_str(),
+            At::Height => px_u16(model.game_pixel_size.height * 2).as_str()
             At::Id => html_id.as_str()
         },
         style! {
@@ -1955,12 +1997,15 @@ fn sidebar_content(viewer_id: Id, model: &Model) -> Vec<Cell<Msg>> {
             Sidebar::None => {
                 vec![]
             }
-            Sidebar::GroupSelected(sub_model) => {
-                group_selected::sidebar_content(sub_model, &model.moves_index_by_unit, &model.game)
-                    .into_iter()
-                    .map(|cell| cell.map_msg(Msg::GroupSelectedSidebar))
-                    .collect::<Vec<_>>()
-            }
+            Sidebar::GroupSelected(sub_model) => group_selected::sidebar_content(
+                sub_model,
+                &model.moves_index_by_unit,
+                &model.unit_changes,
+                &model.game,
+            )
+            .into_iter()
+            .map(|cell| cell.map_msg(Msg::GroupSelectedSidebar))
+            .collect::<Vec<_>>(),
             Sidebar::UnitSelected(sub_model) => match model.game.get_unit(&sub_model.unit_id) {
                 None => {
                     vec![Cell::from_str(vec![], "error: could not find unit")]
@@ -1970,6 +2015,7 @@ fn sidebar_content(viewer_id: Id, model: &Model) -> Vec<Cell<Msg>> {
                     model.game.transport_index(),
                     unit_model,
                     &model.moves_index_by_unit,
+                    &model.unit_changes,
                     &model.game,
                 )
                 .into_iter()
