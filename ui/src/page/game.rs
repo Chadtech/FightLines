@@ -2389,29 +2389,33 @@ mod test_movement_arrow {
             .collect::<Vec<_>>()
     }
 
+    fn large_mobility() -> HashSet<Point<i32>> {
+        let mut ret = HashSet::new();
+
+        for x in -32..32 {
+            for y in -32..32 {
+                ret.insert(Point { x, y });
+            }
+        }
+
+        ret
+    }
+
     #[test]
     fn no_path_for_origin() {
-        let mobility: HashSet<Point<i32>> = vec![Point { x: 0, y: 0 }]
-            .into_iter()
-            .collect::<HashSet<Point<i32>>>();
-
         let want: Vec<Direction> = vec![];
         assert_eq!(
             want,
-            calc_movement_path(Point { x: 0, y: 0 }, None, 16, &mobility)
+            calc_movement_path(Point { x: 0, y: 0 }, None, 16, &large_mobility())
         );
     }
 
     #[test]
     fn east_path_for_mouse_east() {
-        let mobility: HashSet<Point<i32>> = vec![Point { x: 0, y: 0 }, Point { x: 1, y: 0 }]
-            .into_iter()
-            .collect::<HashSet<Point<i32>>>();
-
         let want: Vec<Direction> = vec![Direction::East];
         assert_eq!(
             want,
-            calc_movement_path(Point { x: 1, y: 0 }, None, 16, &mobility)
+            calc_movement_path(Point { x: 1, y: 0 }, None, 16, &large_mobility())
         );
     }
 
@@ -2427,7 +2431,10 @@ mod test_movement_arrow {
             Direction::East,
             Direction::East,
         ];
-        assert_eq!(want, calc_movement_path(Point { x: 8, y: 0 }, None, 16));
+        assert_eq!(
+            want,
+            calc_movement_path(Point { x: 8, y: 0 }, None, 16, &large_mobility())
+        );
     }
 
     #[test]
@@ -2442,7 +2449,10 @@ mod test_movement_arrow {
             Direction::West,
             Direction::West,
         ];
-        assert_eq!(want, calc_movement_path(Point { x: -8, y: 0 }, None, 16));
+        assert_eq!(
+            want,
+            calc_movement_path(Point { x: -8, y: 0 }, None, 16, &large_mobility())
+        );
     }
 
     #[test]
@@ -2457,7 +2467,10 @@ mod test_movement_arrow {
             Direction::North,
             Direction::North,
         ];
-        assert_eq!(want, calc_movement_path(Point { x: 0, y: -8 }, None, 16));
+        assert_eq!(
+            want,
+            calc_movement_path(Point { x: 0, y: -8 }, None, 16, &large_mobility())
+        );
     }
 
     #[test]
@@ -2472,14 +2485,20 @@ mod test_movement_arrow {
             Direction::South,
             Direction::South,
         ];
-        assert_eq!(want, calc_movement_path(Point { x: 0, y: 8 }, None, 16));
+        assert_eq!(
+            want,
+            calc_movement_path(Point { x: 0, y: 8 }, None, 16, &large_mobility())
+        );
     }
 
     #[test]
     fn path_can_go_diagonal() {
         let want: Vec<Direction> = vec![Direction::South, Direction::East];
 
-        assert_eq!(want, calc_movement_path(Point { x: 1, y: 1 }, None, 16));
+        assert_eq!(
+            want,
+            calc_movement_path(Point { x: 1, y: 1 }, None, 16, &large_mobility())
+        );
     }
 
     #[test]
@@ -2495,7 +2514,10 @@ mod test_movement_arrow {
             Direction::East,
         ];
 
-        assert_eq!(want, calc_movement_path(Point { x: 4, y: -4 }, None, 16));
+        assert_eq!(
+            want,
+            calc_movement_path(Point { x: 4, y: -4 }, None, 16, &large_mobility())
+        );
     }
 
     #[test]
@@ -2509,7 +2531,10 @@ mod test_movement_arrow {
             Direction::West,
         ];
 
-        assert_eq!(want, calc_movement_path(Point { x: -4, y: -2 }, None, 16));
+        assert_eq!(
+            want,
+            calc_movement_path(Point { x: -4, y: -2 }, None, 16, &large_mobility())
+        );
     }
 
     #[test]
@@ -2530,7 +2555,8 @@ mod test_movement_arrow {
             calc_movement_path(
                 Point { x: -4, y: 4 },
                 Some(&vec![Direction::South, Direction::South, Direction::South]),
-                16
+                16,
+                &large_mobility()
             )
         );
     }
@@ -2637,7 +2663,8 @@ mod test_movement_arrow {
                     Direction::West,
                     Direction::North
                 ]),
-                16
+                16,
+                &large_mobility()
             )
         );
     }
@@ -2648,7 +2675,12 @@ mod test_movement_arrow {
 
         assert_eq!(
             want,
-            calc_movement_path(Point { x: 1, y: 1 }, Some(&vec![Direction::East]), 2)
+            calc_movement_path(
+                Point { x: 1, y: 1 },
+                Some(&vec![Direction::East]),
+                2,
+                &large_mobility()
+            )
         );
     }
 
@@ -2658,7 +2690,12 @@ mod test_movement_arrow {
 
         assert_eq!(
             want,
-            calc_movement_path(Point { x: 1, y: 1 }, Some(&vec![Direction::South]), 2)
+            calc_movement_path(
+                Point { x: 1, y: 1 },
+                Some(&vec![Direction::South]),
+                2,
+                &large_mobility()
+            )
         );
     }
 }
