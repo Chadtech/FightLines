@@ -1269,19 +1269,28 @@ fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Resu
                     )
                 })?;
 
-                let loc = model
+                let unit_loc = model
                     .game
                     .indexes
                     .position_of_unit_or_transport(&moving_model.unit_id)
                     .map_err(|err| Error::new(error_title, err))?;
 
-                let mouse_point = Point {
-                    x: mouse_loc.x as i32 - loc.x as i32,
-                    y: mouse_loc.y as i32 - loc.y as i32,
+                let mouse_point_relative_to_unit_loc = Point {
+                    x: mouse_loc.x as i32 - unit_loc.x as i32,
+                    y: mouse_loc.y as i32 - unit_loc.y as i32,
                 };
 
-                let arrows = calc_arrows(
-                    mouse_point,
+                let mobility_relative_to_unit_loc = moving_model
+                    .mobility
+                    .iter()
+                    .map(|mobility_loc| Point {
+                        x: mobility_loc.x as i32 - unit_loc.x as i32,
+                        y: mobility_loc.y as i32 - unit_loc.y as i32,
+                    })
+                    .collect::<HashSet<Point<i32>>>();
+
+                let directions = calc_movement_path(
+                    mouse_point_relative_to_unit_loc,
                     Some(
                         &moving_model
                             .arrows
@@ -1290,9 +1299,10 @@ fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Resu
                             .collect::<Vec<_>>(),
                     ),
                     unit_model.unit.mobility_budget() as usize,
+                    &mobility_relative_to_unit_loc,
                 );
 
-                moving_model.arrows = arrows;
+                moving_model.arrows = shared::path::path_with_arrows(&directions);
             } else {
                 moving_model.arrows = vec![];
             }
@@ -2126,16 +2136,6 @@ fn snackbar_view(model: &Model) -> Cell<Msg> {
     }
 }
 
-fn calc_arrows(
-    mouse_pos: Point<i32>,
-    maybe_existing_path: Option<&Vec<Direction>>,
-    range_limit: usize,
-) -> Vec<(Direction, Arrow)> {
-    let directions = calc_movement_path(mouse_pos, maybe_existing_path, range_limit);
-
-    shared::path::path_with_arrows(&directions)
-}
-
 fn outcomes_to_animations(outcomes: Vec<Outcome>) -> Vec<Animation> {
     outcomes
         .into_iter()
@@ -2147,62 +2147,72 @@ fn calc_movement_path(
     mouse_pos: Point<i32>,
     maybe_existing_path: Option<&Vec<Direction>>,
     range_limit: usize,
+    mobility: &HashSet<Point<i32>>,
 ) -> Vec<Direction> {
     match maybe_existing_path {
         None => {
-            if mouse_pos.x == 0 && mouse_pos.y == 0 {
-                vec![]
-            } else {
-                let (direction, next_loc) = if mouse_pos.y.abs() < mouse_pos.x.abs() {
-                    let is_east = mouse_pos.x > 0;
-
-                    let next_loc = Point {
-                        x: if is_east {
-                            mouse_pos.x - 1
-                        } else {
-                            mouse_pos.x + 1
-                        },
-                        y: mouse_pos.y,
-                    };
-
-                    let direction = if is_east {
-                        Direction::East
-                    } else {
-                        Direction::West
-                    };
-
-                    (direction, next_loc)
+            if mobility.contains(&mouse_pos) {
+                if mouse_pos.x == 0 && mouse_pos.y == 0 {
+                    vec![]
                 } else {
-                    let is_south = mouse_pos.y > 0;
+                    let (direction, next_loc) = if mouse_pos.y.abs() < mouse_pos.x.abs() {
+                        let is_east = mouse_pos.x > 0;
 
-                    let next_loc = Point {
-                        x: mouse_pos.x,
-                        y: if is_south {
-                            mouse_pos.y - 1
+                        let next_loc = Point {
+                            x: if is_east {
+                                mouse_pos.x - 1
+                            } else {
+                                mouse_pos.x + 1
+                            },
+                            y: mouse_pos.y,
+                        };
+
+                        let direction = if is_east {
+                            Direction::East
                         } else {
-                            mouse_pos.y + 1
-                        },
-                    };
+                            Direction::West
+                        };
 
-                    let direction = if is_south {
-                        Direction::South
+                        (direction, next_loc)
                     } else {
-                        Direction::North
+                        let is_south = mouse_pos.y > 0;
+
+                        let next_loc = Point {
+                            x: mouse_pos.x,
+                            y: if is_south {
+                                mouse_pos.y - 1
+                            } else {
+                                mouse_pos.y + 1
+                            },
+                        };
+
+                        let direction = if is_south {
+                            Direction::South
+                        } else {
+                            Direction::North
+                        };
+
+                        (direction, next_loc)
                     };
 
-                    (direction, next_loc)
-                };
+                    let mut base_ret = vec![direction];
 
-                let mut base_ret = vec![direction];
+                    base_ret.append(&mut calc_movement_path(
+                        next_loc,
+                        None,
+                        range_limit,
+                        mobility,
+                    ));
 
-                base_ret.append(&mut calc_movement_path(next_loc, None, range_limit));
-
-                base_ret
+                    base_ret
+                }
+            } else {
+                todo!("search for new direction")
             }
         }
         Some(existing_path) => {
             if existing_path.len() > range_limit {
-                calc_movement_path(mouse_pos, None, range_limit)
+                calc_movement_path(mouse_pos, None, range_limit, mobility)
             } else {
                 let new_origin = path_to_pos(existing_path);
                 let mut ret = existing_path.clone();
@@ -2212,7 +2222,12 @@ fn calc_movement_path(
                     y: mouse_pos.y - new_origin.y,
                 };
 
-                ret.append(&mut calc_movement_path(new_mouse_pos, None, range_limit));
+                ret.append(&mut calc_movement_path(
+                    new_mouse_pos,
+                    None,
+                    range_limit,
+                    mobility,
+                ));
 
                 let positions = path_to_positions(&ret);
                 let positions_set: HashSet<Point<i32>> = {
@@ -2229,7 +2244,7 @@ fn calc_movement_path(
                 if positions.len() == positions_set.len() {
                     ret.clone()
                 } else {
-                    calc_movement_path(mouse_pos, None, range_limit)
+                    calc_movement_path(mouse_pos, None, range_limit, mobility)
                 }
             }
         }
@@ -2365,6 +2380,7 @@ mod test_movement_arrow {
     use shared::direction::Direction;
     use shared::path::path_with_arrows;
     use shared::point::Point;
+    use std::collections::HashSet;
 
     fn path_to_arrows(path: &Vec<Direction>) -> Vec<Arrow> {
         path_with_arrows(path)
@@ -2375,14 +2391,28 @@ mod test_movement_arrow {
 
     #[test]
     fn no_path_for_origin() {
+        let mobility: HashSet<Point<i32>> = vec![Point { x: 0, y: 0 }]
+            .into_iter()
+            .collect::<HashSet<Point<i32>>>();
+
         let want: Vec<Direction> = vec![];
-        assert_eq!(want, calc_movement_path(Point { x: 0, y: 0 }, None, 16));
+        assert_eq!(
+            want,
+            calc_movement_path(Point { x: 0, y: 0 }, None, 16, &mobility)
+        );
     }
 
     #[test]
     fn east_path_for_mouse_east() {
+        let mobility: HashSet<Point<i32>> = vec![Point { x: 0, y: 0 }, Point { x: 1, y: 0 }]
+            .into_iter()
+            .collect::<HashSet<Point<i32>>>();
+
         let want: Vec<Direction> = vec![Direction::East];
-        assert_eq!(want, calc_movement_path(Point { x: 1, y: 0 }, None, 16));
+        assert_eq!(
+            want,
+            calc_movement_path(Point { x: 1, y: 0 }, None, 16, &mobility)
+        );
     }
 
     #[test]

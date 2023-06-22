@@ -361,7 +361,7 @@ F      FF      F
 F      FF      F
 F      FF      F
 FFFFFFFFFFFFFFFF
-                    "#
+"#
                 .to_string(),
             }
             .try_into()
