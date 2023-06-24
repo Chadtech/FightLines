@@ -27,7 +27,7 @@ use seed::prelude::{
     cmds, el_ref, streams, At, El, ElRef, Ev, IndexMap, JsCast, Node, Orders, St, StreamHandle,
     ToClasses, UpdateEl,
 };
-use seed::{attrs, canvas, div, style, C};
+use seed::{attrs, canvas, div, log, style, C};
 use shared::api::endpoint::Endpoint;
 use shared::api::game::submit_turn;
 use shared::arrow::Arrow;
@@ -1262,6 +1262,7 @@ fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Resu
 
             if moving_model.mobility.contains(&mouse_loc) {
                 let error_title = "handle mouse move in move mode".to_string();
+
                 let unit_model = model.game.get_unit(&moving_model.unit_id).ok_or_else(|| {
                     Error::new(
                         error_title.clone(),
@@ -1275,19 +1276,19 @@ fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Resu
                     .position_of_unit_or_transport(&moving_model.unit_id)
                     .map_err(|err| Error::new(error_title, err))?;
 
-                let mouse_point_relative_to_unit_loc = Point {
-                    x: mouse_loc.x as i32 - unit_loc.x as i32,
-                    y: mouse_loc.y as i32 - unit_loc.y as i32,
-                };
-
-                let mobility_relative_to_unit_loc = moving_model
-                    .mobility
-                    .iter()
-                    .map(|mobility_loc| Point {
-                        x: mobility_loc.x as i32 - unit_loc.x as i32,
-                        y: mobility_loc.y as i32 - unit_loc.y as i32,
-                    })
-                    .collect::<HashSet<Point<i32>>>();
+                // let mouse_point_relative_to_unit_loc = Point {
+                //     x: mouse_loc.x as i32 - unit_loc.x as i32,
+                //     y: mouse_loc.y as i32 - unit_loc.y as i32,
+                // };
+                //
+                // let mobility_relative_to_unit_loc = moving_model
+                //     .mobility
+                //     .iter()
+                //     .map(|mobility_loc| Point {
+                //         x: mobility_loc.x as i32 - unit_loc.x as i32,
+                //         y: mobility_loc.y as i32 - unit_loc.y as i32,
+                //     })
+                //     .collect::<HashSet<Point<i32>>>();
 
                 // let directions = calc_movement_path(
                 //     mouse_point_relative_to_unit_loc,
@@ -1323,44 +1324,18 @@ fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Resu
                         })
                         .collect::<HashSet<Point<i32>>>();
 
-                    let existing_path: Vec<(Point<i32>, Direction)> = moving_model
+                    let existing_path: Vec<Direction> = moving_model
                         .arrows
                         .iter()
-                        .fold((unit_loc, vec![]), |(loc, mut acc), (dir, _)| {
-                            let point = Point {
-                                x: loc.x as i32,
-                                y: loc.y as i32,
-                            };
-
-                            acc.push((point, dir.clone()));
-
-                            let mut next_loc = loc;
-
-                            match dir {
-                                Direction::North => {
-                                    next_loc.y -= 1;
-                                }
-                                Direction::South => {
-                                    next_loc.y += 1;
-                                }
-                                Direction::East => {
-                                    next_loc.x -= 1;
-                                }
-                                Direction::West => {
-                                    next_loc.x += 1;
-                                }
-                            }
-
-                            (next_loc, acc)
-                        })
-                        .1;
+                        .map(|(dir, _)| dir.clone())
+                        .collect();
 
                     find_movement_path(
                         unit_point,
                         mouse_point,
                         &mobility,
-                        // existing_path,
-                        vec![],
+                        existing_path,
+                        unit_model.unit.mobility_budget().ceil() as usize,
                     )
                     .map_err(|msg| Error::new("calculate arrow".to_string(), msg))?
                 };
@@ -2321,37 +2296,100 @@ fn find_movement_path(
     origin_pos: Point<i32>,
     dest_pos: Point<i32>,
     mobility: &HashSet<Point<i32>>,
-    existing_path: Vec<(Point<i32>, Direction)>,
+    existing_directions: Vec<Direction>,
+    mobility_budget: usize,
 ) -> Result<Vec<Direction>, String> {
+    let existing_path: Vec<(Point<i32>, Direction)> = existing_directions
+        .iter()
+        .fold((origin_pos.clone(), vec![]), |(loc, mut acc), dir| {
+            let mut next_loc = loc.clone();
+
+            match dir {
+                Direction::North => {
+                    next_loc.y -= 1;
+                }
+                Direction::South => {
+                    next_loc.y += 1;
+                }
+                Direction::East => {
+                    next_loc.x += 1;
+                }
+                Direction::West => {
+                    next_loc.x -= 1;
+                }
+            }
+
+            let point = Point {
+                x: next_loc.x as i32,
+                y: next_loc.y as i32,
+            };
+
+            let mut acc2 = acc.clone();
+
+            acc2.push((point, dir.clone()));
+
+            (next_loc, acc2)
+        })
+        .1;
+
     let mut path = existing_path;
 
     let mut escape_with: Option<Vec<Direction>> = None;
 
-    let mut pos = path
+    let (mut pos, mut last_dir) = path
         .last()
-        .map(|(p, _)| p.clone())
-        .unwrap_or_else(|| origin_pos.clone());
+        .map(|(p, dir)| (p.clone(), Some(dir.clone())))
+        .unwrap_or_else(|| (origin_pos.clone(), None));
 
     while pos != dest_pos && escape_with.is_none() {
-        let dir = if pos.y > dest_pos.y {
-            pos.y -= 1;
-
-            Direction::North
-        } else if pos.y < dest_pos.y {
-            pos.y += 1;
-
-            Direction::South
-        } else if pos.x > dest_pos.x {
-            pos.x -= 1;
-
-            Direction::West
-        } else if pos.x < dest_pos.x {
-            pos.x += 1;
-
-            Direction::East
-        } else {
-            unreachable!("find movement pos must be greater than, less than, or equal to dest pos");
+        if path.len() > mobility_budget {
+            path = vec![];
+            pos = origin_pos.clone()
         };
+
+        let y_adjustments = |pos: &mut Point<i32>| {
+            if pos.y > dest_pos.y {
+                pos.y -= 1;
+
+                return Some(Direction::North);
+            }
+
+            if pos.y < dest_pos.y {
+                pos.y += 1;
+
+                return Some(Direction::South);
+            }
+
+            return None;
+        };
+
+        let x_adjustments = |pos: &mut Point<i32>| {
+            if pos.x > dest_pos.x {
+                pos.x -= 1;
+
+                return Some(Direction::West);
+            } else if pos.x < dest_pos.x {
+                pos.x += 1;
+
+                return Some(Direction::East);
+            }
+
+            return None;
+        };
+
+        let maybe_dir: Option<Direction> =
+            if last_dir.clone().map(|d| d.is_x_axis()).unwrap_or(false) {
+                y_adjustments(&mut pos).or_else(|| x_adjustments(&mut pos))
+            } else {
+                x_adjustments(&mut pos).or_else(|| y_adjustments(&mut pos))
+            };
+
+        let dir_result: Result<Direction, String> = maybe_dir.ok_or_else(|| {
+            "find movement pos must be greater than, less than, or equal to dest pos".to_string()
+        });
+
+        let dir = dir_result?;
+        last_dir = Some(dir.clone());
 
         if mobility.contains(&pos) {
             path.push((pos.clone(), dir));
@@ -2691,7 +2729,9 @@ fn game_moves_to_page_actions(moves: Vec<game::action::Action>) -> Vec<Action> {
 #[cfg(test)]
 mod test_movement_arrow {
     use crate::game::{calc_movement_path, Arrow};
-    use crate::page::game::{search_and_find_movement_path, search_and_find_movement_path2};
+    use crate::page::game::{
+        find_movement_path, search_and_find_movement_path, search_and_find_movement_path2,
+    };
     use pretty_assertions::assert_eq;
     use shared::direction::Direction;
     use shared::path::path_with_arrows;
@@ -2774,7 +2814,14 @@ mod test_movement_arrow {
         let want: Vec<Direction> = vec![];
         assert_eq!(
             want,
-            calc_movement_path(Point { x: 0, y: 0 }, None, 16, &large_mobility()).unwrap()
+            find_movement_path(
+                Point { x: 0, y: 0 },
+                Point { x: 0, y: 0 },
+                &large_mobility(),
+                vec![],
+                32
+            )
+            .unwrap()
         );
     }
 
@@ -2783,7 +2830,14 @@ mod test_movement_arrow {
         let want: Vec<Direction> = vec![Direction::East];
         assert_eq!(
             want,
-            calc_movement_path(Point { x: 1, y: 0 }, None, 16, &large_mobility()).unwrap()
+            find_movement_path(
+                Point { x: 0, y: 0 },
+                Point { x: 1, y: 0 },
+                &large_mobility(),
+                vec![],
+                32
+            )
+            .unwrap()
         );
     }
 
@@ -2801,7 +2855,14 @@ mod test_movement_arrow {
         ];
         assert_eq!(
             want,
-            calc_movement_path(Point { x: 8, y: 0 }, None, 16, &large_mobility()).unwrap()
+            find_movement_path(
+                Point { x: 0, y: 0 },
+                Point { x: 8, y: 0 },
+                &large_mobility(),
+                vec![],
+                32
+            )
+            .unwrap()
         );
     }
 
@@ -2819,7 +2880,14 @@ mod test_movement_arrow {
         ];
         assert_eq!(
             want,
-            calc_movement_path(Point { x: -8, y: 0 }, None, 16, &large_mobility()).unwrap()
+            find_movement_path(
+                Point { x: 8, y: 0 },
+                Point { x: 0, y: 0 },
+                &large_mobility(),
+                vec![],
+                32
+            )
+            .unwrap()
         );
     }
 
@@ -2837,7 +2905,14 @@ mod test_movement_arrow {
         ];
         assert_eq!(
             want,
-            calc_movement_path(Point { x: 0, y: -8 }, None, 16, &large_mobility()).unwrap()
+            find_movement_path(
+                Point { x: 0, y: 8 },
+                Point { x: 0, y: 0 },
+                &large_mobility(),
+                vec![],
+                32
+            )
+            .unwrap()
         );
     }
 
@@ -2855,24 +2930,37 @@ mod test_movement_arrow {
         ];
         assert_eq!(
             want,
-            calc_movement_path(Point { x: 0, y: 8 }, None, 16, &large_mobility()).unwrap()
+            find_movement_path(
+                Point { x: 0, y: 0 },
+                Point { x: 0, y: 8 },
+                &large_mobility(),
+                vec![],
+                32
+            )
+            .unwrap()
         );
     }
 
     #[test]
     fn path_can_go_diagonal() {
-        let want: Vec<Direction> = vec![Direction::South, Direction::East];
+        let want: Vec<Direction> = vec![Direction::East, Direction::South];
 
         assert_eq!(
             want,
-            calc_movement_path(Point { x: 1, y: 1 }, None, 16, &large_mobility()).unwrap()
+            find_movement_path(
+                Point { x: 0, y: 0 },
+                Point { x: 1, y: 1 },
+                &large_mobility(),
+                vec![],
+                32
+            )
+            .unwrap()
         );
     }
 
     #[test]
     fn path_can_go_diagonal_far() {
         let want: Vec<Direction> = vec![
-            Direction::North,
             Direction::East,
             Direction::North,
             Direction::East,
@@ -2880,11 +2968,19 @@ mod test_movement_arrow {
             Direction::East,
             Direction::North,
             Direction::East,
+            Direction::North,
         ];
 
         assert_eq!(
             want,
-            calc_movement_path(Point { x: 4, y: -4 }, None, 16, &large_mobility()).unwrap()
+            find_movement_path(
+                Point { x: 0, y: 4 },
+                Point { x: 4, y: 0 },
+                &large_mobility(),
+                vec![],
+                32
+            )
+            .unwrap()
         );
     }
 
@@ -2892,16 +2988,23 @@ mod test_movement_arrow {
     fn path_can_go_diagonal_irregular() {
         let want: Vec<Direction> = vec![
             Direction::West,
-            Direction::West,
             Direction::North,
             Direction::West,
             Direction::North,
+            Direction::West,
             Direction::West,
         ];
 
         assert_eq!(
             want,
-            calc_movement_path(Point { x: -4, y: -2 }, None, 16, &large_mobility()).unwrap()
+            find_movement_path(
+                Point { x: 4, y: 4 },
+                Point { x: 0, y: 2 },
+                &large_mobility(),
+                vec![],
+                32
+            )
+            .unwrap()
         );
     }
 
@@ -2910,21 +3013,22 @@ mod test_movement_arrow {
         let want: Vec<Direction> = vec![
             Direction::South,
             Direction::South,
-            Direction::South,
-            Direction::West,
-            Direction::West,
             Direction::West,
             Direction::South,
+            Direction::West,
+            Direction::South,
+            Direction::West,
             Direction::West,
         ];
 
         assert_eq!(
             want,
-            calc_movement_path(
-                Point { x: -4, y: 4 },
-                Some(&vec![Direction::South, Direction::South, Direction::South]),
-                16,
-                &large_mobility()
+            find_movement_path(
+                Point { x: 4, y: 0 },
+                Point { x: 0, y: 4 },
+                &large_mobility(),
+                vec![Direction::South, Direction::South],
+                32
             )
             .unwrap()
         );
@@ -3399,68 +3503,231 @@ mod test_movement_arrow {
         assert_eq!(want, got);
     }
 
-    #[test]
-    fn arrow_calc_that_needs_search_1() {
-        let mobility = mobility_from_string(
-            Point { x: 0, y: 1 },
-            r#"
-###
-U T
-"#,
-        );
-
-        let want: Vec<Direction> = vec![
-            Direction::North,
-            Direction::East,
-            Direction::East,
-            Direction::South,
-        ];
-
-        assert_eq!(
-            want,
-            calc_movement_path(Point { x: 2, y: 0 }, None, 32, &mobility).unwrap()
-        );
-    }
-
-    #[test]
-    fn arrow_calc_that_needs_search_1() {
-        let mobility = mobility_from_string(
-            Point { x: 0, y: 1 },
-            r#"
-###
-U T
-"#,
-        );
-
-        let want: Vec<Direction> = vec![
-            Direction::North,
-            Direction::East,
-            Direction::East,
-            Direction::South,
-        ];
-
-        assert_eq!(
-            want,
-            calc_movement_path(Point { x: 2, y: 0 }, None, 32, &mobility).unwrap()
-        );
-    }
-
     //     #[test]
-    //     fn basic_search_and_find_movement_path2_1() {
-    //         let mobility = mobility_string(
+    //     fn arrow_calc_that_needs_search_1() {
+    //         let mobility = mobility_from_string(
+    //             Point { x: 0, y: 1 },
     //             r#"
-    // ####
+    // ###
+    // U T
     // "#,
     //         );
     //
-    //         let want: Vec<Direction> = vec![Direction::East, Direction::East, Direction::East];
+    //         let want: Vec<Direction> = vec![
+    //             Direction::North,
+    //             Direction::East,
+    //             Direction::East,
+    //             Direction::South,
+    //         ];
     //
     //         assert_eq!(
     //             want,
-    //             search_and_find_movement_path2(Point { x: 0, y: 0 }, Point { x: 3, y: 0 },)
+    //             calc_movement_path(Point { x: 2, y: 0 }, None, 32, &mobility).unwrap()
     //         );
     //     }
 
+    //     #[test]
+    //     fn arrow_calc_that_needs_search_1() {
+    //         let mobility = mobility_from_string(
+    //             Point { x: 0, y: 1 },
+    //             r#"
+    // ###
+    // U T
+    // "#,
+    //         );
+    //
+    //         let want: Vec<Direction> = vec![
+    //             Direction::North,
+    //             Direction::East,
+    //             Direction::East,
+    //             Direction::South,
+    //         ];
+    //
+    //         assert_eq!(
+    //             want,
+    //             calc_movement_path(Point { x: 2, y: 0 }, None, 32, &mobility).unwrap()
+    //         );
+    //     }
+
+    #[test]
+    fn find_movement_path_east() {
+        let mobility = mobility_string(
+            r#"
+####
+"#,
+        );
+
+        let want: Vec<Direction> = vec![Direction::East, Direction::East, Direction::East];
+
+        assert_eq!(
+            want,
+            find_movement_path(
+                Point { x: 0, y: 0 },
+                Point { x: 3, y: 0 },
+                &mobility,
+                vec![],
+                32,
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn find_movement_path_south() {
+        let mobility = mobility_string(
+            r#"
+#
+#
+#
+#
+"#,
+        );
+
+        let want: Vec<Direction> = vec![Direction::South, Direction::South, Direction::South];
+
+        assert_eq!(
+            want,
+            find_movement_path(
+                Point { x: 0, y: 0 },
+                Point { x: 0, y: 3 },
+                &mobility,
+                vec![],
+                32
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn find_movement_path_east_existing_path() {
+        let mobility = mobility_string(
+            r#"
+####
+"#,
+        );
+
+        let want: Vec<Direction> = vec![Direction::East, Direction::East, Direction::East];
+
+        assert_eq!(
+            want,
+            find_movement_path(
+                Point { x: 0, y: 0 },
+                Point { x: 3, y: 0 },
+                &mobility,
+                vec![Direction::East],
+                32
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn find_movement_path_south_existing_path() {
+        let mobility = mobility_string(
+            r#"
+#
+#
+#
+#
+"#,
+        );
+
+        let want: Vec<Direction> = vec![Direction::South, Direction::South, Direction::South];
+
+        assert_eq!(
+            want,
+            find_movement_path(
+                Point { x: 0, y: 0 },
+                Point { x: 0, y: 3 },
+                &mobility,
+                vec![Direction::South],
+                32
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn find_movement_path_east_more_existing_path() {
+        let mobility = mobility_string(
+            r#"
+####
+"#,
+        );
+
+        let want: Vec<Direction> = vec![Direction::East, Direction::East, Direction::East];
+
+        assert_eq!(
+            want,
+            find_movement_path(
+                Point { x: 0, y: 0 },
+                Point { x: 3, y: 0 },
+                &mobility,
+                vec![Direction::East, Direction::East],
+                32
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn find_movement_path_south_more_existing_path() {
+        let mobility = mobility_string(
+            r#"
+#
+#
+#
+#
+"#,
+        );
+
+        let want: Vec<Direction> = vec![Direction::South, Direction::South, Direction::South];
+
+        assert_eq!(
+            want,
+            find_movement_path(
+                Point { x: 0, y: 0 },
+                Point { x: 0, y: 3 },
+                &mobility,
+                vec![Direction::South, Direction::South],
+                32
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn find_movement_path_south_east_more_existing_path() {
+        let mobility = mobility_string(
+            r#"
+#
+#
+#
+####
+"#,
+        );
+
+        let want: Vec<Direction> = vec![
+            Direction::South,
+            Direction::South,
+            Direction::South,
+            Direction::East,
+            Direction::East,
+            Direction::East,
+        ];
+
+        assert_eq!(
+            want,
+            find_movement_path(
+                Point { x: 0, y: 0 },
+                Point { x: 3, y: 3 },
+                &mobility,
+                vec![Direction::South, Direction::South],
+                32
+            )
+            .unwrap()
+        );
+    }
     //
     //
     //     #[test]

@@ -14,6 +14,19 @@ pub enum Direction {
 }
 
 impl Direction {
+    pub fn is_x_axis(&self) -> bool {
+        match self {
+            Direction::North => false,
+            Direction::South => false,
+            Direction::East => true,
+            Direction::West => true,
+        }
+    }
+
+    pub fn is_y_axis(&self) -> bool {
+        !self.is_x_axis()
+    }
+
     pub fn opposite(&self) -> Direction {
         match self {
             Direction::North => Direction::South,

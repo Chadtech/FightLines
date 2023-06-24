@@ -221,10 +221,17 @@ impl Games {
 
                     let mut game_init_flags = GameInitFlags::new(lobby, &mut init_flags_rng);
 
-                    let truck = unit::Model::new(
+                    let truck_1 = unit::Model::new(
                         Unit::Truck,
                         &red_player_id,
                         Place::on_map(6, 6, FacingDirection::Right),
+                        &TeamColor::Red,
+                    );
+
+                    let truck_2 = unit::Model::new(
+                        Unit::Truck,
+                        &red_player_id,
+                        Place::on_map(1, 1, FacingDirection::Right),
                         &TeamColor::Red,
                     );
 
@@ -236,7 +243,8 @@ impl Games {
                     );
 
                     game_init_flags.with_extra_units(&mut vec![
-                        (UnitId::test("red truck"), truck),
+                        (UnitId::test("red truck 1"), truck_1),
+                        (UnitId::test("red truck 2"), truck_2),
                         (UnitId::test("blue truck"), blue_truck),
                     ]);
 
