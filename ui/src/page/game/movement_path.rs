@@ -1,5 +1,6 @@
 use shared::direction::Direction;
 use shared::point::Point;
+use std::cmp::Ordering;
 use std::collections::HashSet;
 
 pub fn find(
@@ -42,40 +43,38 @@ pub fn find(
         .map(|(p, dir)| (p.clone(), Some(dir.clone())))
         .unwrap_or_else(|| (origin_pos.clone(), None));
 
+    let y_adjustments = |pos: &mut Point<i32>| match pos.y.cmp(&dest_pos.y) {
+        Ordering::Less => {
+            pos.y += 1;
+
+            Some(Direction::South)
+        }
+        Ordering::Equal => None,
+        Ordering::Greater => {
+            pos.y -= 1;
+
+            Some(Direction::North)
+        }
+    };
+
+    let x_adjustments = |pos: &mut Point<i32>| match pos.x.cmp(&dest_pos.x) {
+        Ordering::Less => {
+            pos.x += 1;
+
+            Some(Direction::East)
+        }
+        Ordering::Equal => None,
+        Ordering::Greater => {
+            pos.x -= 1;
+
+            Some(Direction::West)
+        }
+    };
+
     while pos != dest_pos && escape_with.is_none() {
         if path.len() > mobility_budget {
             path = vec![];
             pos = origin_pos.clone()
-        };
-
-        let y_adjustments = |pos: &mut Point<i32>| {
-            if pos.y > dest_pos.y {
-                pos.y -= 1;
-
-                return Some(Direction::North);
-            }
-
-            if pos.y < dest_pos.y {
-                pos.y += 1;
-
-                return Some(Direction::South);
-            }
-
-            None
-        };
-
-        let x_adjustments = |pos: &mut Point<i32>| {
-            if pos.x > dest_pos.x {
-                pos.x -= 1;
-
-                return Some(Direction::West);
-            } else if pos.x < dest_pos.x {
-                pos.x += 1;
-
-                return Some(Direction::East);
-            }
-
-            None
         };
 
         let maybe_dir: Option<Direction> =
@@ -95,7 +94,7 @@ pub fn find(
         if mobility.contains(&pos) {
             path.push((pos.clone(), dir));
         } else {
-            escape_with = Some(search_and_find_movement_path2(
+            escape_with = Some(search_and_find_movement_path(
                 origin_pos.clone(),
                 dest_pos.clone(),
                 mobility,
@@ -104,14 +103,58 @@ pub fn find(
         }
     }
 
-    Ok(escape_with.unwrap_or_else(|| {
-        path.iter()
-            .map(|(_, dir)| dir.clone())
-            .collect::<Vec<Direction>>()
-    }))
+    let filtered_for_double_backs = {
+        let mut path = escape_with.unwrap_or_else(|| {
+            path.iter()
+                .map(|(_, dir)| dir.clone())
+                .collect::<Vec<Direction>>()
+        });
+
+        let mut path_peek = path.iter().enumerate().clone().peekable();
+
+        let mut deletable_steps = vec![];
+
+        while let Some((index, step)) = path_peek.next() {
+            if let Some((_, next)) = path_peek.peek() {
+                match (step, next) {
+                    (Direction::South, Direction::North) => {
+                        deletable_steps.push(index);
+                        deletable_steps.push(index + 1);
+                        path_peek.next();
+                    }
+                    (Direction::North, Direction::South) => {
+                        deletable_steps.push(index);
+                        deletable_steps.push(index + 1);
+                        path_peek.next();
+                    }
+                    (Direction::East, Direction::West) => {
+                        deletable_steps.push(index);
+                        deletable_steps.push(index + 1);
+                        path_peek.next();
+                    }
+                    (Direction::West, Direction::East) => {
+                        deletable_steps.push(index);
+                        deletable_steps.push(index + 1);
+                        path_peek.next();
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        deletable_steps.reverse();
+
+        for step in deletable_steps {
+            path.remove(step);
+        }
+
+        path
+    };
+
+    Ok(filtered_for_double_backs)
 }
 
-fn search_and_find_movement_path2(
+fn search_and_find_movement_path(
     origin_pos: Point<i32>,
     dest_pos: Point<i32>,
     mobility: &HashSet<Point<i32>>,
@@ -212,7 +255,7 @@ fn search_and_find_movement_path2(
 #[cfg(test)]
 mod test_movement_arrow {
     use crate::game::Arrow;
-    use crate::page::game::movement_path::{find, search_and_find_movement_path2};
+    use crate::page::game::movement_path::{find, search_and_find_movement_path};
     use pretty_assertions::assert_eq;
     use shared::direction::Direction;
     use shared::path::path_with_arrows;
@@ -618,7 +661,7 @@ mod test_movement_arrow {
             mobility.insert(Point { x: 0, y });
         }
 
-        let got = search_and_find_movement_path2(
+        let got = search_and_find_movement_path(
             Point { x: 0, y: 4 },
             Point { x: 0, y: 0 },
             &mobility,
@@ -644,7 +687,7 @@ mod test_movement_arrow {
             mobility.insert(Point { x, y: 0 });
         }
 
-        let got = search_and_find_movement_path2(
+        let got = search_and_find_movement_path(
             Point { x: 4, y: 0 },
             Point { x: 0, y: 0 },
             &mobility,
@@ -672,7 +715,7 @@ mod test_movement_arrow {
             }
         }
 
-        let got = search_and_find_movement_path2(
+        let got = search_and_find_movement_path(
             Point { x: 4, y: 4 },
             Point { x: 0, y: 0 },
             &mobility,
@@ -706,7 +749,7 @@ mod test_movement_arrow {
             mobility.insert(Point { x, y: 4 });
         }
 
-        let got = search_and_find_movement_path2(
+        let got = search_and_find_movement_path(
             Point { x: 4, y: 4 },
             Point { x: 0, y: 0 },
             &mobility,
@@ -740,7 +783,7 @@ mod test_movement_arrow {
             mobility.insert(Point { x, y: 0 });
         }
 
-        let got = search_and_find_movement_path2(
+        let got = search_and_find_movement_path(
             Point { x: 4, y: 4 },
             Point { x: 0, y: 0 },
             &mobility,
@@ -771,7 +814,7 @@ mod test_movement_arrow {
 "#,
         );
 
-        let got = search_and_find_movement_path2(
+        let got = search_and_find_movement_path(
             Point { x: 2, y: 1 },
             Point { x: 0, y: 1 },
             &mobility,
@@ -801,7 +844,7 @@ mod test_movement_arrow {
 "#,
         );
 
-        let got = search_and_find_movement_path2(
+        let got = search_and_find_movement_path(
             Point { x: 2, y: 1 },
             Point { x: 0, y: 4 },
             &mobility,
@@ -834,7 +877,7 @@ mod test_movement_arrow {
 "#,
         );
 
-        let got = search_and_find_movement_path2(
+        let got = search_and_find_movement_path(
             Point { x: 2, y: 1 },
             Point { x: 1, y: 4 },
             &mobility,
@@ -868,7 +911,7 @@ mod test_movement_arrow {
 "#,
         );
 
-        let got = search_and_find_movement_path2(
+        let got = search_and_find_movement_path(
             Point { x: 2, y: 1 },
             Point { x: 2, y: 3 },
             &mobility,
@@ -900,7 +943,7 @@ mod test_movement_arrow {
 "#,
         );
 
-        let got = search_and_find_movement_path2(
+        let got = search_and_find_movement_path(
             Point { x: 2, y: 0 },
             Point { x: 0, y: 0 },
             &mobility,

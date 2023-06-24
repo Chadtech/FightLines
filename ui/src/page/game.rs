@@ -35,7 +35,6 @@ use shared::arrow::Arrow;
 use shared::direction::Direction;
 use shared::facing_direction::FacingDirection;
 use shared::frame_count::FrameCount;
-use shared::game::outcome::Outcome;
 use shared::game::{calculate_player_visibility, mobility, unit_index, Game, GameId, Turn};
 use shared::id::Id;
 use shared::located::Located;
@@ -327,7 +326,7 @@ pub fn init(
     let moves: Vec<Action> = match game.get_turn(global.viewer_id()) {
         Ok(turn) => match turn {
             Turn::Waiting => Vec::new(),
-            Turn::Turn { moves } => game_moves_to_page_actions(moves),
+            Turn::Turn { moves } => Action::from_game_actions(moves),
         },
         Err(error) => {
             global.toast(
@@ -907,7 +906,10 @@ fn refetch_game(
             Stage::Waiting { indices } => {
                 let prev_outcomes = fetched_game.clone().prev_outcomes;
 
-                let animations = outcomes_to_animations(prev_outcomes);
+                let animations = prev_outcomes
+                    .into_iter()
+                    .flat_map(Animation::from_outcome)
+                    .collect::<Vec<Animation>>();
 
                 let visibility =
                     calculate_player_visibility(viewer_id, &model.game.map, &indices.by_id);
@@ -1889,29 +1891,24 @@ fn map_canvas_cell(model: &Model) -> Cell<Msg> {
 }
 
 fn game_canvas(model: &Model, r: &ElRef<HtmlCanvasElement>, html_id: String) -> Node<Msg> {
-    canvas![
-        C![Style::Absolute.css_classes().concat()],
-        attrs! {
-            At::Width => px_u16(model.game_pixel_size.width).as_str(),
-            At::Height => px_u16(model.game_pixel_size.height).as_str()
-            At::Id => html_id.as_str()
-        },
-        style! {
-            St::Left => px_i16(model.game_pos.x).as_str(),
-            St::Top => px_i16(model.game_pos.y).as_str(),
-            St::Width => px_u16(model.game_pixel_size.width * 2).as_str(),
-            St::Height => px_u16(model.game_pixel_size.height * 2).as_str()
-        },
-        el_ref(r)
-    ]
+    canvas_proto(model, r, html_id, 1)
 }
 
 fn mini_game_canvas(model: &Model, r: &ElRef<HtmlCanvasElement>, html_id: String) -> Node<Msg> {
+    canvas_proto(model, r, html_id, 2)
+}
+
+fn canvas_proto(
+    model: &Model,
+    r: &ElRef<HtmlCanvasElement>,
+    html_id: String,
+    scale: u16,
+) -> Node<Msg> {
     canvas![
         C![Style::Absolute.css_classes().concat()],
         attrs! {
-            At::Width => px_u16(model.game_pixel_size.width * 2).as_str(),
-            At::Height => px_u16(model.game_pixel_size.height * 2).as_str()
+            At::Width => px_u16(model.game_pixel_size.width * scale).as_str(),
+            At::Height => px_u16(model.game_pixel_size.height * scale).as_str()
             At::Id => html_id.as_str()
         },
         style! {
@@ -2145,81 +2142,4 @@ fn snackbar_view(model: &Model) -> Cell<Msg> {
             )],
         )
     }
-}
-
-fn outcomes_to_animations(outcomes: Vec<Outcome>) -> Vec<Animation> {
-    outcomes
-        .into_iter()
-        .flat_map(Animation::from_outcome)
-        .collect::<Vec<Animation>>()
-}
-
-fn game_moves_to_page_actions(moves: Vec<game::action::Action>) -> Vec<Action> {
-    let mut moves_ret = Vec::new();
-
-    for action in moves {
-        match action {
-            game::action::Action::Travel {
-                unit_id,
-                path,
-                dismounted_from,
-            } => {
-                moves_ret.push(Action::TraveledTo {
-                    unit_id: unit_id.clone(),
-                    path: path.clone(),
-                    arrows: path.with_arrows(),
-                    dismounted_from: dismounted_from.clone(),
-                });
-            }
-            game::action::Action::LoadInto {
-                unit_id,
-                load_into,
-                path,
-            } => moves_ret.push(Action::LoadInto {
-                unit_id: unit_id.clone(),
-                load_into: load_into.clone(),
-                arrows: path.with_arrows(),
-                path: path.clone(),
-            }),
-            game::action::Action::Batch(more_moves) => {
-                let mut more_moves_ret = game_moves_to_page_actions(more_moves);
-                moves_ret.append(&mut more_moves_ret);
-            }
-            game::action::Action::PickUp {
-                unit_id,
-                path,
-                cargo_id,
-                ..
-            } => {
-                moves_ret.push(Action::PickUp {
-                    unit_id: unit_id.clone(),
-                    cargo_id: cargo_id.clone(),
-                    path: path.clone(),
-                    arrows: path.with_arrows(),
-                });
-            }
-            game::action::Action::DropOff {
-                cargo_unit_loc: loc,
-                transport_id,
-            } => moves_ret.push(Action::DropOff {
-                cargo_unit_loc: loc.clone(),
-                transport_id: transport_id.clone(),
-            }),
-            game::action::Action::Replenish {
-                replenishing_unit_id,
-                units,
-                depleted_supply_crates,
-                path,
-                ..
-            } => moves_ret.push(Action::Replenish {
-                replenishing_unit_id,
-                units: units.clone(),
-                depleted_supply_crates,
-                path: path.clone(),
-                arrows: path.with_arrows(),
-            }),
-        }
-    }
-
-    moves_ret
 }
