@@ -88,6 +88,7 @@ pub enum RideOption {
     LoadInto { unit_id: UnitId, unit_label: String },
     PickUp { unit_id: UnitId, unit_label: String },
     Replenish { only_self: bool },
+    Attack,
 }
 
 impl RideOption {
@@ -122,6 +123,7 @@ impl RideOption {
                     "replenish units".to_string()
                 }
             }
+            RideOption::Attack => "attack".to_string(),
         }
     }
 }
@@ -132,6 +134,7 @@ pub enum ClickMsg {
     PickUp(UnitId),
     MoveTo,
     Replenish,
+    Attack,
 }
 
 ///////////////////////////////////////////////////////////////
@@ -163,6 +166,7 @@ pub fn flyout_view(model: &Model, game_screen_pos: &Point<i16>) -> Cell<ClickMsg
                     RideOption::LoadInto { unit_id, .. } => ClickMsg::LoadInto(unit_id.clone()),
                     RideOption::PickUp { unit_id, .. } => ClickMsg::PickUp(unit_id.clone()),
                     RideOption::Replenish { .. } => ClickMsg::Replenish,
+                    RideOption::Attack => ClickMsg::Attack,
                 };
 
                 let button = Button::simple(ride_option.label().as_str())

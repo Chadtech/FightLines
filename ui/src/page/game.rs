@@ -13,6 +13,7 @@ use crate::assets::MiscSpriteRow;
 use crate::error::Error;
 use crate::page::game::action::Action;
 use crate::page::game::animation::Animation;
+use crate::page::game::mode::moving::RideOption;
 use crate::page::game::mode::Mode;
 use crate::page::game::replenishment::Replenishment;
 use crate::page::game::stage::animating_moves;
@@ -363,7 +364,7 @@ pub fn init(
                     cargo_unit_loc: loc,
                     ..
                 } => {
-                    let (_, cargo_unit_id) = loc.value.clone();
+                    let cargo_unit_id = loc.value.1.clone();
 
                     moves_index_ret.insert(cargo_unit_id, action.clone());
                 }
@@ -372,6 +373,9 @@ pub fn init(
                     ..
                 } => {
                     moves_index_ret.insert(replenishing_unit_id.clone(), action.clone());
+                }
+                Action::Attack { unit_id, .. } => {
+                    moves_index_ret.insert(unit_id.clone(), action.clone());
                 }
             }
         }
@@ -800,14 +804,14 @@ fn handle_moving_flyout_msg(
 
     let unit_id = &sub_model.unit_id.clone();
 
+    let arrows = &sub_model.arrows.clone();
+
+    let path = sub_model
+        .path(unit_id, &model.game.indexes)
+        .map_err(|err_msg| Error::new(error_title.clone(), err_msg))?;
+
     match msg {
         mode::moving::ClickMsg::PickUp(cargo_unit_id) => {
-            let arrows = &sub_model.arrows.clone();
-
-            let path = sub_model
-                .path(unit_id, &model.game.indexes)
-                .map_err(|err_msg| Error::new(error_title, err_msg))?;
-
             model.moves_index_by_unit.insert(
                 sub_model.unit_id.clone(),
                 Action::PickUp {
@@ -821,12 +825,6 @@ fn handle_moving_flyout_msg(
             model.clear_mode_and_sidebar()
         }
         mode::moving::ClickMsg::LoadInto(rideable_unit_id) => {
-            let arrows = &sub_model.arrows.clone();
-
-            let path = sub_model
-                .path(unit_id, &model.game.indexes)
-                .map_err(|err_msg| Error::new(error_title, err_msg))?;
-
             model.moves_index_by_unit.insert(
                 sub_model.unit_id.clone(),
                 Action::LoadInto {
@@ -839,20 +837,8 @@ fn handle_moving_flyout_msg(
 
             model.clear_mode_and_sidebar()
         }
-        mode::moving::ClickMsg::MoveTo => {
-            let arrows = &sub_model.arrows.clone();
-
-            let path = sub_model
-                .path(unit_id, &model.game.indexes)
-                .map_err(|err_msg| Error::new(error_title, err_msg))?;
-
-            model.travel_unit(unit_id, path, arrows)
-        }
+        mode::moving::ClickMsg::MoveTo => model.travel_unit(unit_id, path, arrows),
         mode::moving::ClickMsg::Replenish => {
-            let path = sub_model
-                .path(unit_id, &model.game.indexes)
-                .map_err(|err_msg| Error::new(error_title.clone(), err_msg))?;
-
             let replenishment_pos = match path.last_pos() {
                 Some(p) => p,
                 None => {
@@ -870,8 +856,6 @@ fn handle_moving_flyout_msg(
                 &model.game.indexes,
             ) {
                 Ok(replenishment) => {
-                    let arrows = &sub_model.arrows.clone();
-
                     model.moves_index_by_unit.insert(
                         sub_model.unit_id.clone(),
                         Action::Replenish {
@@ -887,6 +871,18 @@ fn handle_moving_flyout_msg(
                 }
                 Err(err_msg) => Err(Error::new(error_title, err_msg)),
             }?;
+
+            model.clear_mode_and_sidebar()
+        }
+        mode::moving::ClickMsg::Attack => {
+            model.moves_index_by_unit.insert(
+                sub_model.unit_id.clone(),
+                Action::Attack {
+                    unit_id: unit_id.clone(),
+                    arrows: arrows.clone(),
+                    path,
+                },
+            );
 
             model.clear_mode_and_sidebar()
         }
@@ -936,7 +932,7 @@ fn refetch_game(
 fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl Orders<Msg>) {
     model.dialog = None;
 
-    let mut req_moves: Vec<game::action::Action> = model
+    let req_moves: Vec<game::action::Action> = model
         .moves_index_by_unit
         .iter()
         .map(|(unit_id, action)| match action {
@@ -980,11 +976,12 @@ fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl 
                 depleted_supply_crates: depleted_supply_crates.clone(),
                 path: path.clone(),
             },
+            Action::Attack { unit_id, path, .. } => game::action::Action::Attack {
+                unit_id: unit_id.clone(),
+                path: path.clone(),
+            },
         })
         .collect();
-
-    let mut rng = global.new_rand_gen();
-    game::action::order(&mut rng, &mut req_moves);
 
     let req_changes: Vec<game::Change> = model
         .unit_changes
@@ -1172,6 +1169,10 @@ fn handle_click_on_screen_when_move_mode(
                         .unwrap_or(true),
                 })
             }
+        }
+
+        if unit_model.unit.can_attack() {
+            ride_options.push(RideOption::Attack);
         }
 
         if ride_options.is_empty() {
@@ -1561,6 +1562,9 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                     }
                     Action::DropOff { .. } => {}
                     Action::Replenish { arrows, .. } => {
+                        draw_arrows(&ctx, model, game_pos, arrows);
+                    }
+                    Action::Attack { arrows, .. } => {
                         draw_arrows(&ctx, model, game_pos, arrows);
                     }
                 };

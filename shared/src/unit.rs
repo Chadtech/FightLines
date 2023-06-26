@@ -159,6 +159,15 @@ impl Unit {
         }
     }
 
+    pub fn can_attack(&self) -> bool {
+        match self {
+            Unit::Infantry => true,
+            Unit::Tank => true,
+            Unit::Truck => false,
+            Unit::SupplyCrate => false,
+        }
+    }
+
     pub fn can_pick_up_supply_crates(&self) -> bool {
         match self {
             Unit::Infantry => false,

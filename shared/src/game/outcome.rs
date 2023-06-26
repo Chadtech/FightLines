@@ -126,5 +126,8 @@ fn outcomes_from_action(action: &Action) -> Vec<Outcome> {
                 path: path.clone(),
             }]
         }
+        Action::Attack { .. } => {
+            todo!("Removing this after Events are implemented")
+        }
     }
 }

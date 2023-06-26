@@ -37,6 +37,11 @@ pub enum Action {
         path: Path,
         arrows: Vec<(Direction, Arrow)>,
     },
+    Attack {
+        unit_id: UnitId,
+        path: Path,
+        arrows: Vec<(Direction, Arrow)>,
+    },
 }
 
 impl Action {
@@ -101,6 +106,11 @@ impl Action {
                     replenishing_unit_id,
                     units: units.clone(),
                     depleted_supply_crates,
+                    path: path.clone(),
+                    arrows: path.with_arrows(),
+                }),
+                game::action::Action::Attack { unit_id, path } => moves_ret.push(Action::Attack {
+                    unit_id: unit_id.clone(),
                     path: path.clone(),
                     arrows: path.with_arrows(),
                 }),

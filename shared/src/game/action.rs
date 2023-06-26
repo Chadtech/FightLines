@@ -33,18 +33,23 @@ pub enum Action {
         depleted_supply_crates: Vec<(UnitId, i16)>,
         path: Path,
     },
+    Attack {
+        unit_id: UnitId,
+        path: Path,
+    },
     Batch(Vec<Action>),
 }
 
 impl Action {
     pub fn to_priority(&self) -> u8 {
         match self {
-            Action::Travel { .. } => 1,
-            Action::LoadInto { .. } => 1,
-            Action::PickUp { .. } => 1,
-            Action::DropOff { .. } => 1,
+            Action::Travel { .. } => 10,
+            Action::LoadInto { .. } => 10,
+            Action::PickUp { .. } => 10,
+            Action::DropOff { .. } => 10,
             Action::Replenish { .. } => 0,
-            Action::Batch(_) => 1,
+            Action::Batch(_) => 10,
+            Action::Attack { .. } => 10,
         }
     }
 }
@@ -104,6 +109,7 @@ pub fn order(rng: &mut RandGen, actions: &mut Vec<Action>) {
                             Action::PickUp { .. } => {}
                             Action::DropOff { .. } => {}
                             Action::Replenish { .. } => {}
+                            Action::Attack { .. } => {}
                         }
 
                         j += 1;
@@ -140,6 +146,7 @@ pub fn order(rng: &mut RandGen, actions: &mut Vec<Action>) {
                         Action::PickUp { .. } => {}
                         Action::DropOff { .. } => {}
                         Action::Replenish { .. } => {}
+                        Action::Attack { .. } => {}
                     }
 
                     j += 1;
@@ -149,6 +156,7 @@ pub fn order(rng: &mut RandGen, actions: &mut Vec<Action>) {
             Action::PickUp { .. } => {}
             Action::DropOff { .. } => {}
             Action::Replenish { .. } => {}
+            Action::Attack { .. } => {}
         }
 
         i += 1;

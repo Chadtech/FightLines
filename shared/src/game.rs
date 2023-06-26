@@ -1,5 +1,6 @@
 pub mod action;
 pub mod day;
+pub mod event;
 pub mod mobility;
 pub mod outcome;
 pub mod unit_index;
@@ -293,9 +294,6 @@ impl Game {
         self.turns_changes.append(changes);
     }
 
-    pub fn outcomes(&mut self, player_moves: &mut Vec<(Id, Vec<Action>)>) -> Vec<Outcome> {
-        vec![self.consume_supplies(), Outcome::from_actions(player_moves)].concat()
-    }
     pub fn advance_turn(&mut self, seed: RandSeed) -> Result<bool, String> {
         let mut rng = RandGen::from_seed(seed);
         let mut player_moves: Vec<(Id, Vec<Action>)> = match &mut self.all_players_turns() {
@@ -325,7 +323,11 @@ impl Game {
             }
         };
 
-        let outcomes = self.outcomes(&mut player_moves);
+        let outcomes = vec![
+            self.consume_supplies(),
+            Outcome::from_actions(&mut player_moves),
+        ]
+        .concat();
 
         self.turn_number += 1;
         self.process_changes();
