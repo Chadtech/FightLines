@@ -37,8 +37,8 @@ pub enum Event {
 pub fn process_turn_into_events(
     rand_seed: RandSeed,
     player_moves: &mut Vec<(Id, Vec<Action>)>,
-    indexes: unit_index::Indexes,
-) -> Vec<Event> {
+    indexes: &mut unit_index::Indexes,
+) -> Result<Vec<Event>, String> {
     let mut rng = RandGen::from_seed(rand_seed);
 
     // These actions might come in orders that don't make sense,
@@ -73,10 +73,48 @@ pub fn process_turn_into_events(
 
     let mut events = baseline_supply_events(indexes);
 
-    events
+    while let Some(event) = events.first() {
+        match event {
+            Event::ConsumedBaselineSupplies { unit_id, cost } => {
+                if let Some(unit_model) = indexes.by_id.get_mut(&unit_id) {
+                    let new_supplies = unit_model.supplies - (cost.ceil() as i16);
+
+                    if new_supplies <= 0 {
+                        let _ = indexes.perish(&unit_id);
+                    } else {
+                        unit_model.supplies = new_supplies;
+                    }
+                }
+            }
+        }
+
+        events.remove(0);
+
+        if let Some((action, rest)) = ordered_actions.split_first() {
+            match action {
+                Action::Travel { path, .. } => {
+                    let mut i = 1;
+
+                    while i < ordered_actions.len() {
+                        let next_action = ordered_actions[i];
+
+                        i += 1
+                    }
+                }
+                Action::LoadInto { .. } => {}
+                Action::PickUp { .. } => {}
+                Action::DropOff { .. } => {}
+                Action::Replenish { .. } => {}
+                Action::Attack { .. } => {}
+                Action::Batch(_) => {}
+            }
+        }
+    }
+
+    Ok(events)
 }
 
-fn baseline_supply_events(indexes: unit_index::Indexes) -> Vec<Event> {
+fn baseline_supply_events(indexes: &unit_index::Indexes) -> Vec<Event> {
     let mut events = vec![];
 
     for (unit_id, unit_model) in indexes.by_id.iter() {

@@ -26,6 +26,18 @@ impl Step {
 }
 
 impl Path {
+    pub fn crosses(&self, other: &Path) -> Option<Located<()>> {
+        for self_step in self.steps.iter() {
+            for other_step in other.steps.iter() {
+                if self_step.is_same_pos_as(&other_step) {
+                    return Some(self_step.to_unit());
+                }
+            }
+        }
+
+        return None;
+    }
+
     pub fn shift_first(&mut self) -> Option<Located<Direction>> {
         if !self.steps.is_empty() {
             let removed = self.steps.remove(0);
@@ -156,4 +168,79 @@ pub fn path_with_arrows(path: &[Direction]) -> Vec<(Direction, Arrow)> {
     }
 
     arrows
+}
+
+#[cfg(test)]
+mod test_path {
+    use crate::direction::Direction;
+    use crate::game::action::{order, unbatch, Action};
+    use crate::located;
+    use crate::located::Located;
+    use crate::path::{Path, Step};
+    use crate::rng::RandGen;
+    use crate::tile::Tile;
+    use crate::unit::UnitId;
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn crosses() {
+        let path_1 = Path::from_directions_test_only(
+            &located::unit(2, 0),
+            &vec![
+                Direction::South,
+                Direction::South,
+                Direction::South,
+                Direction::South,
+                Direction::South,
+            ],
+        );
+
+        let path_2 = Path::from_directions_test_only(
+            &located::unit(0, 2),
+            &vec![
+                Direction::East,
+                Direction::East,
+                Direction::East,
+                Direction::East,
+                Direction::East,
+            ],
+        );
+
+        let got = path_1.crosses(&path_2);
+
+        let want = Some(located::unit(2, 2));
+
+        assert_eq!(want, got);
+    }
+
+    #[test]
+    fn do_notcross() {
+        let path_1 = Path::from_directions_test_only(
+            &located::unit(2, 0),
+            &vec![
+                Direction::South,
+                Direction::South,
+                Direction::South,
+                Direction::South,
+                Direction::South,
+            ],
+        );
+
+        let path_2 = Path::from_directions_test_only(
+            &located::unit(4, 0),
+            &vec![
+                Direction::South,
+                Direction::South,
+                Direction::South,
+                Direction::South,
+                Direction::South,
+            ],
+        );
+
+        let got = path_1.crosses(&path_2);
+
+        let want = None;
+
+        assert_eq!(want, got);
+    }
 }

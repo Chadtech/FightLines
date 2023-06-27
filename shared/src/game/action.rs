@@ -33,11 +33,14 @@ pub enum Action {
         depleted_supply_crates: Vec<(UnitId, i16)>,
         path: Path,
     },
-    Attack {
-        unit_id: UnitId,
-        path: Path,
-    },
+    Attack(Attack),
     Batch(Vec<Action>),
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct Attack {
+    pub unit_id: UnitId,
+    pub path: Path,
 }
 
 impl Action {
@@ -48,8 +51,36 @@ impl Action {
             Action::PickUp { .. } => 10,
             Action::DropOff { .. } => 10,
             Action::Replenish { .. } => 0,
-            Action::Batch(_) => 10,
             Action::Attack { .. } => 10,
+            Action::Batch(_) => 10,
+        }
+    }
+
+    pub fn first_crossing_path<'a>(
+        path: &Path,
+        actions: &'a Vec<Action>,
+    ) -> Option<(usize, &'a Attack)> {
+        let mut i = 0;
+
+        while i < actions.len() {
+            let action = actions.get(i).unwrap();
+
+            if let Action::Attack(attack) = action {
+                if path.crosses(&attack.path) {
+                    return Some((i, attack));
+                }
+            }
+
+            i += 1
+        }
+
+        None
+    }
+
+    pub fn attacking_path(&self) -> Option<&Path> {
+        match self {
+            Action::Attack { path, .. } => Some(path),
+            _ => None,
         }
     }
 }
@@ -63,6 +94,26 @@ impl Ord for Action {
 impl PartialOrd for Action {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+pub fn unbatch(actions: &mut Vec<Action>) {
+    let mut i = 0;
+
+    while i < actions.len() {
+        match actions.get(i).unwrap() {
+            Action::Batch(batched_actions) => {
+                let batched_actions = batched_actions.clone();
+                let num_batched_actions = batched_actions.len();
+
+                actions.splice(i..(i + 1), batched_actions.into_iter());
+
+                i += num_batched_actions;
+            }
+            _ => {
+                i += 1;
+            }
+        }
     }
 }
 
@@ -178,7 +229,7 @@ pub fn order(rng: &mut RandGen, actions: &mut Vec<Action>) {
 #[cfg(test)]
 mod test_game_actions {
     use crate::direction::Direction;
-    use crate::game::action::{order, Action};
+    use crate::game::action::{order, unbatch, Action};
     use crate::located;
     use crate::path::Path;
     use crate::rng::RandGen;
@@ -324,6 +375,46 @@ mod test_game_actions {
                 ])
             ]
         )
+    }
+
+    #[test]
+    fn unbatching_works() {
+        let action_1 = Action::Travel {
+            unit_id: UnitId::test("A"),
+            path: Path::from_directions_test_only(&located::unit(1, 1), &vec![Direction::North]),
+            dismounted_from: None,
+        };
+
+        let action_2 = Action::Travel {
+            unit_id: UnitId::test("B"),
+            path: Path::from_directions_test_only(&located::unit(1, 1), &vec![Direction::North]),
+            dismounted_from: None,
+        };
+
+        let action_3 = Action::Travel {
+            unit_id: UnitId::test("C"),
+            path: Path::from_directions_test_only(&located::unit(1, 1), &vec![Direction::North]),
+            dismounted_from: None,
+        };
+
+        let action_4 = Action::Travel {
+            unit_id: UnitId::test("D"),
+            path: Path::from_directions_test_only(&located::unit(1, 1), &vec![Direction::North]),
+            dismounted_from: None,
+        };
+
+        let want = vec![
+            action_1.clone(),
+            action_2.clone(),
+            action_3.clone(),
+            action_4.clone(),
+        ];
+
+        let mut got = vec![action_1, Action::Batch(vec![action_2, action_3]), action_4];
+
+        unbatch(&mut got);
+
+        assert_eq!(got.clone(), want);
     }
 
     #[test]

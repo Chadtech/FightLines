@@ -41,6 +41,25 @@ impl Indexes {
         }
     }
 
+    pub fn perish(&mut self, unit_id: &UnitId) -> Result<(), String> {
+        self.by_id.delete(unit_id);
+
+        if self.by_transport.contains(&unit_id) {
+            let facing_dir_loc = match self.position_of_unit_or_transport(&unit_id) {
+                Ok(l) => l,
+                Err(msg) => {
+                    return Err(msg);
+                }
+            };
+
+            for (_, cargo_model) in self.by_transport.get_mut(&unit_id).unwrap() {
+                cargo_model.place = Place::OnMap(facing_dir_loc.clone());
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn position_of_unit_or_transport(
         &self,
         unit_id: &UnitId,
