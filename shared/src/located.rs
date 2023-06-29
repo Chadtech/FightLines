@@ -31,6 +31,13 @@ impl<T> Located<T> {
         self.x == other.x && self.y == other.y
     }
 
+    pub fn distance_from<U>(&self, other: &Located<U>) -> u16 {
+        let dx = ((self.x as i16) - (other.x as i16)).unsigned_abs();
+        let dy = ((self.y as i16) - (other.y as i16)).unsigned_abs();
+
+        dx + dy
+    }
+
     pub fn to_unit(&self) -> Located<()> {
         unit(self.x, self.y)
     }

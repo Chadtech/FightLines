@@ -1,7 +1,7 @@
 use crate::arrow::Arrow;
 use crate::direction::Direction;
 use crate::located::Located;
-use crate::tile::Tile;
+use crate::map::Map;
 use crate::unit::Unit;
 use serde::{Deserialize, Serialize};
 
@@ -13,15 +13,11 @@ pub struct Path {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 struct Step {
     pub direction: Direction,
-    pub tile: Tile,
 }
 
-impl Step {
-    pub fn from_dir_test_only(dir: Direction) -> Step {
-        Step {
-            direction: dir,
-            tile: Tile::GrassPlain,
-        }
+impl From<Direction> for Step {
+    fn from(dir: Direction) -> Self {
+        Step { direction: dir }
     }
 }
 
@@ -29,13 +25,13 @@ impl Path {
     pub fn crosses(&self, other: &Path) -> Option<Located<()>> {
         for self_step in self.steps.iter() {
             for other_step in other.steps.iter() {
-                if self_step.is_same_pos_as(&other_step) {
+                if self_step.is_same_pos_as(other_step) {
                     return Some(self_step.to_unit());
                 }
             }
         }
 
-        return None;
+        None
     }
 
     pub fn shift_first(&mut self) -> Option<Located<Direction>> {
@@ -47,11 +43,11 @@ impl Path {
             None
         }
     }
-    pub fn supply_cost(&self, unit: &Unit) -> i16 {
+    pub fn supply_cost(&self, map: &Map, unit: &Unit) -> i16 {
         let mut cost: i16 = 0;
 
         for loc_step in self.steps.iter() {
-            let tile = &loc_step.value.tile;
+            let tile = map.get_tile(&loc_step.to_unit());
 
             cost += tile.travel_supply_cost(unit);
         }
@@ -74,7 +70,7 @@ impl Path {
         path_with_arrows(self.to_directions().as_slice())
     }
 
-    pub fn from_directions_test_only<T>(loc: &Located<T>, dirs: &Vec<Direction>) -> Path {
+    pub fn from_directions<T>(loc: &Located<T>, dirs: &Vec<Direction>) -> Path {
         let mut path: Vec<Located<Step>> = Vec::new();
 
         let mut pos_x = loc.x;
@@ -84,7 +80,9 @@ impl Path {
             path.push(Located {
                 x: pos_x,
                 y: pos_y,
-                value: Step::from_dir_test_only(dir.clone()),
+                value: Step {
+                    direction: dir.clone(),
+                },
             });
         }
 
@@ -94,11 +92,17 @@ impl Path {
             path.push(Located {
                 x: pos_x,
                 y: pos_y,
-                value: Step::from_dir_test_only(dir.clone()),
+                value: Step {
+                    direction: dir.clone(),
+                },
             });
         }
 
         Path { steps: path }
+    }
+
+    pub fn from_directions_test_only<T>(loc: &Located<T>, dirs: &Vec<Direction>) -> Path {
+        Path::from_directions(loc, dirs)
     }
 }
 

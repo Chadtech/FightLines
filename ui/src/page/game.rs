@@ -804,7 +804,11 @@ fn handle_moving_flyout_msg(
 
     let unit_id = &sub_model.unit_id.clone();
 
-    let arrows = &sub_model.arrows.clone();
+    let arrows = &sub_model
+        .arrows
+        .iter()
+        .map(|step| (step.direction.clone(), step.arrow.clone()))
+        .collect::<Vec<(Direction, Arrow)>>();
 
     let path = sub_model
         .path(unit_id, &model.game.indexes)
@@ -976,10 +980,12 @@ fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl 
                 depleted_supply_crates: depleted_supply_crates.clone(),
                 path: path.clone(),
             },
-            Action::Attack { unit_id, path, .. } => game::action::Action::Attack {
-                unit_id: unit_id.clone(),
-                path: path.clone(),
-            },
+            Action::Attack { unit_id, path, .. } => {
+                game::action::Action::Attack(game::action::Attack {
+                    unit_id: unit_id.clone(),
+                    path: path.clone(),
+                })
+            }
         })
         .collect();
 
@@ -1176,7 +1182,11 @@ fn handle_click_on_screen_when_move_mode(
         }
 
         if ride_options.is_empty() {
-            let arrows = moving_model.arrows.clone();
+            let arrows = moving_model
+                .arrows
+                .iter()
+                .map(|arrow_step| arrow_step.into())
+                .collect::<Vec<(Direction, Arrow)>>();
 
             model.travel_unit(&unit_id, path, &arrows)?;
         } else {
@@ -1303,7 +1313,7 @@ fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Resu
                     let existing_path: Vec<Direction> = moving_model
                         .arrows
                         .iter()
-                        .map(|(dir, _)| dir.clone())
+                        .map(|arrow_step| arrow_step.direction.clone())
                         .collect();
 
                     movement_path::find(
@@ -1316,7 +1326,15 @@ fn handle_mouse_move_for_mode(model: &mut Model, mouse_loc: Located<()>) -> Resu
                     .map_err(|msg| Error::new("calculate arrow".to_string(), msg))?
                 };
 
-                moving_model.arrows = shared::path::path_with_arrows(&directions);
+                let directions = shared::path::path_with_arrows(&directions);
+
+                moving_model.arrows = directions
+                    .iter()
+                    .map(|(direction, arrow)| mode::moving::ArrowStep {
+                        direction: direction.clone(),
+                        arrow: arrow.clone(),
+                    })
+                    .collect::<Vec<mode::moving::ArrowStep>>();
             } else {
                 moving_model.arrows = vec![];
             }
@@ -1405,8 +1423,16 @@ fn draw_mode(model: &Model) -> Result<(), Error> {
 
             let mut arrow_x = loc.x;
             let mut arrow_y = loc.y;
-            for (dir, arrow) in &moving_model.arrows {
-                draw_arrow(&ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y, false);
+            for arrow_step in &moving_model.arrows {
+                draw_arrow(
+                    &ctx,
+                    model,
+                    &arrow_step.arrow,
+                    &arrow_step.direction,
+                    &mut arrow_x,
+                    &mut arrow_y,
+                    false,
+                );
             }
         }
     }

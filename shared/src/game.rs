@@ -180,6 +180,9 @@ impl Game {
     pub fn get_mut_unit(&mut self, unit_id: &UnitId) -> Option<&mut unit::Model> {
         self.indexes.by_id.get_mut(unit_id)
     }
+    pub fn get_map(&self) -> &Map {
+        &self.map
+    }
     pub fn get_unit(&self, unit_id: &UnitId) -> Option<&unit::Model> {
         self.indexes.by_id.get(unit_id)
     }
@@ -395,6 +398,8 @@ impl Game {
     }
 
     pub fn process_outcomes(&mut self, outcomes: Vec<Outcome>) -> Result<(), String> {
+        let map = self.map.clone();
+
         for outcome in outcomes {
             match outcome {
                 Outcome::Traveled { unit_id, path } => {
@@ -406,7 +411,7 @@ impl Game {
                         };
 
                         if let Some(unit) = self.get_mut_unit(&unit_id) {
-                            unit.supplies -= path.supply_cost(&unit.unit);
+                            unit.supplies -= path.supply_cost(&map, &unit.unit);
 
                             let new_facing_dir =
                                 FacingDirection::from_directions(path.clone().to_directions())
@@ -428,7 +433,7 @@ impl Game {
                     ..
                 } => {
                     if let Some(unit) = self.get_mut_unit(&unit_id) {
-                        unit.supplies -= path.supply_cost(&unit.unit);
+                        unit.supplies -= path.supply_cost(&map, &unit.unit);
                         unit.place = Place::InUnit(loaded_into.clone());
                     }
                 }
@@ -488,7 +493,7 @@ impl Game {
                         }
                     };
 
-                    unit.supplies -= path.supply_cost(&unit.unit);
+                    unit.supplies -= path.supply_cost(&map, &unit.unit);
 
                     if let Some(loc_dir) = path.last_pos() {
                         let new_facing_dir =
@@ -526,7 +531,7 @@ impl Game {
                         };
 
                         if let Some(unit_model) = self.get_mut_unit(&replenishing_unit_id) {
-                            unit_model.supplies -= path.supply_cost(&unit_model.unit);
+                            unit_model.supplies -= path.supply_cost(&map, &unit_model.unit);
 
                             let new_facing_dir =
                                 FacingDirection::from_directions(path.clone().to_directions())

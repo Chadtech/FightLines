@@ -56,18 +56,20 @@ impl Action {
         }
     }
 
-    pub fn first_crossing_path<'a>(
+    pub fn closest_crossing_attack_path<'a>(
         path: &Path,
-        actions: &'a Vec<Action>,
-    ) -> Option<(usize, &'a Attack)> {
+        actions: &'a [Action],
+    ) -> Option<(usize, Located<&'a Attack>)> {
         let mut i = 0;
+
+        let mut closest_crossing_path: Option<(usize, Located<&'a Attack>)> = None;
 
         while i < actions.len() {
             let action = actions.get(i).unwrap();
 
             if let Action::Attack(attack) = action {
-                if path.crosses(&attack.path) {
-                    return Some((i, attack));
+                if let Some(loc) = path.crosses(&attack.path) {
+                    return Some((i, loc.with_value(attack)));
                 }
             }
 
@@ -79,7 +81,7 @@ impl Action {
 
     pub fn attacking_path(&self) -> Option<&Path> {
         match self {
-            Action::Attack { path, .. } => Some(path),
+            Action::Attack(Attack { path, .. }) => Some(path),
             _ => None,
         }
     }

@@ -20,8 +20,20 @@ use std::collections::HashSet;
 pub struct Model {
     pub unit_id: UnitId,
     pub mobility: HashSet<Located<()>>,
-    pub arrows: Vec<(Direction, Arrow)>,
+    pub arrows: Vec<ArrowStep>,
     pub ride_options: Option<Located<RideOptionsModel>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ArrowStep {
+    pub direction: Direction,
+    pub arrow: Arrow,
+}
+
+impl From<&ArrowStep> for (Direction, Arrow) {
+    fn from(step: &ArrowStep) -> Self {
+        (step.direction.clone(), step.arrow.clone())
+    }
 }
 
 impl Model {
@@ -62,13 +74,13 @@ impl Model {
     ) -> Result<Path, String> {
         let loc = unit_indexes.position_of_unit_or_transport(unit_id)?;
 
-        let path = Path::from_directions_test_only::<FacingDirection>(
+        let path = Path::from_directions::<FacingDirection>(
             &loc,
             &self
                 .arrows
                 .clone()
                 .into_iter()
-                .map(|(dir, _)| dir)
+                .map(|ArrowStep { direction, .. }| direction)
                 .collect::<Vec<Direction>>(),
         );
 

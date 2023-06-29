@@ -109,11 +109,12 @@ impl Action {
                     path: path.clone(),
                     arrows: path.with_arrows(),
                 }),
-                game::action::Action::Attack { unit_id, path } => moves_ret.push(Action::Attack {
-                    unit_id: unit_id.clone(),
-                    path: path.clone(),
-                    arrows: path.with_arrows(),
-                }),
+                game::action::Action::Attack(game::action::Attack { unit_id, path }) => moves_ret
+                    .push(Action::Attack {
+                        unit_id: unit_id.clone(),
+                        path: path.clone(),
+                        arrows: path.with_arrows(),
+                    }),
             }
         }
 

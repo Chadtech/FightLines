@@ -1,6 +1,7 @@
 use crate::direction::Direction;
 use crate::game;
 use crate::game::action::Action;
+use crate::game::event::Event::Battle;
 use crate::game::unit_index;
 use crate::id::Id;
 use crate::located::Located;
@@ -10,28 +11,25 @@ use crate::unit::UnitId;
 
 pub enum Event {
     ConsumedBaselineSupplies { unit_id: UnitId, cost: f32 }, // Travelled {
-                                                             //     unit_id: UnitId,
-                                                             //     path: Path,
-                                                             // },
-                                                             // Loaded {
-                                                             //     cargo_id: UnitId,
-                                                             //     transport_id: UnitId,
-                                                             //     picked_up: bool,
-                                                             //     loc: Located<()>,
-                                                             // },
-                                                             // Unloaded {
-                                                             //     cargo_id: UnitId,
-                                                             //     transport_id: UnitId,
-                                                             //     loc: Located<()>,
-                                                             // },
-                                                             // Replenished {
-                                                             //     unit_id: UnitId,
-                                                             //     loc: Located<()>,
-                                                             // },
-                                                             // Battle {
-                                                             //     attackers: Vec<(Direction, UnitId)>,
-                                                             //     defenders: Vec<(Direction, UnitId)>,
-                                                             // },
+    //     unit_id: UnitId,
+    //     path: Path,
+    // },
+    // Loaded {
+    //     cargo_id: UnitId,
+    //     transport_id: UnitId,
+    //     picked_up: bool,
+    //     loc: Located<()>,
+    // },
+    // Unloaded {
+    //     cargo_id: UnitId,
+    //     transport_id: UnitId,
+    //     loc: Located<()>,
+    // },
+    // Replenished {
+    //     unit_id: UnitId,
+    //     loc: Located<()>,
+    // },
+    Battle {},
 }
 
 pub fn process_turn_into_events(
@@ -76,29 +74,29 @@ pub fn process_turn_into_events(
     while let Some(event) = events.first() {
         match event {
             Event::ConsumedBaselineSupplies { unit_id, cost } => {
-                if let Some(unit_model) = indexes.by_id.get_mut(&unit_id) {
+                if let Some(unit_model) = indexes.by_id.get_mut(unit_id) {
                     let new_supplies = unit_model.supplies - (cost.ceil() as i16);
 
                     if new_supplies <= 0 {
-                        let _ = indexes.perish(&unit_id);
+                        let _ = indexes.perish(unit_id);
                     } else {
                         unit_model.supplies = new_supplies;
                     }
                 }
             }
+            Battle { .. } => {}
         }
 
         events.remove(0);
 
         if let Some((action, rest)) = ordered_actions.split_first() {
             match action {
-                Action::Travel { path, .. } => {
-                    let mut i = 1;
-
-                    while i < ordered_actions.len() {
-                        let next_action = ordered_actions[i];
-
-                        i += 1
+                Action::Travel { path, unit_id, .. } => {
+                    if let Some((attack_index, attack_loc)) =
+                        Action::closest_crossing_attack_path(path, rest)
+                    {
+                        // let attacker = indexes.by_id.get_mut(&attack_loc.value.unit_id);
+                        events.push(Battle {});
                     }
                 }
                 Action::LoadInto { .. } => {}
@@ -121,7 +119,7 @@ fn baseline_supply_events(indexes: &unit_index::Indexes) -> Vec<Event> {
         if let Some(supply_cost) = unit_model.unit.baseline_supply_cost() {
             events.push(Event::ConsumedBaselineSupplies {
                 unit_id: unit_id.clone(),
-                cost: supply_cost.clone(),
+                cost: supply_cost,
             });
         }
     }
