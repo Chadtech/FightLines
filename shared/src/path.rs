@@ -34,6 +34,10 @@ impl Path {
         None
     }
 
+    pub fn first_pos(&self) -> Option<Located<()>> {
+        self.steps.first().map(|loc_step| loc_step.to_unit())
+    }
+
     pub fn shift_first(&mut self) -> Option<Located<Direction>> {
         if !self.steps.is_empty() {
             let removed = self.steps.remove(0);

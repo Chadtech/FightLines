@@ -1,7 +1,6 @@
-use crate::direction::Direction;
 use crate::game;
 use crate::game::action::Action;
-use crate::game::event::Event::Battle;
+use crate::game::replenishment::Replenishment;
 use crate::game::unit_index;
 use crate::id::Id;
 use crate::located::Located;
@@ -10,26 +9,30 @@ use crate::rng::{RandGen, RandSeed};
 use crate::unit::UnitId;
 
 pub enum Event {
-    ConsumedBaselineSupplies { unit_id: UnitId, cost: f32 }, // Travelled {
-    //     unit_id: UnitId,
-    //     path: Path,
-    // },
-    // Loaded {
-    //     cargo_id: UnitId,
-    //     transport_id: UnitId,
-    //     picked_up: bool,
-    //     loc: Located<()>,
-    // },
-    // Unloaded {
-    //     cargo_id: UnitId,
-    //     transport_id: UnitId,
-    //     loc: Located<()>,
-    // },
-    // Replenished {
-    //     unit_id: UnitId,
-    //     loc: Located<()>,
-    // },
-    Battle {},
+    ConsumedBaselineSupplies {
+        unit_id: UnitId,
+        cost: f32,
+    },
+    Travelled {
+        unit_id: UnitId,
+        path: Path,
+    },
+    Loaded {
+        cargo_id: UnitId,
+        transport_id: UnitId,
+        picked_up: bool,
+        loc: Located<()>,
+    },
+    Unloaded {
+        cargo_id: UnitId,
+        transport_id: UnitId,
+        loc: Located<()>,
+    },
+    Replenished {
+        unit_id: UnitId,
+        amount: i16,
+    },
+    // Battle {},
 }
 
 pub fn process_turn_into_events(
@@ -71,45 +74,122 @@ pub fn process_turn_into_events(
 
     let mut events = baseline_supply_events(indexes);
 
-    while let Some(event) = events.first() {
-        match event {
-            Event::ConsumedBaselineSupplies { unit_id, cost } => {
-                if let Some(unit_model) = indexes.by_id.get_mut(unit_id) {
-                    let new_supplies = unit_model.supplies - (cost.ceil() as i16);
+    let mut i = 0;
 
-                    if new_supplies <= 0 {
-                        let _ = indexes.perish(unit_id);
-                    } else {
-                        unit_model.supplies = new_supplies;
-                    }
-                }
-            }
-            Battle { .. } => {}
-        }
+    while i < ordered_actions.len() {
+        let action = ordered_actions.get(i).unwrap();
 
-        events.remove(0);
+        let _ = process_action(action, &mut ordered_actions, &mut events);
 
-        if let Some((action, rest)) = ordered_actions.split_first() {
-            match action {
-                Action::Travel { path, unit_id, .. } => {
-                    if let Some((attack_index, attack_loc)) =
-                        Action::closest_crossing_attack_path(path, rest)
-                    {
-                        // let attacker = indexes.by_id.get_mut(&attack_loc.value.unit_id);
-                        events.push(Battle {});
-                    }
-                }
-                Action::LoadInto { .. } => {}
-                Action::PickUp { .. } => {}
-                Action::DropOff { .. } => {}
-                Action::Replenish { .. } => {}
-                Action::Attack { .. } => {}
-                Action::Batch(_) => {}
-            }
-        }
+        i += 1;
     }
 
+    // while let Some(event) = events.first() {
+    //     match event {
+    //         Event::ConsumedBaselineSupplies { unit_id, cost } => {
+    //             if let Some(unit_model) = indexes.by_id.get_mut(unit_id) {
+    //                 let new_supplies = unit_model.supplies - (cost.ceil() as i16);
+    //
+    //                 if new_supplies <= 0 {
+    //                     let _ = indexes.perish(unit_id);
+    //                 } else {
+    //                     unit_model.supplies = new_supplies;
+    //                 }
+    //             }
+    //         }
+    //         Event::Travelled { .. } => {}
+    //     }
+    //
+    //     events.remove(0);
+    //
+    //     if let Some((action, rest)) = ordered_actions.split_first() {
+    //         match action {
+    //             Action::Travel { path, unit_id, .. } => {
+    //                 events.push(Event::Travelled {
+    //                     unit_id: unit_id.clone(),
+    //                     path: path.clone(),
+    //                 });
+    //             }
+    //             Action::LoadInto { .. } => {}
+    //             Action::PickUp { .. } => {}
+    //             Action::DropOff { .. } => {}
+    //             Action::Replenish { .. } => {}
+    //             Action::Attack { .. } => {}
+    //             Action::Batch(_) => {}
+    //         }
+    //     }
+    // }
+
     Ok(events)
+}
+
+fn process_action(
+    action: &Action,
+    indexes: &unit_index::Indexes,
+    actions: &mut Vec<Action>,
+    events: &mut Vec<Event>,
+) -> Result<(), String> {
+    match action {
+        Action::Travel { path, unit_id, .. } => {
+            events.push(Event::Travelled {
+                unit_id: unit_id.clone(),
+                path: path.clone(),
+            });
+        }
+        Action::LoadInto {
+            unit_id,
+            load_into,
+            path,
+        } => {
+            if let Some(pos) = path.last_pos() {
+                events.push(Event::Loaded {
+                    cargo_id: unit_id.clone(),
+                    transport_id: load_into.clone(),
+                    picked_up: false,
+                    loc: pos,
+                });
+            }
+        }
+        Action::PickUp {
+            unit_id,
+            cargo_id,
+            path,
+        } => {
+            if let Some(pos) = path.last_pos() {
+                events.push(Event::Loaded {
+                    cargo_id: cargo_id.clone(),
+                    transport_id: unit_id.clone(),
+                    picked_up: true,
+                    loc: pos,
+                });
+            }
+        }
+        Action::DropOff {
+            cargo_unit_loc,
+            transport_id,
+        } => events.push(Event::Unloaded {
+            cargo_id: cargo_unit_loc.value.1.clone(),
+            transport_id: transport_id.clone(),
+            loc: cargo_unit_loc.to_unit(),
+        }),
+        Action::Replenish {
+            replenishing_unit_id,
+            ..
+        } => {
+            let unit_model = match indexes.by_id.get(replenishing_unit_id) {
+                Some(u) => u,
+                None => {
+                    return Err("could not find replenishing unit".to_string());
+                }
+            };
+
+            // let replenishment_result = Replenishment::calculate()
+        }
+        Action::Attack(_) => {}
+        Action::Batch(_) => {}
+    }
+
+    Ok(())
 }
 
 fn baseline_supply_events(indexes: &unit_index::Indexes) -> Vec<Event> {

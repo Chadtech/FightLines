@@ -51,7 +51,7 @@ impl Action {
             Action::PickUp { .. } => 10,
             Action::DropOff { .. } => 10,
             Action::Replenish { .. } => 0,
-            Action::Attack { .. } => 10,
+            Action::Attack { .. } => 5,
             Action::Batch(_) => 10,
         }
     }
@@ -60,23 +60,41 @@ impl Action {
         path: &Path,
         actions: &'a [Action],
     ) -> Option<(usize, Located<&'a Attack>)> {
-        let mut i = 0;
-
         let mut closest_crossing_path: Option<(usize, Located<&'a Attack>)> = None;
 
-        while i < actions.len() {
-            let action = actions.get(i).unwrap();
+        if let Some(origin) = path.first_pos() {
+            let mut i = 0;
 
-            if let Action::Attack(attack) = action {
-                if let Some(loc) = path.crosses(&attack.path) {
-                    return Some((i, loc.with_value(attack)));
+            while i < actions.len() {
+                let action = actions.get(i).unwrap();
+
+                if let Action::Attack(attack) = action {
+                    if let Some(cross_loc) = path.crosses(&attack.path) {
+                        match closest_crossing_path.clone() {
+                            None => closest_crossing_path = Some((i, cross_loc.with_value(attack))),
+                            Some((_, existing)) => {
+                                if origin.distance_from(&existing)
+                                    > origin.distance_from(&cross_loc)
+                                {
+                                    closest_crossing_path = Some((
+                                        i,
+                                        Located {
+                                            x: cross_loc.x,
+                                            y: cross_loc.y,
+                                            value: attack,
+                                        },
+                                    ));
+                                }
+                            }
+                        }
+                    }
                 }
-            }
 
-            i += 1
+                i += 1
+            }
         }
 
-        None
+        closest_crossing_path
     }
 
     pub fn attacking_path(&self) -> Option<&Path> {

@@ -3,6 +3,7 @@ pub mod day;
 pub mod event;
 pub mod mobility;
 pub mod outcome;
+pub mod replenishment;
 pub mod unit_index;
 
 use crate::facing_direction::FacingDirection;
