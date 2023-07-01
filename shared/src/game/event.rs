@@ -28,11 +28,18 @@ pub enum Event {
         transport_id: UnitId,
         loc: Located<()>,
     },
-    Replenished {
+    ReplenishedUnits {
+        path: Path,
+        unit_id: UnitId,
+    },
+    WasReplenished {
         unit_id: UnitId,
         amount: i16,
     },
-    // Battle {},
+    DepletedCrate {
+        unit_id: UnitId,
+        amount: i16,
+    }, // Battle {},
 }
 
 pub fn process_turn_into_events(
@@ -73,60 +80,72 @@ pub fn process_turn_into_events(
     }
 
     let mut events = baseline_supply_events(indexes);
+    let mut errors: Vec<String> = vec![];
 
-    let mut i = 0;
+    while let Some(event) = events.first() {
+        let mut event_error = |err: String| {
+            let mut err_msg = "event error : ".to_string();
 
-    while i < ordered_actions.len() {
-        let action = ordered_actions.get(i).unwrap();
+            err_msg.push_str(err.as_str());
 
-        let _ = process_action(action, &mut ordered_actions, &mut events);
+            errors.push(err_msg);
+        };
 
-        i += 1;
+        match event {
+            Event::ConsumedBaselineSupplies { unit_id, cost } => {
+                match indexes.consume_base_supplies(unit_id, cost.ceil() as i16) {
+                    Ok(consume_baseline_supplies) => {
+                        if consume_baseline_supplies.perished {
+                            delete_actions_for_deleted_unit(unit_id.clone(), &mut ordered_actions);
+                        }
+                    }
+                    Err(err) => {
+                        event_error(err);
+                    }
+                }
+            }
+            Event::Travelled { .. } => {}
+            Event::Loaded { .. } => {}
+            Event::Unloaded { .. } => {}
+            Event::ReplenishedUnits { .. } => {}
+            Event::WasReplenished { .. } => {}
+            Event::DepletedCrate { .. } => {}
+        }
+
+        events.remove(0);
+
+        if let Some(action) = ordered_actions.first() {
+            if let Err(err) = process_action(&action, indexes, &mut events) {
+                let mut err_msg = "process action error : ".to_string();
+
+                err_msg.push_str(err.as_str());
+
+                errors.push(err_msg);
+            };
+        }
     }
 
-    // while let Some(event) = events.first() {
-    //     match event {
-    //         Event::ConsumedBaselineSupplies { unit_id, cost } => {
-    //             if let Some(unit_model) = indexes.by_id.get_mut(unit_id) {
-    //                 let new_supplies = unit_model.supplies - (cost.ceil() as i16);
-    //
-    //                 if new_supplies <= 0 {
-    //                     let _ = indexes.perish(unit_id);
-    //                 } else {
-    //                     unit_model.supplies = new_supplies;
-    //                 }
-    //             }
-    //         }
-    //         Event::Travelled { .. } => {}
-    //     }
-    //
-    //     events.remove(0);
-    //
-    //     if let Some((action, rest)) = ordered_actions.split_first() {
-    //         match action {
-    //             Action::Travel { path, unit_id, .. } => {
-    //                 events.push(Event::Travelled {
-    //                     unit_id: unit_id.clone(),
-    //                     path: path.clone(),
-    //                 });
-    //             }
-    //             Action::LoadInto { .. } => {}
-    //             Action::PickUp { .. } => {}
-    //             Action::DropOff { .. } => {}
-    //             Action::Replenish { .. } => {}
-    //             Action::Attack { .. } => {}
-    //             Action::Batch(_) => {}
-    //         }
-    //     }
-    // }
-
     Ok(events)
+}
+
+fn delete_actions_for_deleted_unit(deleted_unit_id: UnitId, actions: &mut Vec<Action>) {
+    let mut i = 0;
+    while i < actions.len() {
+        let action = actions.get(i).unwrap();
+
+        if let Some(replacement_actions) = action.when_unit_deleted(deleted_unit_id.clone()) {
+            let replacements_len = replacement_actions.len();
+            actions.splice(i..i + 1, replacement_actions);
+            i += replacements_len;
+        }
+
+        i += 1
+    }
 }
 
 fn process_action(
     action: &Action,
     indexes: &unit_index::Indexes,
-    actions: &mut Vec<Action>,
     events: &mut Vec<Event>,
 ) -> Result<(), String> {
     match action {
@@ -174,16 +193,45 @@ fn process_action(
         }),
         Action::Replenish {
             replenishing_unit_id,
+            path,
             ..
         } => {
             let unit_model = match indexes.by_id.get(replenishing_unit_id) {
-                Some(u) => u,
                 None => {
-                    return Err("could not find replenishing unit".to_string());
+                    return Err("could not finding replenishing unit".to_string());
+                }
+                Some(u) => u,
+            };
+
+            let replenishment_pos = match path.last_pos() {
+                Some(p) => p,
+                None => {
+                    return Err("replenishing unit does not travel".to_string());
                 }
             };
 
-            // let replenishment_result = Replenishment::calculate()
+            let replenishment = Replenishment::calculate(
+                &unit_model.owner,
+                replenishing_unit_id,
+                replenishment_pos,
+                indexes,
+            )?;
+
+            for (unit_id, amount) in replenishment.replenished_units {
+                events.push(Event::WasReplenished { unit_id, amount });
+            }
+
+            for (crate_id, amount) in replenishment.depleted_supply_crates {
+                events.push(Event::DepletedCrate {
+                    unit_id: crate_id,
+                    amount,
+                });
+            }
+
+            events.push(Event::ReplenishedUnits {
+                unit_id: replenishing_unit_id.clone(),
+                path: path.clone(),
+            });
         }
         Action::Attack(_) => {}
         Action::Batch(_) => {}
@@ -206,3 +254,6 @@ fn baseline_supply_events(indexes: &unit_index::Indexes) -> Vec<Event> {
 
     events
 }
+
+#[cfg(test)]
+mod test_events {}

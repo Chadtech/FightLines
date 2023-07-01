@@ -1,8 +1,8 @@
-use shared::game::unit_index::Indexes;
-use shared::id::Id;
-use shared::located::Located;
-use shared::unit;
-use shared::unit::UnitId;
+use crate::game::unit_index::Indexes;
+use crate::id::Id;
+use crate::located::Located;
+use crate::unit;
+use crate::unit::UnitId;
 use std::cmp;
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -132,15 +132,15 @@ impl Replenishment {
 
 #[cfg(test)]
 mod test_replenishment {
-    use crate::page::game::replenishment::Replenishment;
+    use crate::facing_direction::FacingDirection;
+    use crate::game::replenishment::Replenishment;
+    use crate::game::unit_index::Indexes;
+    use crate::id::Id;
+    use crate::located::Located;
+    use crate::team_color::TeamColor;
+    use crate::unit::{Place, Unit, UnitId};
+    use crate::{located, unit};
     use pretty_assertions::assert_eq;
-    use shared::facing_direction::FacingDirection;
-    use shared::game::unit_index::Indexes;
-    use shared::id::Id;
-    use shared::located::Located;
-    use shared::team_color::TeamColor;
-    use shared::unit::{Place, Unit, UnitId};
-    use shared::{located, unit};
 
     #[test]
     fn one_unit_one_crate() {

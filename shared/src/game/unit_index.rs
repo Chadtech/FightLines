@@ -19,6 +19,10 @@ pub struct Indexes {
     pub by_transport: by_transport::Index,
 }
 
+pub struct ConsumeBaselineSupplies {
+    pub perished: bool,
+}
+
 impl Indexes {
     pub fn make(units: Vec<(UnitId, unit::Model)>) -> Indexes {
         let mut unit_hashmap: HashMap<UnitId, unit::Model> = HashMap::new();
@@ -58,6 +62,29 @@ impl Indexes {
         }
 
         Ok(())
+    }
+
+    pub fn consume_base_supplies(
+        &mut self,
+        unit_id: &UnitId,
+        cost: i16,
+    ) -> Result<ConsumeBaselineSupplies, String> {
+        match self.by_id.get_mut(unit_id) {
+            None => Err("could not find unit for consuming base supplies".to_string()),
+            Some(unit_model) => {
+                let new_supplies = unit_model.supplies - cost;
+
+                let perished = new_supplies <= 0;
+
+                if perished {
+                    self.perish(unit_id)?
+                } else {
+                    unit_model.supplies = new_supplies;
+                }
+
+                Ok(ConsumeBaselineSupplies { perished })
+            }
+        }
     }
 
     pub fn position_of_unit_or_transport(

@@ -44,6 +44,82 @@ pub struct Attack {
 }
 
 impl Action {
+    // None means no delete
+    // Some means delete, and the vec is of the actions to replace the action with.
+    // Some(vec![]) means delete and no replacement
+    // A case of replacement might include a unit moving to load into a truck, but
+    // the truck gets deleted. In this case the LoadInto action should be replaced
+    // with a Travel action
+    pub fn when_unit_deleted(&self, deleted_unit_id: UnitId) -> Option<Vec<Action>> {
+        match self {
+            Action::Travel { unit_id, .. } => {
+                if deleted_unit_id == unit_id.clone() {
+                    Some(vec![])
+                } else {
+                    None
+                }
+            }
+            Action::LoadInto {
+                unit_id,
+                load_into,
+                path,
+            } => {
+                if unit_id.clone() == deleted_unit_id {
+                    Some(vec![])
+                } else if deleted_unit_id == load_into.clone() {
+                    Some(vec![Action::Travel {
+                        unit_id: unit_id.clone(),
+                        path: path.clone(),
+                        dismounted_from: None,
+                    }])
+                } else {
+                    None
+                }
+            }
+            Action::PickUp {
+                cargo_id,
+                unit_id,
+                path,
+            } => {
+                if unit_id.clone() == deleted_unit_id {
+                    Some(vec![])
+                } else if cargo_id.clone() == deleted_unit_id {
+                    Some(vec![Action::Travel {
+                        unit_id: unit_id.clone(),
+                        path: path.clone(),
+                        dismounted_from: None,
+                    }])
+                } else {
+                    None
+                }
+            }
+            Action::DropOff { cargo_unit_loc, .. } => {
+                if cargo_unit_loc.value.1 == deleted_unit_id {
+                    Some(vec![])
+                } else {
+                    None
+                }
+            }
+            Action::Replenish {
+                replenishing_unit_id,
+                ..
+            } => {
+                if deleted_unit_id == replenishing_unit_id.clone() {
+                    Some(vec![])
+                } else {
+                    None
+                }
+            }
+            Action::Attack(Attack { unit_id, .. }) => {
+                if unit_id.clone() == deleted_unit_id {
+                    Some(vec![])
+                } else {
+                    None
+                }
+            }
+            Action::Batch(_) => None,
+        }
+    }
     pub fn to_priority(&self) -> u8 {
         match self {
             Action::Travel { .. } => 10,

@@ -181,13 +181,8 @@ pub fn path_with_arrows(path: &[Direction]) -> Vec<(Direction, Arrow)> {
 #[cfg(test)]
 mod test_path {
     use crate::direction::Direction;
-    use crate::game::action::{order, unbatch, Action};
     use crate::located;
-    use crate::located::Located;
-    use crate::path::{Path, Step};
-    use crate::rng::RandGen;
-    use crate::tile::Tile;
-    use crate::unit::UnitId;
+    use crate::path::Path;
     use pretty_assertions::assert_eq;
 
     #[test]
