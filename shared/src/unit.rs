@@ -88,6 +88,13 @@ impl Place {
             value: facing_direction,
         })
     }
+
+    pub fn to_map_loc(&self) -> Option<&Located<FacingDirection>> {
+        match self {
+            Place::OnMap(loc) => Some(loc),
+            Place::InUnit(_) => None,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Debug)]

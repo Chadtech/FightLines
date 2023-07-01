@@ -1,5 +1,7 @@
 use crate::facing_direction::FacingDirection;
 use crate::located::Located;
+use crate::map::Map;
+use crate::path::Path;
 use crate::unit;
 use crate::unit::Place;
 use crate::unit::UnitId;
@@ -87,6 +89,45 @@ impl Indexes {
         }
     }
 
+    pub fn travel_unit(&mut self, unit_id: &UnitId, path: &Path, map: &Map) -> Result<(), String> {
+        let loc = match path.last_pos() {
+            None => {
+                return Ok(());
+            }
+            Some(loc) => loc,
+        };
+
+        let current_loc = match self.position_of_unit_or_transport(&unit_id) {
+            Ok(facing_dir_loc) => facing_dir_loc,
+            Err(msg) => {
+                return Err(msg);
+            }
+        };
+
+        return match self.by_id.get_mut(&unit_id) {
+            Some(unit_model) => {
+                unit_model.supplies -= path.supply_cost(&map, &unit_model.unit);
+
+                let new_facing_dir = FacingDirection::from_directions(path.clone().to_directions())
+                    .unwrap_or_else(|| current_loc.value.clone());
+
+                unit_model.place = Place::OnMap(loc.with_value(new_facing_dir.clone()));
+
+                self.by_location
+                    .filter_unit_id(&current_loc.to_unit(), unit_id);
+                self.by_location.insert(
+                    &loc.to_unit(),
+                    unit_id.clone(),
+                    new_facing_dir,
+                    unit_model.clone(),
+                );
+
+                Ok(())
+            }
+            None => Err("could not get unit when trying to travel it".to_string()),
+        };
+    }
+
     pub fn position_of_unit_or_transport(
         &self,
         unit_id: &UnitId,
@@ -98,5 +139,12 @@ impl Indexes {
                 Place::InUnit(transport_id) => self.position_of_unit_or_transport(transport_id)?,
             }),
         }
+    }
+
+    pub fn get_units_by_location(
+        &self,
+        key: &Located<()>,
+    ) -> Option<&Vec<(UnitId, FacingDirection, unit::Model)>> {
+        self.by_location.get(key)
     }
 }

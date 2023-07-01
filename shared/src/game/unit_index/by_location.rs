@@ -20,6 +20,37 @@ impl Index {
         self.0.iter()
     }
 
+    pub fn filter_unit_id(&mut self, loc: &Located<()>, unit_id_to_remove: &UnitId) {
+        if let Some(units) = self.0.get(loc) {
+            let new_units = units
+                .into_iter()
+                .filter_map(|(unit_id, facing_dir, unit_model)| {
+                    if unit_id != unit_id_to_remove {
+                        Some((unit_id.clone(), facing_dir.clone(), unit_model.clone()))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<(UnitId, FacingDirection, unit::Model)>>();
+
+            self.0.insert(loc.clone(), new_units);
+        }
+    }
+
+    pub fn insert(
+        &mut self,
+        loc: &Located<()>,
+        unit_id: UnitId,
+        facing_dir: FacingDirection,
+        unit_model: unit::Model,
+    ) {
+        let entry = (unit_id, facing_dir, unit_model);
+
+        let units = self.0.entry(loc.clone()).or_insert_with(Vec::new);
+
+        units.push(entry);
+    }
+
     pub fn get_replenishable_units<'a>(
         &'a self,
         viewer_id: &'a Id,

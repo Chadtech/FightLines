@@ -4,14 +4,16 @@ use crate::game::replenishment::Replenishment;
 use crate::game::unit_index;
 use crate::id::Id;
 use crate::located::Located;
+use crate::map::Map;
 use crate::path::Path;
 use crate::rng::{RandGen, RandSeed};
 use crate::unit::UnitId;
 
+#[derive(PartialEq, Eq, Debug)]
 pub enum Event {
     ConsumedBaselineSupplies {
         unit_id: UnitId,
-        cost: f32,
+        cost: i16,
     },
     Travelled {
         unit_id: UnitId,
@@ -46,7 +48,8 @@ pub fn process_turn_into_events(
     rand_seed: RandSeed,
     player_moves: &mut Vec<(Id, Vec<Action>)>,
     indexes: &mut unit_index::Indexes,
-) -> Result<Vec<Event>, String> {
+    map: &Map,
+) -> Result<Vec<String>, String> {
     let mut rng = RandGen::from_seed(rand_seed);
 
     // These actions might come in orders that don't make sense,
@@ -68,14 +71,16 @@ pub fn process_turn_into_events(
             if let Some((_, actions)) = player_moves.get_mut(player_index) {
                 if let Some(first) = actions.first() {
                     ordered_actions.push(first.clone());
-                    ordered_actions.remove(0);
+                    actions.remove(0);
                     if actions.is_empty() {
                         player_moves.remove(player_index);
                     }
                 }
             }
 
-            player_index = (player_index + 1) % player_moves.len();
+            if !player_moves.is_empty() {
+                player_index = (player_index + 1) % player_moves.len();
+            }
         }
     }
 
@@ -93,7 +98,7 @@ pub fn process_turn_into_events(
 
         match event {
             Event::ConsumedBaselineSupplies { unit_id, cost } => {
-                match indexes.consume_base_supplies(unit_id, cost.ceil() as i16) {
+                match indexes.consume_base_supplies(unit_id, cost.clone()) {
                     Ok(consume_baseline_supplies) => {
                         if consume_baseline_supplies.perished {
                             delete_actions_for_deleted_unit(unit_id.clone(), &mut ordered_actions);
@@ -104,7 +109,11 @@ pub fn process_turn_into_events(
                     }
                 }
             }
-            Event::Travelled { .. } => {}
+            Event::Travelled { unit_id, path } => {
+                if let Err(err) = indexes.travel_unit(unit_id, path, map) {
+                    event_error(err);
+                }
+            }
             Event::Loaded { .. } => {}
             Event::Unloaded { .. } => {}
             Event::ReplenishedUnits { .. } => {}
@@ -122,10 +131,12 @@ pub fn process_turn_into_events(
 
                 errors.push(err_msg);
             };
+
+            ordered_actions.remove(0);
         }
     }
 
-    Ok(events)
+    Ok(errors)
 }
 
 fn delete_actions_for_deleted_unit(deleted_unit_id: UnitId, actions: &mut Vec<Action>) {
@@ -247,7 +258,7 @@ fn baseline_supply_events(indexes: &unit_index::Indexes) -> Vec<Event> {
         if let Some(supply_cost) = unit_model.unit.baseline_supply_cost() {
             events.push(Event::ConsumedBaselineSupplies {
                 unit_id: unit_id.clone(),
-                cost: supply_cost,
+                cost: supply_cost.ceil() as i16,
             });
         }
     }
@@ -256,4 +267,94 @@ fn baseline_supply_events(indexes: &unit_index::Indexes) -> Vec<Event> {
 }
 
 #[cfg(test)]
-mod test_events {}
+mod test_events {
+    use crate::direction::Direction;
+    use crate::facing_direction::FacingDirection;
+    use crate::game::action::Action;
+    use crate::game::event::process_turn_into_events;
+    use crate::game::unit_index::Indexes;
+    use crate::id::Id;
+    use crate::located::Located;
+    use crate::map::Map;
+    use crate::path::Path;
+    use crate::rng::RandSeed;
+    use crate::team_color::TeamColor;
+    use crate::unit::{Place, Unit, UnitId};
+    use crate::{located, unit};
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn process_travel() {
+        let rand_seed = RandSeed::test();
+
+        let player_1 = Id::from_string("player 1".to_string(), true).unwrap();
+        let infantry_id = UnitId::test("infantry");
+
+        let path = Path::from_directions_test_only(&located::unit(2, 2), &vec![Direction::South]);
+
+        let player_1_actions = vec![Action::Travel {
+            unit_id: infantry_id.clone(),
+            path: path.clone(),
+            dismounted_from: None,
+        }];
+
+        let mut actions = vec![(player_1.clone(), player_1_actions)];
+
+        let mut indexes = Indexes::make(vec![(
+            infantry_id.clone(),
+            unit::Model::new(
+                Unit::Infantry,
+                &player_1,
+                Place::OnMap(Located {
+                    x: 2,
+                    y: 2,
+                    value: FacingDirection::Right,
+                }),
+                &TeamColor::Red,
+            ),
+        )]);
+
+        let map = Map::grass_square();
+
+        let got_errors =
+            process_turn_into_events(rand_seed, &mut actions, &mut indexes, &map).unwrap();
+
+        let want_errors: Vec<String> = vec![];
+        assert_eq!(want_errors, got_errors);
+
+        let got_infantry_loc = indexes
+            .by_id
+            .get(&infantry_id)
+            .unwrap()
+            .place
+            .to_map_loc()
+            .unwrap();
+
+        let want_loc = &Located {
+            x: 2,
+            y: 3,
+            value: FacingDirection::Right,
+        };
+
+        assert_eq!(want_loc, got_infantry_loc);
+
+        let got_units_by_loc = indexes.by_location.get(&want_loc.to_unit()).unwrap();
+
+        let mut infantry_after_turn = unit::Model::new(
+            Unit::Infantry,
+            &player_1,
+            Place::OnMap(Located {
+                x: 2,
+                y: 3,
+                value: FacingDirection::Right,
+            }),
+            &TeamColor::Red,
+        );
+
+        infantry_after_turn.supplies = 982;
+
+        let want_units = &vec![(infantry_id, FacingDirection::Right, infantry_after_turn)];
+
+        assert_eq!(want_units, got_units_by_loc);
+    }
+}

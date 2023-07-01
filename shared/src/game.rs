@@ -22,7 +22,6 @@ use crate::team_color::TeamColor;
 use crate::unit::{Place, Unit, UnitId};
 use crate::{located, unit};
 use serde::{Deserialize, Serialize};
-use std::collections::hash_map::Iter;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 
@@ -187,11 +186,6 @@ impl Game {
     pub fn get_unit(&self, unit_id: &UnitId) -> Option<&unit::Model> {
         self.indexes.by_id.get(unit_id)
     }
-    pub fn units_by_location(
-        &self,
-    ) -> Iter<'_, Located<()>, Vec<(UnitId, FacingDirection, unit::Model)>> {
-        self.indexes.by_location.iter()
-    }
     pub fn get_units_by_transport(&self, unit_id: &UnitId) -> Option<&Vec<(UnitId, unit::Model)>> {
         self.indexes.by_transport.get(unit_id)
     }
@@ -211,7 +205,7 @@ impl Game {
         carrying_unit: &Unit,
         mouse_loc: &Located<()>,
     ) -> Option<Vec<(UnitId, unit::Model)>> {
-        match self.indexes.by_location.get(mouse_loc) {
+        match self.indexes.get_units_by_location(mouse_loc) {
             Some(units) => {
                 let rideable_units = units
                     .iter()
@@ -239,7 +233,7 @@ impl Game {
         &self,
         mouse_loc: &Located<()>,
     ) -> Option<Vec<(UnitId, unit::Model)>> {
-        match self.indexes.by_location.get(mouse_loc) {
+        match self.indexes.get_units_by_location(mouse_loc) {
             Some(units) => {
                 let supply_crates = units
                     .iter()
@@ -650,13 +644,6 @@ impl Game {
         }
 
         has_submitted
-    }
-
-    pub fn get_units_by_location(
-        &self,
-        key: &Located<()>,
-    ) -> Option<&Vec<(UnitId, FacingDirection, unit::Model)>> {
-        self.indexes.by_location.get(key)
     }
 
     pub fn num_players(&self) -> usize {

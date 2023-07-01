@@ -1210,7 +1210,11 @@ fn handle_click_on_screen_when_no_mode(
         }
     };
 
-    let units_at_pos = match model.game.get_units_by_location(&located::unit(x, y)) {
+    let units_at_pos = match model
+        .game
+        .indexes
+        .get_units_by_location(&located::unit(x, y))
+    {
         Some(units) => units,
         None => {
             return Ok(());
