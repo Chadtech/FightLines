@@ -95,6 +95,13 @@ impl Place {
             Place::InUnit(_) => None,
         }
     }
+
+    pub fn in_unit_loc(&self) -> Option<&UnitId> {
+        match self {
+            Place::OnMap(_) => None,
+            Place::InUnit(unit_id) => Some(unit_id),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Debug)]

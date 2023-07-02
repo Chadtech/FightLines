@@ -23,7 +23,7 @@ impl Index {
     pub fn filter_unit_id(&mut self, loc: &Located<()>, unit_id_to_remove: &UnitId) {
         if let Some(units) = self.0.get(loc) {
             let new_units = units
-                .into_iter()
+                .iter()
                 .filter_map(|(unit_id, facing_dir, unit_model)| {
                     if unit_id != unit_id_to_remove {
                         Some((unit_id.clone(), facing_dir.clone(), unit_model.clone()))

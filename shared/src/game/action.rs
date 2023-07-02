@@ -94,7 +94,7 @@ impl Action {
                 }
             }
             Action::DropOff { cargo_unit_loc, .. } => {
-                if cargo_unit_loc.value.1 == deleted_unit_id {
+                if cargo_unit_loc.value.1.clone() == deleted_unit_id {
                     Some(vec![])
                 } else {
                     None

@@ -25,6 +25,11 @@ pub struct ConsumeBaselineSupplies {
     pub perished: bool,
 }
 
+pub struct CargoAndTransportIds<'a> {
+    pub cargo_id: &'a UnitId,
+    pub transport_id: &'a UnitId,
+}
+
 impl Indexes {
     pub fn make(units: Vec<(UnitId, unit::Model)>) -> Indexes {
         let mut unit_hashmap: HashMap<UnitId, unit::Model> = HashMap::new();
@@ -89,6 +94,83 @@ impl Indexes {
         }
     }
 
+    pub fn pick_up(
+        &mut self,
+        units: CargoAndTransportIds<'_>,
+        path: &Path,
+        map: &Map,
+    ) -> Result<(), String> {
+        let cargo_unit_model = match self.by_id.get_mut(units.cargo_id) {
+            Some(c) => c,
+            None => {
+                return Err("could not find cargo unit during pick up".to_string());
+            }
+        };
+
+        let cargo_last_pos = match cargo_unit_model.place.clone() {
+            Place::OnMap(loc) => loc.to_unit(),
+            Place::InUnit(_) => {
+                return Err("cargo not on map during pick up".to_string());
+            }
+        };
+
+        cargo_unit_model.place = Place::InUnit(units.transport_id.clone());
+
+        self.by_location
+            .filter_unit_id(&cargo_last_pos, units.cargo_id);
+
+        self.travel_unit(units.transport_id, path, map)?;
+
+        Ok(())
+    }
+
+    pub fn unload(&mut self, cargo_id: &UnitId) -> Result<(), String> {
+        let facing_dir = self.position_of_unit_or_transport(cargo_id)?;
+
+        let cargo = match self.by_id.get_mut(cargo_id) {
+            Some(u) => u,
+            None => {
+                return Err("could not find unit to unload".to_string());
+            }
+        };
+
+        cargo.place = Place::OnMap(facing_dir.clone());
+
+        self.by_location.insert(
+            &facing_dir.to_unit(),
+            cargo_id.clone(),
+            facing_dir.value,
+            cargo.clone(),
+        );
+
+        Ok(())
+    }
+
+    pub fn load_into(
+        &mut self,
+        units: CargoAndTransportIds<'_>,
+        path: &Path,
+        map: &Map,
+    ) -> Result<(), String> {
+        match self.by_id.get_mut(units.cargo_id) {
+            None => Err("could not find cargo unit when loading into".to_string()),
+            Some(cargo_model) => {
+                let current_loc = match cargo_model.place.clone() {
+                    Place::OnMap(loc) => loc,
+                    Place::InUnit(_) => return Err("cargo unit was not on the map".to_string()),
+                };
+
+                cargo_model.supplies -= path.supply_cost(map, &cargo_model.unit);
+                cargo_model.place = Place::InUnit(units.transport_id.clone());
+
+                self.by_location
+                    .filter_unit_id(&current_loc.to_unit(), units.cargo_id);
+
+                Ok(())
+            }
+        }
+    }
+
     pub fn travel_unit(&mut self, unit_id: &UnitId, path: &Path, map: &Map) -> Result<(), String> {
         let loc = match path.last_pos() {
             None => {
@@ -97,16 +179,16 @@ impl Indexes {
             Some(loc) => loc,
         };
 
-        let current_loc = match self.position_of_unit_or_transport(&unit_id) {
+        let current_loc = match self.position_of_unit_or_transport(unit_id) {
             Ok(facing_dir_loc) => facing_dir_loc,
             Err(msg) => {
                 return Err(msg);
             }
         };
 
-        return match self.by_id.get_mut(&unit_id) {
+        match self.by_id.get_mut(unit_id) {
             Some(unit_model) => {
-                unit_model.supplies -= path.supply_cost(&map, &unit_model.unit);
+                unit_model.supplies -= path.supply_cost(map, &unit_model.unit);
 
                 let new_facing_dir = FacingDirection::from_directions(path.clone().to_directions())
                     .unwrap_or_else(|| current_loc.value.clone());
@@ -125,7 +207,7 @@ impl Indexes {
                 Ok(())
             }
             None => Err("could not get unit when trying to travel it".to_string()),
-        };
+        }
     }
 
     pub fn position_of_unit_or_transport(

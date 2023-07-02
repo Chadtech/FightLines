@@ -1,9 +1,8 @@
 use crate::game;
 use crate::game::action::Action;
 use crate::game::replenishment::Replenishment;
-use crate::game::unit_index;
+use crate::game::{action, unit_index};
 use crate::id::Id;
-use crate::located::Located;
 use crate::map::Map;
 use crate::path::Path;
 use crate::rng::{RandGen, RandSeed};
@@ -22,13 +21,15 @@ pub enum Event {
     Loaded {
         cargo_id: UnitId,
         transport_id: UnitId,
-        picked_up: bool,
-        loc: Located<()>,
+        path: Path,
+    },
+    PickedUp {
+        cargo_id: UnitId,
+        transport_id: UnitId,
+        path: Path,
     },
     Unloaded {
         cargo_id: UnitId,
-        transport_id: UnitId,
-        loc: Located<()>,
     },
     ReplenishedUnits {
         path: Path,
@@ -84,9 +85,10 @@ pub fn process_turn_into_events(
         }
     }
 
+    action::unbatch(&mut ordered_actions);
+
     let mut events = baseline_supply_events(indexes);
     let mut errors: Vec<String> = vec![];
-
     while let Some(event) = events.first() {
         let mut event_error = |err: String| {
             let mut err_msg = "event error : ".to_string();
@@ -98,7 +100,7 @@ pub fn process_turn_into_events(
 
         match event {
             Event::ConsumedBaselineSupplies { unit_id, cost } => {
-                match indexes.consume_base_supplies(unit_id, cost.clone()) {
+                match indexes.consume_base_supplies(unit_id, *cost) {
                     Ok(consume_baseline_supplies) => {
                         if consume_baseline_supplies.perished {
                             delete_actions_for_deleted_unit(unit_id.clone(), &mut ordered_actions);
@@ -114,8 +116,43 @@ pub fn process_turn_into_events(
                     event_error(err);
                 }
             }
-            Event::Loaded { .. } => {}
-            Event::Unloaded { .. } => {}
+            Event::Loaded {
+                cargo_id,
+                transport_id,
+                path,
+            } => {
+                if let Err(err) = indexes.load_into(
+                    unit_index::CargoAndTransportIds {
+                        cargo_id,
+                        transport_id,
+                    },
+                    path,
+                    map,
+                ) {
+                    event_error(err)
+                }
+            }
+            Event::PickedUp {
+                cargo_id,
+                transport_id,
+                path,
+            } => {
+                if let Err(err) = indexes.pick_up(
+                    unit_index::CargoAndTransportIds {
+                        cargo_id,
+                        transport_id,
+                    },
+                    path,
+                    map,
+                ) {
+                    event_error(err);
+                }
+            }
+            Event::Unloaded { cargo_id } => {
+                if let Err(err) = indexes.unload(cargo_id) {
+                    event_error(err);
+                }
+            }
             Event::ReplenishedUnits { .. } => {}
             Event::WasReplenished { .. } => {}
             Event::DepletedCrate { .. } => {}
@@ -124,7 +161,7 @@ pub fn process_turn_into_events(
         events.remove(0);
 
         if let Some(action) = ordered_actions.first() {
-            if let Err(err) = process_action(&action, indexes, &mut events) {
+            if let Err(err) = process_action(action, indexes, &mut events) {
                 let mut err_msg = "process action error : ".to_string();
 
                 err_msg.push_str(err.as_str());
@@ -171,36 +208,25 @@ fn process_action(
             load_into,
             path,
         } => {
-            if let Some(pos) = path.last_pos() {
-                events.push(Event::Loaded {
-                    cargo_id: unit_id.clone(),
-                    transport_id: load_into.clone(),
-                    picked_up: false,
-                    loc: pos,
-                });
-            }
+            events.push(Event::Loaded {
+                cargo_id: unit_id.clone(),
+                transport_id: load_into.clone(),
+                path: path.clone(),
+            });
         }
         Action::PickUp {
             unit_id,
             cargo_id,
             path,
         } => {
-            if let Some(pos) = path.last_pos() {
-                events.push(Event::Loaded {
-                    cargo_id: cargo_id.clone(),
-                    transport_id: unit_id.clone(),
-                    picked_up: true,
-                    loc: pos,
-                });
-            }
+            events.push(Event::PickedUp {
+                cargo_id: cargo_id.clone(),
+                transport_id: unit_id.clone(),
+                path: path.clone(),
+            });
         }
-        Action::DropOff {
-            cargo_unit_loc,
-            transport_id,
-        } => events.push(Event::Unloaded {
+        Action::DropOff { cargo_unit_loc, .. } => events.push(Event::Unloaded {
             cargo_id: cargo_unit_loc.value.1.clone(),
-            transport_id: transport_id.clone(),
-            loc: cargo_unit_loc.to_unit(),
         }),
         Action::Replenish {
             replenishing_unit_id,
@@ -356,5 +382,174 @@ mod test_events {
         let want_units = &vec![(infantry_id, FacingDirection::Right, infantry_after_turn)];
 
         assert_eq!(want_units, got_units_by_loc);
+    }
+
+    #[test]
+    fn process_loading() {
+        let rand_seed = RandSeed::test();
+
+        let player_1 = Id::from_string("player 1".to_string(), true).unwrap();
+        let infantry_id = UnitId::test("infantry");
+        let truck_id = UnitId::test("truck");
+
+        let player_1_loads_actions = vec![Action::LoadInto {
+            unit_id: infantry_id.clone(),
+            load_into: truck_id.clone(),
+            path: Path::from_directions_test_only(
+                &located::unit(2, 2),
+                &vec![Direction::South, Direction::South],
+            ),
+        }];
+
+        let mut actions = vec![(player_1.clone(), player_1_loads_actions)];
+
+        let mut indexes = Indexes::make(vec![
+            (
+                infantry_id.clone(),
+                unit::Model::new(
+                    Unit::Infantry,
+                    &player_1,
+                    Place::OnMap(Located {
+                        x: 2,
+                        y: 2,
+                        value: FacingDirection::Right,
+                    }),
+                    &TeamColor::Red,
+                ),
+            ),
+            (
+                truck_id.clone(),
+                unit::Model::new(
+                    Unit::Truck,
+                    &player_1,
+                    Place::OnMap(Located {
+                        x: 2,
+                        y: 4,
+                        value: FacingDirection::Right,
+                    }),
+                    &TeamColor::Red,
+                ),
+            ),
+        ]);
+
+        let map = Map::grass_square();
+
+        let got_errors =
+            process_turn_into_events(rand_seed.clone(), &mut actions, &mut indexes, &map).unwrap();
+
+        let want_errors: Vec<String> = vec![];
+        assert_eq!(want_errors, got_errors);
+
+        // After the turn, the infantry is located in the truck
+        {
+            let got_infantry_loc = indexes
+                .by_id
+                .get(&infantry_id)
+                .unwrap()
+                .place
+                .in_unit_loc()
+                .unwrap();
+
+            let want_loc = truck_id.clone();
+
+            assert_eq!(want_loc, got_infantry_loc.clone());
+        }
+
+        // After the turn, the infantry is no longer located a 2,2, where it was before
+        {
+            let got_units_by_loc = indexes.by_location.get(&located::unit(2, 2)).unwrap();
+
+            let want_units: Vec<(UnitId, FacingDirection, unit::Model)> = vec![];
+
+            assert_eq!(&want_units, got_units_by_loc);
+        }
+
+        // After the turn, we can get the infantry by id as we expect it
+        {
+            let mut infantry_after_turn = unit::Model::new(
+                Unit::Infantry,
+                &player_1,
+                Place::InUnit(truck_id.clone()),
+                &TeamColor::Red,
+            );
+
+            infantry_after_turn.supplies = 972;
+
+            let got_infantry_by_id = indexes.by_id.get(&infantry_id.clone()).unwrap().clone();
+            let want_infantry_by_id = infantry_after_turn;
+
+            assert_eq!(want_infantry_by_id, got_infantry_by_id);
+        }
+
+        let player_1_unload_actions = vec![
+            Action::Travel {
+                unit_id: truck_id.clone(),
+                path: Path::from_directions_test_only(
+                    &located::unit(2, 4),
+                    &vec![
+                        Direction::East,
+                        Direction::East,
+                        Direction::East,
+                        Direction::East,
+                    ],
+                ),
+                dismounted_from: None,
+            },
+            Action::Travel {
+                unit_id: infantry_id.clone(),
+                path: Path::from_directions_test_only(
+                    &located::unit(6, 4),
+                    &vec![Direction::South, Direction::South],
+                ),
+                dismounted_from: Some(truck_id.clone()),
+            },
+        ];
+
+        let mut actions = vec![(player_1.clone(), player_1_unload_actions)];
+
+        let got_errors =
+            process_turn_into_events(rand_seed, &mut actions, &mut indexes, &map).unwrap();
+
+        let want_errors: Vec<String> = vec![];
+
+        assert_eq!(want_errors, got_errors);
+
+        // After the second turn, the truck has moved
+        {
+            let got_truck_loc = indexes
+                .by_id
+                .get(&truck_id)
+                .unwrap()
+                .place
+                .to_map_loc()
+                .unwrap();
+
+            let want_loc = Located {
+                x: 6,
+                y: 4,
+                value: FacingDirection::Right,
+            };
+
+            assert_eq!(want_loc, got_truck_loc.clone());
+        }
+
+        // After the second turn, the infantry is located south of the truck
+        {
+            let got_infantry_loc = indexes
+                .by_id
+                .get(&infantry_id)
+                .unwrap()
+                .place
+                .to_map_loc()
+                .unwrap();
+
+            let want_loc = Located {
+                x: 6,
+                y: 6,
+                value: FacingDirection::Right,
+            };
+
+            assert_eq!(want_loc, got_infantry_loc.clone());
+        }
     }
 }
