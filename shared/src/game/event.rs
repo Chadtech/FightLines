@@ -561,7 +561,7 @@ mod test_events {
         let truck_id = UnitId::test("truck");
         let supply_crate_id = UnitId::test("supply crate");
 
-        let player_1_loads_actions = vec![Action::PickUp {
+        let player_1_pickup_actions = vec![Action::PickUp {
             unit_id: truck_id.clone(),
             cargo_id: supply_crate_id.clone(),
             path: Path::from_directions_test_only(
@@ -570,7 +570,7 @@ mod test_events {
             ),
         }];
 
-        let mut actions = vec![(player_1.clone(), player_1_loads_actions)];
+        let mut actions = vec![(player_1.clone(), player_1_pickup_actions)];
 
         let mut indexes = Indexes::make(vec![
             (
@@ -666,9 +666,88 @@ mod test_events {
                 .unwrap()
                 .clone();
 
-            let want_crate_loc = truck_id;
+            let want_crate_loc = truck_id.clone();
 
             assert_eq!(want_crate_loc, got_crate_loc);
+        }
+
+        let player_1_drop_actions = vec![Action::DropOff {
+            transport_id: truck_id.clone(),
+            cargo_unit_loc: Located {
+                x: 2,
+                y: 4,
+                value: (FacingDirection::Left, supply_crate_id.clone()),
+            },
+        }];
+
+        let mut actions = vec![(player_1.clone(), player_1_drop_actions)];
+
+        let got_errors =
+            process_turn_into_events(rand_seed.clone(), &mut actions, &mut indexes, &map).unwrap();
+
+        let want_errors: Vec<String> = vec![];
+        assert_eq!(want_errors, got_errors);
+
+        // After second turn crates location is on map
+        {
+            let got_crate_loc = indexes
+                .by_id
+                .get(&supply_crate_id)
+                .unwrap()
+                .place
+                .to_map_loc()
+                .unwrap()
+                .clone();
+
+            let want_crate_loc = Located {
+                x: 2,
+                y: 4,
+                value: FacingDirection::Left,
+            };
+
+            assert_eq!(want_crate_loc, got_crate_loc);
+
+            let mut crate_after_turn = unit::Model::new(
+                Unit::SupplyCrate,
+                &player_1,
+                Place::OnMap(Located {
+                    x: 2,
+                    y: 4,
+                    value: FacingDirection::Left,
+                }),
+                &TeamColor::Red,
+            );
+
+            crate_after_turn.supplies = 8192;
+
+            let mut truck_after_turn = unit::Model::new(
+                Unit::Truck,
+                &player_1,
+                Place::OnMap(Located {
+                    x: 2,
+                    y: 4,
+                    value: FacingDirection::Left,
+                }),
+                &TeamColor::Red,
+            );
+
+            truck_after_turn.supplies = 1962;
+
+            let two_units: Vec<(UnitId, FacingDirection, unit::Model)> = vec![
+                (truck_id.clone(), FacingDirection::Left, truck_after_turn),
+                (
+                    supply_crate_id.clone(),
+                    FacingDirection::Left,
+                    crate_after_turn,
+                ),
+            ];
+
+            let want_curr_loc: Option<&Vec<(UnitId, FacingDirection, unit::Model)>> =
+                Some(&two_units);
+
+            let got_curr_loc = indexes.by_location.get(&located::unit(2, 4));
+
+            assert_eq!(want_curr_loc, got_curr_loc);
         }
     }
 }
