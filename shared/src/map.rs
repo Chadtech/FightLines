@@ -138,6 +138,7 @@ pub enum MapOpt {
     DisplayTest,
     ReplenishTest,
     ArrowTest,
+    GamePlayTest,
 }
 
 pub struct StartingUnits {
@@ -329,6 +330,11 @@ impl MapOpt {
                 }],
                 rest_players_militatries: vec![],
             },
+            MapOpt::GamePlayTest => StartingUnits {
+                first_player_military: vec![],
+                second_player_military: vec![],
+                rest_players_militatries: vec![],
+            },
         }
     }
 
@@ -361,6 +367,30 @@ F      FF      F
 F      FF      F
 F      FF      F
 FFFFFFFFFFFFFFFF
+"#
+                .to_string(),
+            }
+            .try_into()
+            .unwrap(),
+            MapOpt::GamePlayTest => DevFlags {
+                base_tile: Tile::GrassPlain,
+                src: r#"
+FFF FFFFFF  FFFF
+FFF  FF  FF  FFF
+F     HHHH     G
+F      HHF F   G
+F   F  FF  F   G
+F  FF      F   G
+G      FF      G
+G    H FF H    G
+G    H FF H    G
+G   HHHFFHHH   G
+F      FHHHHH  G
+F HHH   F  HH  G
+F   HH      H  G
+FF  HH FF      G
+FFF  FF FF    FF
+FFF  FF      FFF
 "#
                 .to_string(),
             }

@@ -40,6 +40,7 @@ pub enum DevGameId {
     DisplayTest,
     ReplenishTest,
     ArrowTest,
+    GamePlayTest,
 }
 
 impl ToString for GameId {
@@ -57,6 +58,7 @@ impl ToString for DevGameId {
             DevGameId::DisplayTest => DISPLAY_TEST.to_string(),
             DevGameId::ReplenishTest => REPLENISH_TEST.to_string(),
             DevGameId::ArrowTest => ARROW_TEST.to_string(),
+            DevGameId::GamePlayTest => GAME_PLAY_TEST.to_string(),
         }
     }
 }
@@ -77,6 +79,7 @@ pub const ALL_DEV_IDS: &[DevGameId] = &[
     DevGameId::DisplayTest,
     DevGameId::ReplenishTest,
     DevGameId::ArrowTest,
+    DevGameId::GamePlayTest,
 ];
 
 impl GameId {
@@ -95,6 +98,10 @@ impl GameId {
 
         if s == ARROW_TEST {
             return Some(DevGameId::ArrowTest.into());
+        }
+
+        if s == GAME_PLAY_TEST {
+            return Some(DevGameId::GamePlayTest.into());
         }
 
         Id::from_string(s, false).map(GameId::GameId)
@@ -171,6 +178,7 @@ pub enum FromLobbyError {
 const DISPLAY_TEST: &str = "display-test";
 const REPLENISH_TEST: &str = "replenish-test";
 const ARROW_TEST: &str = "arrow-test";
+const GAME_PLAY_TEST: &str = "game-play-test";
 
 ////////////////////////////////////////////////////////////////////////////////
 // Api //

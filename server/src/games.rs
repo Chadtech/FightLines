@@ -94,6 +94,17 @@ impl Games {
 
         let mut games = HashMap::new();
 
+        // This does nothing, but if you are
+        // brought here by a compile error,
+        // you probably need to add your new
+        // dev id to ALL_DEV_IDS
+        match DevGameId::DisplayTest {
+            DevGameId::DisplayTest => {}
+            DevGameId::ReplenishTest => {}
+            DevGameId::ArrowTest => {}
+            DevGameId::GamePlayTest => {}
+        }
+
         for dev_game_id in game::ALL_DEV_IDS {
             let game = match dev_game_id {
                 DevGameId::DisplayTest => {
@@ -246,6 +257,167 @@ impl Games {
                         (UnitId::test("red truck 1"), truck_1),
                         (UnitId::test("red truck 2"), truck_2),
                         (UnitId::test("blue truck"), blue_truck),
+                    ]);
+
+                    Game::try_from(game_init_flags).unwrap()
+                }
+                DevGameId::GamePlayTest => {
+                    let red_player_id = Id::from_string("red".to_string(), true).unwrap();
+                    let mut lobby = Lobby::new(
+                        red_player_id.clone(),
+                        Player {
+                            name: Name::from_str("red").unwrap(),
+                            color: TeamColor::Red,
+                        },
+                    );
+
+                    let blue_player_id = Id::from_string("blue".to_string(), true).unwrap();
+
+                    let _ = lobby.add_guest(
+                        blue_player_id.clone(),
+                        Player {
+                            name: Name::from_str("blue").unwrap(),
+                            color: TeamColor::Blue,
+                        },
+                    );
+
+                    lobby.set_map_choice(MapOpt::GamePlayTest);
+
+                    let new_seed: RandSeed = RandSeed::next(&mut rng);
+
+                    let mut init_flags_rng = RandGen::from_seed(new_seed);
+
+                    let mut game_init_flags = GameInitFlags::new(lobby, &mut init_flags_rng);
+
+                    let red_truck_1 = unit::Model::new(
+                        Unit::Truck,
+                        &red_player_id,
+                        Place::on_map(1, 2, FacingDirection::Right),
+                        &TeamColor::Red,
+                    );
+
+                    let red_truck_2 = unit::Model::new(
+                        Unit::Truck,
+                        &red_player_id,
+                        Place::on_map(2, 2, FacingDirection::Right),
+                        &TeamColor::Red,
+                    );
+
+                    let red_infantry_1 = unit::Model::new(
+                        Unit::Infantry,
+                        &red_player_id,
+                        Place::on_map(3, 2, FacingDirection::Right),
+                        &TeamColor::Red,
+                    );
+
+                    let red_infantry_2 = unit::Model::new(
+                        Unit::Infantry,
+                        &red_player_id,
+                        Place::on_map(2, 4, FacingDirection::Right),
+                        &TeamColor::Red,
+                    );
+
+                    let red_tank_1 = unit::Model::new(
+                        Unit::Tank,
+                        &red_player_id,
+                        Place::on_map(3, 3, FacingDirection::Right),
+                        &TeamColor::Red,
+                    );
+
+                    let red_tank_2 = unit::Model::new(
+                        Unit::Tank,
+                        &red_player_id,
+                        Place::on_map(3, 5, FacingDirection::Right),
+                        &TeamColor::Red,
+                    );
+
+                    let red_supply_crate_1 = unit::Model::new(
+                        Unit::SupplyCrate,
+                        &red_player_id,
+                        Place::on_map(3, 10, FacingDirection::Right),
+                        &TeamColor::Red,
+                    );
+
+                    let red_supply_crate_2 = unit::Model::new(
+                        Unit::SupplyCrate,
+                        &red_player_id,
+                        Place::on_map(8, 5, FacingDirection::Right),
+                        &TeamColor::Red,
+                    );
+
+                    let blue_truck_1 = unit::Model::new(
+                        Unit::Truck,
+                        &blue_player_id,
+                        Place::on_map(14, 12, FacingDirection::Left),
+                        &TeamColor::Blue,
+                    );
+
+                    let blue_truck_2 = unit::Model::new(
+                        Unit::Truck,
+                        &blue_player_id,
+                        Place::on_map(13, 13, FacingDirection::Left),
+                        &TeamColor::Blue,
+                    );
+
+                    let blue_infantry_1 = unit::Model::new(
+                        Unit::Infantry,
+                        &blue_player_id,
+                        Place::on_map(12, 12, FacingDirection::Left),
+                        &TeamColor::Blue,
+                    );
+
+                    let blue_infantry_2 = unit::Model::new(
+                        Unit::Infantry,
+                        &blue_player_id,
+                        Place::on_map(13, 11, FacingDirection::Left),
+                        &TeamColor::Blue,
+                    );
+
+                    let blue_tank_1 = unit::Model::new(
+                        Unit::Tank,
+                        &blue_player_id,
+                        Place::on_map(11, 12, FacingDirection::Left),
+                        &TeamColor::Blue,
+                    );
+
+                    let blue_tank_2 = unit::Model::new(
+                        Unit::Tank,
+                        &blue_player_id,
+                        Place::on_map(11, 10, FacingDirection::Left),
+                        &TeamColor::Blue,
+                    );
+
+                    let blue_supply_crate_1 = unit::Model::new(
+                        Unit::SupplyCrate,
+                        &red_player_id,
+                        Place::on_map(6, 12, FacingDirection::Right),
+                        &TeamColor::Blue,
+                    );
+
+                    let blue_supply_crate_2 = unit::Model::new(
+                        Unit::SupplyCrate,
+                        &red_player_id,
+                        Place::on_map(11, 5, FacingDirection::Right),
+                        &TeamColor::Blue,
+                    );
+
+                    game_init_flags.with_extra_units(&mut vec![
+                        (UnitId::test("red truck 1"), red_truck_1),
+                        (UnitId::test("red truck 2"), red_truck_2),
+                        (UnitId::test("blue truck 1"), blue_truck_1),
+                        (UnitId::test("blue truck 2"), blue_truck_2),
+                        (UnitId::test("red infantry 1"), red_infantry_1),
+                        (UnitId::test("red infantry 2"), red_infantry_2),
+                        (UnitId::test("blue infantry 1"), blue_infantry_1),
+                        (UnitId::test("blue infantry 2"), blue_infantry_2),
+                        (UnitId::test("red tank 1"), red_tank_1),
+                        (UnitId::test("red tank 2"), red_tank_2),
+                        (UnitId::test("blue tank 1"), blue_tank_1),
+                        (UnitId::test("blue tank 2"), blue_tank_2),
+                        (UnitId::test("red supply crate 1"), red_supply_crate_1),
+                        (UnitId::test("red supply crate 2"), red_supply_crate_2),
+                        (UnitId::test("blue supply crate 1"), blue_supply_crate_1),
+                        (UnitId::test("blue supply crate 2"), blue_supply_crate_2),
                     ]);
 
                     Game::try_from(game_init_flags).unwrap()

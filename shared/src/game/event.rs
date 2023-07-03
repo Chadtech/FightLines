@@ -85,6 +85,8 @@ pub fn process_turn(
         }
     }
 
+    dbg!(&ordered_actions);
+
     action::unbatch(&mut ordered_actions);
 
     let mut events = baseline_supply_events(indexes);
@@ -847,7 +849,7 @@ mod test_events {
             value: FacingDirection::Right,
         };
 
-        // assert_eq!(want_blue_infantry_loc, got_blue_infantry_loc);
+        assert_eq!(want_blue_infantry_loc, got_blue_infantry_loc);
 
         let got_units_by_loc = indexes
             .by_location

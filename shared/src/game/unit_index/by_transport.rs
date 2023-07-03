@@ -49,15 +49,13 @@ pub fn make(units: &unit_index::by_id::Index) -> Index {
 
 #[cfg(test)]
 mod test_index_by_transport {
-    use crate::direction::Direction;
     use crate::facing_direction::FacingDirection;
     use crate::game::unit_index::{by_id, by_transport};
     use crate::id::Id;
     use crate::located::Located;
-    use crate::path::Path;
     use crate::team_color::TeamColor;
+    use crate::unit;
     use crate::unit::{Place, Unit, UnitId};
-    use crate::{located, unit};
     use pretty_assertions::assert_eq;
     use std::collections::HashMap;
 
