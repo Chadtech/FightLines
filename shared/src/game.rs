@@ -323,13 +323,21 @@ impl Game {
 
         let outcomes = vec![
             self.consume_supplies(),
-            Outcome::from_actions(&mut player_moves),
+            Outcome::from_actions(&mut player_moves.clone()),
         ]
         .concat();
 
         self.turn_number += 1;
         self.process_changes();
-        self.process_outcomes(outcomes.clone())?;
+        // self.process_outcomes(outcomes.clone())?;
+
+        let event_rand_seed: RandSeed = RandSeed::next(&mut rng);
+        let _ = event::process_turn(
+            event_rand_seed,
+            &mut player_moves,
+            &mut self.indexes,
+            &self.map,
+        );
 
         self.prev_outcomes = outcomes;
         self.indexes.by_location = unit_index::by_location::make(&self.indexes.by_id);

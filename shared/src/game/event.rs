@@ -1,4 +1,3 @@
-use crate::game;
 use crate::game::action::Action;
 use crate::game::replenishment::Replenishment;
 use crate::game::{action, unit_index};
@@ -45,19 +44,19 @@ pub enum Event {
     }, // Battle {},
 }
 
-pub fn process_turn_into_events(
+pub fn process_turn(
     rand_seed: RandSeed,
     player_moves: &mut Vec<(Id, Vec<Action>)>,
     indexes: &mut unit_index::Indexes,
     map: &Map,
-) -> Result<Vec<String>, String> {
+) -> Vec<String> {
     let mut rng = RandGen::from_seed(rand_seed);
 
     // These actions might come in orders that don't make sense,
     // such as a unit moving away from a transport before it has
     // been unloaded from the transport.
     for (_, moves) in &mut *player_moves {
-        game::action::order(&mut rng, moves);
+        action::order(&mut rng, moves);
     }
 
     let mut ordered_actions = Vec::new();
@@ -73,9 +72,10 @@ pub fn process_turn_into_events(
                 if let Some(first) = actions.first() {
                     ordered_actions.push(first.clone());
                     actions.remove(0);
-                    if actions.is_empty() {
-                        player_moves.remove(player_index);
-                    }
+                }
+
+                if actions.is_empty() {
+                    player_moves.remove(player_index);
                 }
             }
 
@@ -181,7 +181,7 @@ pub fn process_turn_into_events(
         }
     }
 
-    Ok(errors)
+    errors
 }
 
 fn delete_actions_for_deleted_unit(deleted_unit_id: UnitId, actions: &mut Vec<Action>) {
@@ -305,7 +305,7 @@ mod test_events {
     use crate::direction::Direction;
     use crate::facing_direction::FacingDirection;
     use crate::game::action::Action;
-    use crate::game::event::process_turn_into_events;
+    use crate::game::event::process_turn;
     use crate::game::unit_index::Indexes;
     use crate::id::Id;
     use crate::located::Located;
@@ -350,8 +350,7 @@ mod test_events {
 
         let map = Map::grass_square();
 
-        let got_errors =
-            process_turn_into_events(rand_seed, &mut actions, &mut indexes, &map).unwrap();
+        let got_errors = process_turn(rand_seed, &mut actions, &mut indexes, &map);
 
         let want_errors: Vec<String> = vec![];
         assert_eq!(want_errors, got_errors);
@@ -442,8 +441,7 @@ mod test_events {
 
         let map = Map::grass_square();
 
-        let got_errors =
-            process_turn_into_events(rand_seed.clone(), &mut actions, &mut indexes, &map).unwrap();
+        let got_errors = process_turn(rand_seed.clone(), &mut actions, &mut indexes, &map);
 
         let want_errors: Vec<String> = vec![];
         assert_eq!(want_errors, got_errors);
@@ -515,8 +513,7 @@ mod test_events {
 
         let mut actions = vec![(player_1.clone(), player_1_unload_actions)];
 
-        let got_errors =
-            process_turn_into_events(rand_seed, &mut actions, &mut indexes, &map).unwrap();
+        let got_errors = process_turn(rand_seed, &mut actions, &mut indexes, &map);
 
         let want_errors: Vec<String> = vec![];
 
@@ -611,8 +608,7 @@ mod test_events {
 
         let map = Map::grass_square();
 
-        let got_errors =
-            process_turn_into_events(rand_seed.clone(), &mut actions, &mut indexes, &map).unwrap();
+        let got_errors = process_turn(rand_seed.clone(), &mut actions, &mut indexes, &map);
 
         let want_errors: Vec<String> = vec![];
         assert_eq!(want_errors, got_errors);
@@ -690,8 +686,7 @@ mod test_events {
 
         let mut actions = vec![(player_1.clone(), player_1_drop_actions)];
 
-        let got_errors =
-            process_turn_into_events(rand_seed.clone(), &mut actions, &mut indexes, &map).unwrap();
+        let got_errors = process_turn(rand_seed.clone(), &mut actions, &mut indexes, &map);
 
         let want_errors: Vec<String> = vec![];
         assert_eq!(want_errors, got_errors);
@@ -757,5 +752,123 @@ mod test_events {
 
             assert_eq!(want_curr_loc, got_curr_loc);
         }
+    }
+
+    #[test]
+    fn process_two_player_travel() {
+        let rand_seed = RandSeed::test();
+
+        let red_player_id = Id::from_string("red player".to_string(), true).unwrap();
+        let red_infantry_id = UnitId::test("red infantry");
+
+        let red_player_actions = vec![Action::Travel {
+            unit_id: red_infantry_id.clone(),
+            path: Path::from_directions_test_only(&located::unit(2, 2), &vec![Direction::South]),
+            dismounted_from: None,
+        }];
+
+        let blue_player_id = Id::from_string("blue player".to_string(), true).unwrap();
+        let blue_infantry_id = UnitId::test("blue infantry");
+
+        let blue_player_actions = vec![Action::Travel {
+            unit_id: blue_infantry_id.clone(),
+            path: Path::from_directions_test_only(&located::unit(4, 2), &vec![Direction::South]),
+            dismounted_from: None,
+        }];
+
+        let mut actions = vec![
+            (red_player_id.clone(), red_player_actions),
+            (blue_player_id.clone(), blue_player_actions),
+        ];
+
+        let mut indexes = Indexes::make(vec![
+            (
+                red_infantry_id.clone(),
+                unit::Model::new(
+                    Unit::Infantry,
+                    &red_player_id,
+                    Place::OnMap(Located {
+                        x: 2,
+                        y: 2,
+                        value: FacingDirection::Right,
+                    }),
+                    &TeamColor::Red,
+                ),
+            ),
+            (
+                blue_infantry_id.clone(),
+                unit::Model::new(
+                    Unit::Infantry,
+                    &blue_player_id,
+                    Place::OnMap(Located {
+                        x: 4,
+                        y: 2,
+                        value: FacingDirection::Right,
+                    }),
+                    &TeamColor::Blue,
+                ),
+            ),
+        ]);
+
+        let map = Map::grass_square();
+
+        let got_errors = process_turn(rand_seed, &mut actions, &mut indexes, &map);
+
+        let want_errors: Vec<String> = vec![];
+        assert_eq!(want_errors, got_errors);
+
+        let got_red_infantry_loc = indexes
+            .by_id
+            .get(&red_infantry_id)
+            .unwrap()
+            .place
+            .to_map_loc()
+            .unwrap();
+
+        let want_red_infantry_loc = &Located {
+            x: 2,
+            y: 3,
+            value: FacingDirection::Right,
+        };
+
+        assert_eq!(want_red_infantry_loc, got_red_infantry_loc);
+
+        let got_blue_infantry_loc = indexes
+            .by_id
+            .get(&blue_infantry_id)
+            .unwrap()
+            .place
+            .to_map_loc()
+            .unwrap();
+
+        let want_blue_infantry_loc = &Located {
+            x: 4,
+            y: 3,
+            value: FacingDirection::Right,
+        };
+
+        // assert_eq!(want_blue_infantry_loc, got_blue_infantry_loc);
+
+        let got_units_by_loc = indexes
+            .by_location
+            .get(&want_red_infantry_loc.to_unit())
+            .unwrap();
+
+        let mut infantry_after_turn = unit::Model::new(
+            Unit::Infantry,
+            &red_player_id,
+            Place::OnMap(Located {
+                x: 2,
+                y: 3,
+                value: FacingDirection::Right,
+            }),
+            &TeamColor::Red,
+        );
+
+        infantry_after_turn.supplies = 982;
+
+        let want_units = &vec![(red_infantry_id, FacingDirection::Right, infantry_after_turn)];
+
+        assert_eq!(want_units, got_units_by_loc);
     }
 }
