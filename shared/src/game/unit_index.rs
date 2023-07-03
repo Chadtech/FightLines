@@ -3,9 +3,10 @@ use crate::located::Located;
 use crate::map::Map;
 use crate::path::Path;
 use crate::unit;
-use crate::unit::Place;
 use crate::unit::UnitId;
+use crate::unit::{Model, Place};
 use serde::{Deserialize, Serialize};
+use std::cmp;
 use std::collections::HashMap;
 
 pub mod by_id;
@@ -117,11 +118,58 @@ impl Indexes {
         cargo_unit_model.place = Place::InUnit(units.transport_id.clone());
 
         self.by_location
-            .filter_unit_id(&cargo_last_pos, units.cargo_id);
+            .delete_unit(&cargo_last_pos, units.cargo_id);
 
         self.travel_unit(units.transport_id, path, map)?;
 
         Ok(())
+    }
+
+    pub fn replenish(&mut self, unit_id: &UnitId, amount: i16) -> Result<(), String> {
+        let unit_model = match self.by_id.get_mut(unit_id) {
+            None => return Err("could not get unit to replenish".to_string()),
+            Some(u) => u,
+        };
+
+        unit_model.supplies = cmp::min(amount, unit_model.unit.max_supplies());
+
+        Ok(())
+    }
+
+    pub fn deplete_supply_crate(&mut self, unit_id: &UnitId, amount: i16) -> Result<(), String> {
+        let unit_model = match self.by_id.get_mut(unit_id) {
+            None => {
+                return Err("could not get unit to deplete supplies".to_string());
+            }
+            Some(u) => u,
+        };
+
+        let place = unit_model.place.clone();
+
+        if !unit_model.unit.is_supply_crate() {
+            return Err("trying to deplete supplies of non-supply crate unit".to_string());
+        }
+
+        let new_supply_level = unit_model.supplies - amount;
+
+        if new_supply_level <= 0 {
+            self.by_id.delete(unit_id);
+
+            self.delete_by_place(unit_id, &place);
+        }
+
+        Ok(())
+    }
+
+    pub fn delete_by_place(&mut self, unit_id: &UnitId, place: &Place) {
+        match place {
+            Place::OnMap(loc) => {
+                self.by_location.delete_unit(&loc.to_unit(), unit_id);
+            }
+            Place::InUnit(transport_id) => {
+                self.by_transport.delete_unit(transport_id, unit_id);
+            }
+        }
     }
 
     pub fn unload(&mut self, cargo_id: &UnitId) -> Result<(), String> {
@@ -164,7 +212,7 @@ impl Indexes {
                 cargo_model.place = Place::InUnit(units.transport_id.clone());
 
                 self.by_location
-                    .filter_unit_id(&current_loc.to_unit(), units.cargo_id);
+                    .delete_unit(&current_loc.to_unit(), units.cargo_id);
 
                 Ok(())
             }
@@ -190,19 +238,21 @@ impl Indexes {
             Some(unit_model) => {
                 unit_model.supplies -= path.supply_cost(map, &unit_model.unit);
 
+                let prev_place = unit_model.place.clone();
+
                 let new_facing_dir = FacingDirection::from_directions(path.clone().to_directions())
                     .unwrap_or_else(|| current_loc.value.clone());
 
                 unit_model.place = Place::OnMap(loc.with_value(new_facing_dir.clone()));
 
-                self.by_location
-                    .filter_unit_id(&current_loc.to_unit(), unit_id);
                 self.by_location.insert(
                     &loc.to_unit(),
                     unit_id.clone(),
                     new_facing_dir,
                     unit_model.clone(),
                 );
+
+                self.delete_by_place(unit_id, &prev_place);
 
                 Ok(())
             }

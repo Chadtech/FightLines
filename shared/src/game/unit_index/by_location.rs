@@ -20,7 +20,7 @@ impl Index {
         self.0.iter()
     }
 
-    pub fn filter_unit_id(&mut self, loc: &Located<()>, unit_id_to_remove: &UnitId) {
+    pub fn delete_unit(&mut self, loc: &Located<()>, unit_id_to_remove: &UnitId) {
         if let Some(units) = self.0.get(loc) {
             let new_units = units
                 .iter()

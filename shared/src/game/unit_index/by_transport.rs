@@ -19,6 +19,16 @@ impl Index {
     pub fn contains(&mut self, unit_id: &UnitId) -> bool {
         self.0.contains_key(unit_id)
     }
+
+    pub fn delete_unit(&mut self, transport_id: &UnitId, cargo_id_to_delete: &UnitId) {
+        if let Some(cargo) = self.get_mut(transport_id) {
+            *cargo = cargo
+                .iter()
+                .filter(|(cargo_id, _)| cargo_id != cargo_id_to_delete)
+                .map(|cargo_unit| cargo_unit.clone())
+                .collect::<Vec<(UnitId, unit::Model)>>();
+        }
+    }
 }
 
 pub fn make(units: &unit_index::by_id::Index) -> Index {
@@ -35,4 +45,62 @@ pub fn make(units: &unit_index::by_id::Index) -> Index {
     }
 
     Index(ret)
+}
+
+#[cfg(test)]
+mod test_index_by_transport {
+    use crate::direction::Direction;
+    use crate::facing_direction::FacingDirection;
+    use crate::game::unit_index::{by_id, by_transport};
+    use crate::id::Id;
+    use crate::located::Located;
+    use crate::path::Path;
+    use crate::team_color::TeamColor;
+    use crate::unit::{Place, Unit, UnitId};
+    use crate::{located, unit};
+    use pretty_assertions::assert_eq;
+    use std::collections::HashMap;
+
+    #[test]
+    fn transport_delete_by_unit_id() {
+        let player_id = Id::from_string("player".to_string(), true).unwrap();
+
+        let infantry_id = UnitId::test("infantry");
+        let truck_id = UnitId::test("truck");
+
+        let infantry = unit::Model::new(
+            Unit::Infantry,
+            &player_id.clone(),
+            Place::InUnit(truck_id.clone()),
+            &TeamColor::Red,
+        );
+
+        let truck = unit::Model::new(
+            Unit::Truck,
+            &player_id.clone(),
+            Place::OnMap(Located {
+                x: 2,
+                y: 2,
+                value: FacingDirection::Right,
+            }),
+            &TeamColor::Red,
+        );
+
+        let units = vec![(infantry_id.clone(), infantry), (truck_id.clone(), truck)]
+            .into_iter()
+            .collect::<HashMap<UnitId, unit::Model>>();
+
+        let by_id_index = by_id::Index::from_hash_map(units);
+
+        let mut by_transport_index = by_transport::make(&by_id_index);
+
+        by_transport_index.delete_unit(&truck_id, &infantry_id);
+
+        let got = by_transport_index.get(&truck_id);
+
+        let want = &vec![];
+        let want = Some(want);
+
+        assert_eq!(got, want);
+    }
 }

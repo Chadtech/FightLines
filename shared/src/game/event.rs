@@ -154,8 +154,16 @@ pub fn process_turn_into_events(
                 }
             }
             Event::ReplenishedUnits { .. } => {}
-            Event::WasReplenished { .. } => {}
-            Event::DepletedCrate { .. } => {}
+            Event::WasReplenished { unit_id, amount } => {
+                if let Err(err) = indexes.replenish(unit_id, *amount) {
+                    event_error(err)
+                }
+            }
+            Event::DepletedCrate { unit_id, amount } => {
+                if let Err(err) = indexes.deplete_supply_crate(unit_id, *amount) {
+                    event_error(err)
+                }
+            }
         }
 
         events.remove(0);
