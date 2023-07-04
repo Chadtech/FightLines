@@ -101,18 +101,18 @@ impl Model {
                     Ok(false)
                 }
                 Animation::DropOff {
-                    cargo_unit: loc, ..
+                    cargo_id,
+                    cargo_loc,
+                    ..
                 } => {
-                    let (facing_dir, cargo_id) = loc.value.clone();
-
-                    let cargo_unit_model = match self.indices.by_id.get_mut(&cargo_id) {
+                    let cargo_unit_model = match self.indices.by_id.get_mut(cargo_id) {
                         Some(u) => u,
                         None => {
                             return Err("could not find cargo unit".to_string());
                         }
                     };
 
-                    cargo_unit_model.place = Place::OnMap(loc.with_value(facing_dir));
+                    cargo_unit_model.place = Place::OnMap(cargo_loc.clone());
 
                     self.indices.by_location = unit_index::by_location::make(&self.indices.by_id);
 
@@ -187,11 +187,10 @@ pub fn sidebar_view<Msg: 'static>(
                         vec![Cell::from_str(vec![], msg.as_str())]
                     }
                     Animation::DropOff {
-                        cargo_unit: loc,
+                        cargo_id,
                         transport_id,
+                        ..
                     } => {
-                        let cargo_id = &loc.value.1;
-
                         let msg = match (unit_index.get(transport_id), unit_index.get(cargo_id)) {
                             (Some(transport), Some(cargo)) => {
                                 let mut dropoff_msg = transport

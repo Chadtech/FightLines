@@ -25,7 +25,7 @@ impl Index {
             *cargo = cargo
                 .iter()
                 .filter(|(cargo_id, _)| cargo_id != cargo_id_to_delete)
-                .map(|cargo_unit| cargo_unit.clone())
+                .cloned()
                 .collect::<Vec<(UnitId, unit::Model)>>();
         }
     }

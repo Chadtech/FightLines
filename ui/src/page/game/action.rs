@@ -1,8 +1,6 @@
 use shared::arrow::Arrow;
 use shared::direction::Direction;
-use shared::facing_direction::FacingDirection;
 use shared::game;
-use shared::located::Located;
 use shared::path::Path;
 use shared::unit::UnitId;
 
@@ -27,8 +25,7 @@ pub enum Action {
         arrows: Vec<(Direction, Arrow)>,
     },
     DropOff {
-        cargo_unit_loc: Located<(FacingDirection, UnitId)>,
-        transport_id: UnitId,
+        cargo_id: UnitId,
     },
     Replenish {
         replenishing_unit_id: UnitId,
@@ -89,13 +86,9 @@ impl Action {
                         arrows: path.with_arrows(),
                     });
                 }
-                game::action::Action::DropOff {
-                    cargo_unit_loc: loc,
-                    transport_id,
-                } => moves_ret.push(Action::DropOff {
-                    cargo_unit_loc: loc.clone(),
-                    transport_id: transport_id.clone(),
-                }),
+                game::action::Action::DropOff { cargo_id } => {
+                    moves_ret.push(Action::DropOff { cargo_id })
+                }
                 game::action::Action::Replenish {
                     replenishing_unit_id,
                     units,

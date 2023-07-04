@@ -1,4 +1,3 @@
-use crate::facing_direction::FacingDirection;
 use crate::located::Located;
 use crate::path::Path;
 use crate::rng::RandGen;
@@ -24,8 +23,7 @@ pub enum Action {
         path: Path,
     },
     DropOff {
-        cargo_unit_loc: Located<(FacingDirection, UnitId)>,
-        transport_id: UnitId,
+        cargo_id: UnitId,
     },
     Replenish {
         replenishing_unit_id: UnitId,
@@ -93,8 +91,8 @@ impl Action {
                     None
                 }
             }
-            Action::DropOff { cargo_unit_loc, .. } => {
-                if cargo_unit_loc.value.1.clone() == deleted_unit_id {
+            Action::DropOff { cargo_id } => {
+                if cargo_id.clone() == deleted_unit_id {
                     Some(vec![])
                 } else {
                     None

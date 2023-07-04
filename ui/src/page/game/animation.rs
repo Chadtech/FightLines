@@ -1,5 +1,5 @@
 use shared::facing_direction::FacingDirection;
-use shared::game::outcome::Outcome;
+use shared::game::event::Event;
 use shared::game::unit_index;
 use shared::id::Id;
 use shared::located::Located;
@@ -18,7 +18,8 @@ pub enum Animation {
         unit_id: UnitId,
     },
     DropOff {
-        cargo_unit: Located<(FacingDirection, UnitId)>,
+        cargo_id: UnitId,
+        cargo_loc: Located<FacingDirection>,
         transport_id: UnitId,
     },
     Replenish {
@@ -51,65 +52,72 @@ impl Animation {
             None => Err("could not find unit".to_string()),
         }
     }
-    pub fn from_outcome(outcome: Outcome) -> Vec<Animation> {
-        match outcome {
-            Outcome::Traveled { unit_id, path, .. } => vec![Animation::Travel {
+
+    pub fn from_event(event: Event) -> Vec<Animation> {
+        match event {
+            Event::ConsumedBaselineSupplies { .. } => {
+                vec![]
+            }
+            Event::Travelled { unit_id, path, .. } => vec![Animation::Travel {
                 unit_id,
                 path,
                 loads_into: None,
                 picks_up: None,
             }],
-            Outcome::LoadedInto {
-                unit_id,
+            Event::Loaded {
+                cargo_id,
+                transport_id,
                 path,
-                loaded_into,
                 ..
             } => vec![Animation::Travel {
-                unit_id,
+                unit_id: cargo_id,
                 path,
-                loads_into: Some(loaded_into),
+                loads_into: Some(transport_id),
                 picks_up: None,
             }],
-            Outcome::NamedUnit { .. } => vec![],
-            Outcome::Perished { unit_id } => vec![Animation::Perish { unit_id }],
-            Outcome::ConsumedSupplies { .. } => vec![],
-            Outcome::PickUp {
-                unit_id,
-                path,
+            Event::PickedUp {
                 cargo_id,
+                transport_id,
+                path,
+                ..
             } => vec![Animation::Travel {
-                unit_id,
+                unit_id: transport_id,
                 path,
                 loads_into: None,
                 picks_up: Some(cargo_id),
             }],
-            Outcome::Placed {
-                cargo_unit_loc: loc,
+            Event::DroppedOff {
+                cargo_id,
                 transport_id,
+                cargo_loc,
             } => vec![Animation::DropOff {
-                cargo_unit: loc,
+                cargo_id,
                 transport_id,
+                cargo_loc,
             }],
-            Outcome::Replenished {
-                replenishing_unit_id,
-                units,
+            Event::ReplenishedUnits {
+                unit_id,
+                replenished_units,
                 path,
-                ..
-            } => vec![
-                Animation::Travel {
-                    unit_id: replenishing_unit_id.clone(),
-                    path,
-                    loads_into: None,
-                    picks_up: None,
-                },
-                Animation::Replenish {
-                    units: units
-                        .iter()
-                        .map(|unit| unit.0.clone())
-                        .collect::<Vec<UnitId>>(),
-                    replenishing_unit_id,
-                },
-            ],
+            } => {
+                vec![
+                    Animation::Travel {
+                        unit_id: unit_id.clone(),
+                        path,
+                        loads_into: None,
+                        picks_up: None,
+                    },
+                    Animation::Replenish {
+                        replenishing_unit_id: unit_id,
+                        units: replenished_units,
+                    },
+                ]
+            }
+            Event::WasReplenished { .. } => vec![],
+            Event::DepletedCrate { .. } => vec![],
+            Event::Perished { unit_id } => {
+                vec![Animation::Perish { unit_id }]
+            }
         }
     }
 }

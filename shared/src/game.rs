@@ -2,14 +2,13 @@ pub mod action;
 pub mod day;
 pub mod event;
 pub mod mobility;
-pub mod outcome;
 pub mod replenishment;
 pub mod unit_index;
 
 use crate::facing_direction::FacingDirection;
 use crate::game::action::Action;
 use crate::game::day::Time;
-use crate::game::outcome::Outcome;
+use crate::game::event::Event;
 use crate::game::unit_index::Indexes;
 use crate::id::Id;
 use crate::lobby::{Lobby, LobbyId};
@@ -133,7 +132,7 @@ pub struct Game {
     pub map: Map,
     pub turn_number: u32,
     pub turns_changes: Vec<Change>,
-    pub prev_outcomes: Vec<Outcome>,
+    pub prev_turns_events: Vec<Event>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -329,25 +328,19 @@ impl Game {
             }
         };
 
-        let outcomes = vec![
-            self.consume_supplies(),
-            Outcome::from_actions(&mut player_moves.clone()),
-        ]
-        .concat();
-
         self.turn_number += 1;
         self.process_changes();
         // self.process_outcomes(outcomes.clone())?;
 
         let event_rand_seed: RandSeed = RandSeed::next(&mut rng);
-        let _ = event::process_turn(
+        let event::ProcessedTurn { events, .. } = event::process_turn(
             event_rand_seed,
             &mut player_moves,
             &mut self.indexes,
             &self.map,
         );
 
-        self.prev_outcomes = outcomes;
+        self.prev_turns_events = events;
         self.indexes.by_location = unit_index::by_location::make(&self.indexes.by_id);
         self.indexes.by_player = unit_index::by_player::make(&self.indexes.by_id);
         self.indexes.by_transport = unit_index::by_transport::make(&self.indexes.by_id);
@@ -379,189 +372,6 @@ impl Game {
                 }
             }
         }
-    }
-
-    fn consume_supplies(&self) -> Vec<Outcome> {
-        let mut outcomes = Vec::new();
-
-        for (unit_id, unit_model) in self.indexes.by_id.iter() {
-            if let Some(supply_cost) = unit_model.unit.baseline_supply_cost() {
-                let supply_cost = supply_cost.ceil() as i16;
-
-                let new_supplies = unit_model.supplies - supply_cost;
-
-                let outcome = if new_supplies < 0 {
-                    Outcome::Perished {
-                        unit_id: unit_id.clone(),
-                    }
-                } else {
-                    Outcome::ConsumedSupplies {
-                        unit_id: unit_id.clone(),
-                        supplies: supply_cost,
-                    }
-                };
-
-                outcomes.push(outcome);
-            }
-        }
-
-        outcomes
-    }
-
-    pub fn process_outcomes(&mut self, outcomes: Vec<Outcome>) -> Result<(), String> {
-        let map = self.map.clone();
-
-        for outcome in outcomes {
-            match outcome {
-                Outcome::Traveled { unit_id, path } => {
-                    if let Some(loc_dir) = path.last_pos() {
-                        let facing_dir = match self.indexes.position_of_unit_or_transport(&unit_id)
-                        {
-                            Ok(facing_dir_loc) => facing_dir_loc.value,
-                            Err(msg) => return Err(msg),
-                        };
-
-                        if let Some(unit) = self.get_mut_unit(&unit_id) {
-                            unit.supplies -= path.supply_cost(&map, &unit.unit);
-
-                            let new_facing_dir =
-                                FacingDirection::from_directions(path.clone().to_directions())
-                                    .unwrap_or(facing_dir);
-
-                            unit.place = Place::OnMap(loc_dir.with_value(new_facing_dir));
-                        }
-                    }
-                }
-                Outcome::NamedUnit { unit_id, name } => {
-                    if let Some(unit) = self.get_mut_unit(&unit_id) {
-                        unit.name = Some(name);
-                    }
-                }
-                Outcome::LoadedInto {
-                    unit_id,
-                    loaded_into,
-                    path,
-                    ..
-                } => {
-                    if let Some(unit) = self.get_mut_unit(&unit_id) {
-                        unit.supplies -= path.supply_cost(&map, &unit.unit);
-                        unit.place = Place::InUnit(loaded_into.clone());
-                    }
-                }
-                Outcome::Perished { unit_id } => {
-                    self.indexes.by_id.delete(&unit_id);
-
-                    if self.indexes.by_transport.contains(&unit_id) {
-                        let facing_dir_loc =
-                            match self.indexes.position_of_unit_or_transport(&unit_id) {
-                                Ok(l) => l,
-                                Err(msg) => {
-                                    return Err(msg);
-                                }
-                            };
-
-                        for (_, cargo_model) in self.indexes.by_transport.get_mut(&unit_id).unwrap()
-                        {
-                            cargo_model.place = Place::OnMap(facing_dir_loc.clone());
-                        }
-                    }
-                }
-                Outcome::ConsumedSupplies { unit_id, supplies } => {
-                    if let Some(unit) = self.get_mut_unit(&unit_id) {
-                        unit.supplies -= supplies;
-                    }
-                }
-                Outcome::PickUp {
-                    unit_id,
-                    cargo_id,
-                    path,
-                } => {
-                    if self.get_unit(&cargo_id).is_none()
-                        || self.get_unit(&unit_id).is_none()
-                        || path.last_pos().is_none()
-                    {
-                        return Ok(());
-                    }
-
-                    let facing_dir = match self.indexes.position_of_unit_or_transport(&unit_id) {
-                        Ok(facing_dir_loc) => facing_dir_loc.value,
-                        Err(msg) => return Err(msg),
-                    };
-
-                    let cargo_unit = match self.get_mut_unit(&cargo_id) {
-                        Some(cargo) => cargo,
-                        None => {
-                            return Ok(());
-                        }
-                    };
-
-                    cargo_unit.place = Place::InUnit(unit_id.clone());
-
-                    let unit = match self.get_mut_unit(&unit_id) {
-                        Some(u) => u,
-                        None => {
-                            return Ok(());
-                        }
-                    };
-
-                    unit.supplies -= path.supply_cost(&map, &unit.unit);
-
-                    if let Some(loc_dir) = path.last_pos() {
-                        let new_facing_dir =
-                            FacingDirection::from_directions(path.clone().to_directions())
-                                .unwrap_or(facing_dir);
-
-                        unit.place = Place::OnMap(loc_dir.with_value(new_facing_dir));
-                    }
-                }
-                Outcome::Placed { cargo_unit_loc, .. } => {
-                    let (facing_dir, unit_id) = cargo_unit_loc.value.clone();
-
-                    let unit = match self.get_mut_unit(&unit_id) {
-                        Some(u) => u,
-                        None => {
-                            return Ok(());
-                        }
-                    };
-
-                    unit.place = Place::OnMap(cargo_unit_loc.with_value(facing_dir));
-                }
-                Outcome::Replenished {
-                    units,
-                    path,
-                    replenishing_unit_id,
-                    ..
-                } => {
-                    if let Some(loc_dir) = path.last_pos() {
-                        let facing_dir = match self
-                            .indexes
-                            .position_of_unit_or_transport(&replenishing_unit_id)
-                        {
-                            Ok(facing_dir_loc) => facing_dir_loc.value,
-                            Err(msg) => return Err(msg),
-                        };
-
-                        if let Some(unit_model) = self.get_mut_unit(&replenishing_unit_id) {
-                            unit_model.supplies -= path.supply_cost(&map, &unit_model.unit);
-
-                            let new_facing_dir =
-                                FacingDirection::from_directions(path.clone().to_directions())
-                                    .unwrap_or(facing_dir);
-
-                            unit_model.place = Place::OnMap(loc_dir.with_value(new_facing_dir));
-                        }
-                    }
-
-                    for (unit_id, supplies) in units {
-                        if let Some(unit) = self.get_mut_unit(&unit_id) {
-                            unit.supplies += supplies;
-                        };
-                    }
-                }
-            }
-        }
-
-        Ok(())
     }
 
     pub fn get_turn(&self, player_id: Id) -> Result<Turn, String> {
@@ -918,7 +728,7 @@ impl TryFrom<GameInitFlags<'_>> for Game {
                     map,
                     turn_number: 0,
                     turns_changes: Vec::new(),
-                    prev_outcomes: Vec::new(),
+                    prev_turns_events: vec![],
                 };
 
                 Ok(game)

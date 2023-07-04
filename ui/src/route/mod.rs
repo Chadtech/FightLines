@@ -1,4 +1,4 @@
-use seed::{log, Url};
+use seed::Url;
 use shared::game::GameId;
 use shared::id::Id;
 use shared::lobby::LobbyId;
@@ -131,18 +131,12 @@ impl Route {
                         .and_then(|values| values.first())
                         .map(|value| Id::Dev(value.to_string()));
 
-                    log!(&path);
-
                     return path
                         .next()
                         .and_then(|id| GameId::from_string(id.clone()))
-                        .map(|game_id| {
-                            log!(game_id);
-
-                            Route::Game {
-                                game_id,
-                                dev_viewer_id,
-                            }
+                        .map(|game_id| Route::Game {
+                            game_id,
+                            dev_viewer_id,
                         });
                 }
 

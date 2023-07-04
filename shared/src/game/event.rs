@@ -1,13 +1,16 @@
+use crate::facing_direction::FacingDirection;
 use crate::game::action::Action;
 use crate::game::replenishment::Replenishment;
 use crate::game::{action, unit_index};
 use crate::id::Id;
+use crate::located::Located;
 use crate::map::Map;
 use crate::path::Path;
 use crate::rng::{RandGen, RandSeed};
-use crate::unit::UnitId;
+use crate::unit::{Place, UnitId};
+use serde::{Deserialize, Serialize};
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum Event {
     ConsumedBaselineSupplies {
         unit_id: UnitId,
@@ -29,10 +32,13 @@ pub enum Event {
     },
     DroppedOff {
         cargo_id: UnitId,
+        transport_id: UnitId,
+        cargo_loc: Located<FacingDirection>,
     },
     ReplenishedUnits {
         path: Path,
         unit_id: UnitId,
+        replenished_units: Vec<UnitId>,
     },
     WasReplenished {
         unit_id: UnitId,
@@ -41,7 +47,15 @@ pub enum Event {
     DepletedCrate {
         unit_id: UnitId,
         amount: i16,
+    },
+    Perished {
+        unit_id: UnitId,
     }, // Battle {},
+}
+
+pub struct ProcessedTurn {
+    pub events: Vec<Event>,
+    pub errors: Vec<String>,
 }
 
 pub fn process_turn(
@@ -49,7 +63,7 @@ pub fn process_turn(
     player_moves: &mut Vec<(Id, Vec<Action>)>,
     indexes: &mut unit_index::Indexes,
     map: &Map,
-) -> Vec<String> {
+) -> ProcessedTurn {
     let mut rng = RandGen::from_seed(rand_seed);
 
     // These actions might come in orders that don't make sense,
@@ -85,13 +99,15 @@ pub fn process_turn(
         }
     }
 
-    dbg!(&ordered_actions);
-
     action::unbatch(&mut ordered_actions);
 
     let mut events = baseline_supply_events(indexes);
     let mut errors: Vec<String> = vec![];
-    while let Some(event) = events.first() {
+    let mut event_index = 0;
+    // while let Some(event) = events.first() {
+    while event_index < events.len() {
+        let event = events.get(event_index).unwrap();
+
         let mut event_error = |err: String| {
             let mut err_msg = "event error : ".to_string();
 
@@ -106,6 +122,10 @@ pub fn process_turn(
                     Ok(consume_baseline_supplies) => {
                         if consume_baseline_supplies.perished {
                             delete_actions_for_deleted_unit(unit_id.clone(), &mut ordered_actions);
+
+                            events.push(Event::Perished {
+                                unit_id: unit_id.clone(),
+                            });
                         }
                     }
                     Err(err) => {
@@ -150,12 +170,14 @@ pub fn process_turn(
                     event_error(err);
                 }
             }
-            Event::DroppedOff { cargo_id } => {
+            Event::DroppedOff { cargo_id, .. } => {
                 if let Err(err) = indexes.unload(cargo_id) {
                     event_error(err);
                 }
             }
-            Event::ReplenishedUnits { .. } => {}
+            Event::ReplenishedUnits { .. } => {
+                // This is only used for animation
+            }
             Event::WasReplenished { unit_id, amount } => {
                 if let Err(err) = indexes.replenish(unit_id, *amount) {
                     event_error(err)
@@ -166,9 +188,12 @@ pub fn process_turn(
                     event_error(err)
                 }
             }
+            Event::Perished { .. } => {
+                // This is only used for animation
+            }
         }
 
-        events.remove(0);
+        event_index += 1;
 
         if let Some(action) = ordered_actions.first() {
             if let Err(err) = process_action(action, indexes, &mut events) {
@@ -183,7 +208,7 @@ pub fn process_turn(
         }
     }
 
-    errors
+    ProcessedTurn { errors, events }
 }
 
 fn delete_actions_for_deleted_unit(deleted_unit_id: UnitId, actions: &mut Vec<Action>) {
@@ -235,9 +260,27 @@ fn process_action(
                 path: path.clone(),
             });
         }
-        Action::DropOff { cargo_unit_loc, .. } => events.push(Event::DroppedOff {
-            cargo_id: cargo_unit_loc.value.1.clone(),
-        }),
+        Action::DropOff { cargo_id } => {
+            let unit_model = match indexes.by_id.get(cargo_id) {
+                Some(u) => u,
+                None => return Err("could not get unit when making drop off event".to_string()),
+            };
+
+            let transport_id = match &unit_model.place {
+                Place::OnMap(_) => {
+                    return Err("unit that is being dropped off is already on map".to_string())
+                }
+                Place::InUnit(t) => t,
+            };
+
+            let loc = indexes.position_of_unit_or_transport(cargo_id)?;
+
+            events.push(Event::DroppedOff {
+                cargo_id: cargo_id.clone(),
+                cargo_loc: loc,
+                transport_id: transport_id.clone(),
+            })
+        }
         Action::Replenish {
             replenishing_unit_id,
             path,
@@ -264,6 +307,12 @@ fn process_action(
                 indexes,
             )?;
 
+            let replenished_unit_ids = replenishment
+                .replenished_units
+                .iter()
+                .map(|(unit_id, _)| unit_id.clone())
+                .collect::<Vec<UnitId>>();
+
             for (unit_id, amount) in replenishment.replenished_units {
                 events.push(Event::WasReplenished { unit_id, amount });
             }
@@ -277,6 +326,7 @@ fn process_action(
 
             events.push(Event::ReplenishedUnits {
                 unit_id: replenishing_unit_id.clone(),
+                replenished_units: replenished_unit_ids,
                 path: path.clone(),
             });
         }
@@ -352,7 +402,7 @@ mod test_events {
 
         let map = Map::grass_square();
 
-        let got_errors = process_turn(rand_seed, &mut actions, &mut indexes, &map);
+        let got_errors = process_turn(rand_seed, &mut actions, &mut indexes, &map).errors;
 
         let want_errors: Vec<String> = vec![];
         assert_eq!(want_errors, got_errors);
@@ -443,7 +493,7 @@ mod test_events {
 
         let map = Map::grass_square();
 
-        let got_errors = process_turn(rand_seed.clone(), &mut actions, &mut indexes, &map);
+        let got_errors = process_turn(rand_seed.clone(), &mut actions, &mut indexes, &map).errors;
 
         let want_errors: Vec<String> = vec![];
         assert_eq!(want_errors, got_errors);
@@ -515,7 +565,7 @@ mod test_events {
 
         let mut actions = vec![(player_1.clone(), player_1_unload_actions)];
 
-        let got_errors = process_turn(rand_seed, &mut actions, &mut indexes, &map);
+        let got_errors = process_turn(rand_seed, &mut actions, &mut indexes, &map).errors;
 
         let want_errors: Vec<String> = vec![];
 
@@ -610,7 +660,7 @@ mod test_events {
 
         let map = Map::grass_square();
 
-        let got_errors = process_turn(rand_seed.clone(), &mut actions, &mut indexes, &map);
+        let got_errors = process_turn(rand_seed.clone(), &mut actions, &mut indexes, &map).errors;
 
         let want_errors: Vec<String> = vec![];
         assert_eq!(want_errors, got_errors);
@@ -688,7 +738,7 @@ mod test_events {
 
         let mut actions = vec![(player_1.clone(), player_1_drop_actions)];
 
-        let got_errors = process_turn(rand_seed.clone(), &mut actions, &mut indexes, &map);
+        let got_errors = process_turn(rand_seed.clone(), &mut actions, &mut indexes, &map).errors;
 
         let want_errors: Vec<String> = vec![];
         assert_eq!(want_errors, got_errors);
@@ -814,7 +864,7 @@ mod test_events {
 
         let map = Map::grass_square();
 
-        let got_errors = process_turn(rand_seed, &mut actions, &mut indexes, &map);
+        let got_errors = process_turn(rand_seed, &mut actions, &mut indexes, &map).errors;
 
         let want_errors: Vec<String> = vec![];
         assert_eq!(want_errors, got_errors);

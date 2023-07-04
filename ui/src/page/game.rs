@@ -360,13 +360,8 @@ pub fn init(
                     moves_index_ret.insert(unit_id.clone(), action.clone());
                     moves_index_ret.insert(cargo_id.clone(), action.clone());
                 }
-                Action::DropOff {
-                    cargo_unit_loc: loc,
-                    ..
-                } => {
-                    let cargo_unit_id = loc.value.1.clone();
-
-                    moves_index_ret.insert(cargo_unit_id, action.clone());
+                Action::DropOff { cargo_id, .. } => {
+                    moves_index_ret.insert(cargo_id.clone(), action.clone());
                 }
                 Action::Replenish {
                     replenishing_unit_id,
@@ -721,29 +716,10 @@ fn handle_unit_selected_sidebar_msg(
         unit_selected::Msg::UnitRow(view::unit_row::Msg::Clicked(cargo_unit_id)) => {
             if let Some(cargo_unit_model) = model.game.get_unit(&cargo_unit_id) {
                 if cargo_unit_model.unit.is_supply_crate() {
-                    let unit_model = match model.game.get_unit(&sub_model.unit_id) {
-                        Some(u) => u,
-                        None => {
-                            return Ok(());
-                        }
-                    };
-
-                    let loc = match unit_model.place.clone() {
-                        Place::OnMap(l) => l,
-                        Place::InUnit(_) => {
-                            return Ok(());
-                        }
-                    };
-
                     model.moves_index_by_unit.insert(
                         cargo_unit_id.clone(),
                         Action::DropOff {
-                            cargo_unit_loc: Located {
-                                x: loc.x,
-                                y: loc.y,
-                                value: (loc.value, cargo_unit_id.clone()),
-                            },
-                            transport_id: sub_model.unit_id.clone(),
+                            cargo_id: cargo_unit_id.clone(),
                         },
                     );
                 } else {
@@ -904,11 +880,11 @@ fn refetch_game(
     } else {
         model.stage = match &model.stage {
             Stage::Waiting { indices } => {
-                let prev_outcomes = fetched_game.clone().prev_outcomes;
+                let prev_turns_events = fetched_game.clone().prev_turns_events;
 
-                let animations = prev_outcomes
+                let animations = prev_turns_events
                     .into_iter()
-                    .flat_map(Animation::from_outcome)
+                    .flat_map(Animation::from_event)
                     .collect::<Vec<Animation>>();
 
                 let visibility =
@@ -961,12 +937,8 @@ fn submit_turn(global: &mut global::Model, model: &mut Model, orders: &mut impl 
                 cargo_id: cargo_id.clone(),
                 path: path.clone(),
             },
-            Action::DropOff {
-                cargo_unit_loc: loc,
-                transport_id,
-            } => game::action::Action::DropOff {
-                cargo_unit_loc: loc.clone(),
-                transport_id: transport_id.clone(),
+            Action::DropOff { cargo_id } => game::action::Action::DropOff {
+                cargo_id: cargo_id.clone(),
             },
             Action::Replenish {
                 replenishing_unit_id,
