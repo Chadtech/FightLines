@@ -195,6 +195,7 @@ pub fn flyout_view(model: &Model, game_screen_pos: &Point<i16>) -> Cell<ClickMsg
                     Style::P2,
                     Style::FlexCol,
                     Style::G3,
+                    Style::W8,
                 ],
                 move_buttons
                     .into_iter()

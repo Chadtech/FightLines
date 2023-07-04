@@ -1538,8 +1538,8 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
     mini_units_ctx.clear_rect(
         0.,
         0.,
-        model.game_pixel_size.width_fl,
-        model.game_pixel_size.height_fl,
+        model.game_pixel_size.width_fl * 2.0,
+        model.game_pixel_size.height_fl * 2.0,
     );
 
     let indices = match &model.stage {
