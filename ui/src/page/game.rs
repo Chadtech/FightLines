@@ -13,7 +13,6 @@ use crate::assets::MiscSpriteRow;
 use crate::error::Error;
 use crate::page::game::action::Action;
 use crate::page::game::animation::Animation;
-use crate::page::game::mode::moving::RideOption;
 use crate::page::game::mode::Mode;
 use crate::page::game::replenishment::Replenishment;
 use crate::page::game::stage::animating_moves;
@@ -711,6 +710,9 @@ fn handle_unit_selected_sidebar_msg(
         unit_selected::Msg::ClickedBackToGroup => {
             if let Some(group_model) = sub_model.from_group.clone() {
                 taking_turn_model.sidebar = Sidebar::GroupSelected(group_model);
+                taking_turn_model.mode = Mode::None;
+
+                draw_mode(model)?;
             }
         }
         unit_selected::Msg::UnitRow(view::unit_row::Msg::Clicked(cargo_unit_id)) => {
@@ -1052,10 +1054,10 @@ fn handle_click_on_screen_when_move_mode(
             None => return Error::throw(error_title, "could not get unit".to_string()),
         };
 
-        let unit_pos: Located<()> = match &unit_model.place {
-            Place::OnMap(loc) => loc.to_unit(),
-            Place::InUnit(_) => {
-                return model.clear_mode_and_sidebar();
+        let unit_pos = match model.game.indexes.position_of_unit_or_transport(&unit_id) {
+            Ok(l) => l.to_unit(),
+            Err(err) => {
+                return Err(Error::new(error_title, err));
             }
         };
 
@@ -1150,7 +1152,7 @@ fn handle_click_on_screen_when_move_mode(
         }
 
         if unit_model.unit.can_attack() {
-            ride_options.push(RideOption::Attack);
+            ride_options.push(mode::moving::RideOption::Attack);
         }
 
         if ride_options.is_empty() {
@@ -1942,11 +1944,11 @@ fn px_i16(n: i16) -> String {
 }
 
 fn click_screen(model: &Model) -> Cell<Msg> {
-    let cursor_style = if model.mouse_game_position.is_none() {
-        Style::none()
-    } else {
-        Style::CursorNone
-    };
+    // let cursor_style = if model.mouse_game_position.is_none() {
+    //     Style::none()
+    // } else {
+    //     Style::CursorNone
+    // };
 
     let screen: Node<Msg> = div![
         C![Style::Absolute.css_classes().concat()],
@@ -1962,25 +1964,30 @@ fn click_screen(model: &Model) -> Cell<Msg> {
         },
     ];
 
-    Cell::from_html(vec![cursor_style], vec![screen])
-        .on_mouse_down(|event| {
-            Msg::MouseDownOnScreen(Point {
-                x: event.page_x() as i16,
-                y: event.page_y() as i16,
-            })
+    Cell::from_html(
+        vec![
+        //cursor_style
+        ],
+        vec![screen],
+    )
+    .on_mouse_down(|event| {
+        Msg::MouseDownOnScreen(Point {
+            x: event.page_x() as i16,
+            y: event.page_y() as i16,
         })
-        .on_mouse_up(|event| {
-            Msg::MouseUpOnScreen(Point {
-                x: event.page_x() as i16,
-                y: event.page_y() as i16,
-            })
+    })
+    .on_mouse_up(|event| {
+        Msg::MouseUpOnScreen(Point {
+            x: event.page_x() as i16,
+            y: event.page_y() as i16,
         })
-        .on_mouse_move(|event| {
-            Msg::MouseMoveOnScreen(Point {
-                x: event.page_x() as i16,
-                y: event.page_y() as i16,
-            })
+    })
+    .on_mouse_move(|event| {
+        Msg::MouseMoveOnScreen(Point {
+            x: event.page_x() as i16,
+            y: event.page_y() as i16,
         })
+    })
 }
 
 fn sidebar_view(viewer_id: Id, model: &Model) -> Cell<Msg> {

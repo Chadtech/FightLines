@@ -84,22 +84,19 @@ pub fn find(
                 x_adjustments(&mut pos).or_else(|| y_adjustments(&mut pos))
             };
 
-        let dir_result: Result<Direction, String> = maybe_dir.ok_or_else(|| {
-            "find movement pos must be greater than, less than, or equal to dest pos".to_string()
-        });
+        if let Some(dir) = maybe_dir {
+            last_dir = Some(dir.clone());
 
-        let dir = dir_result?;
-        last_dir = Some(dir.clone());
-
-        if mobility.contains(&pos) {
-            path.push((pos.clone(), dir));
-        } else {
-            escape_with = Some(search_and_find_movement_path(
-                origin_pos.clone(),
-                dest_pos.clone(),
-                mobility,
-                path.clone(),
-            )?);
+            if mobility.contains(&pos) {
+                path.push((pos.clone(), dir));
+            } else {
+                escape_with = Some(search_and_find_movement_path(
+                    origin_pos.clone(),
+                    dest_pos.clone(),
+                    mobility,
+                    path.clone(),
+                )?);
+            }
         }
     }
 
