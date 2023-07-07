@@ -130,6 +130,80 @@ impl Action {
         }
     }
 
+    pub fn path(&self) -> Option<&Path> {
+        match self {
+            Action::Travel { path, .. } => Some(path),
+            Action::LoadInto { path, .. } => Some(path),
+            Action::PickUp { path, .. } => Some(path),
+            Action::DropOff { .. } => None,
+            Action::Replenish { path, .. } => Some(path),
+            Action::Batch(_) => {
+                // I don't think batch should ever be used in the contexts
+                // where path() is called
+                None
+            }
+            Action::Attack(Attack { path, .. }) => Some(path),
+        }
+    }
+
+    pub fn moving_unit(&self) -> Option<&UnitId> {
+        match self {
+            Action::Travel { unit_id, .. } => Some(unit_id),
+            Action::LoadInto { unit_id, .. } => Some(unit_id),
+            Action::PickUp { unit_id, .. } => Some(unit_id),
+            Action::DropOff { .. } => None,
+            Action::Replenish {
+                replenishing_unit_id,
+                ..
+            } => Some(replenishing_unit_id),
+            Action::Attack(Attack { unit_id, .. }) => Some(unit_id),
+            Action::Batch(_) => None,
+        }
+    }
+
+    pub fn closest_crossing_path<'a>(
+        path: &Path,
+        actions: &'a [Action],
+    ) -> Option<(usize, Located<&'a UnitId>)> {
+        let mut closest_crossing_path: Option<(usize, Located<&'a UnitId>)> = None;
+
+        if let Some(origin) = path.first_pos() {
+            let mut i = 0;
+
+            while i < actions.len() {
+                let action = actions.get(i).unwrap();
+
+                if let (Some(unit_id), Some(path)) = (action.moving_unit(), action.path()) {
+                    if let Some(cross_loc) = path.crosses(path) {
+                        match closest_crossing_path.clone() {
+                            None => {
+                                closest_crossing_path = Some((i, cross_loc.with_value(unit_id)))
+                            }
+                            Some((_, existing)) => {
+                                if origin.distance_from(&existing)
+                                    > origin.distance_from(&cross_loc)
+                                {
+                                    closest_crossing_path = Some((
+                                        i,
+                                        Located {
+                                            x: cross_loc.x,
+                                            y: cross_loc.y,
+                                            value: unit_id,
+                                        },
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                }
+
+                i += 1
+            }
+        }
+
+        closest_crossing_path
+    }
+
     pub fn closest_crossing_attack_path<'a>(
         path: &Path,
         actions: &'a [Action],

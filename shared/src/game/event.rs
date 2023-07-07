@@ -196,15 +196,16 @@ pub fn process_turn(
         event_index += 1;
 
         if let Some(action) = ordered_actions.first() {
-            if let Err(err) = process_action(action, indexes, &mut events) {
+            let action = action.clone();
+            ordered_actions.remove(0);
+
+            if let Err(err) = process_action(action, &mut ordered_actions, indexes, &mut events) {
                 let mut err_msg = "process action error : ".to_string();
 
                 err_msg.push_str(err.as_str());
 
                 errors.push(err_msg);
             };
-
-            ordered_actions.remove(0);
         }
     }
 
@@ -227,7 +228,8 @@ fn delete_actions_for_deleted_unit(deleted_unit_id: UnitId, actions: &mut Vec<Ac
 }
 
 fn process_action(
-    action: &Action,
+    action: Action,
+    remaining_actions: &mut Vec<Action>,
     indexes: &unit_index::Indexes,
     events: &mut Vec<Event>,
 ) -> Result<(), String> {
@@ -261,7 +263,7 @@ fn process_action(
             });
         }
         Action::DropOff { cargo_id } => {
-            let unit_model = match indexes.by_id.get(cargo_id) {
+            let unit_model = match indexes.by_id.get(&cargo_id) {
                 Some(u) => u,
                 None => return Err("could not get unit when making drop off event".to_string()),
             };
@@ -273,7 +275,7 @@ fn process_action(
                 Place::InUnit(t) => t,
             };
 
-            let loc = indexes.position_of_unit_or_transport(cargo_id)?;
+            let loc = indexes.position_of_unit_or_transport(&cargo_id)?;
 
             events.push(Event::DroppedOff {
                 cargo_id: cargo_id.clone(),
@@ -286,7 +288,7 @@ fn process_action(
             path,
             ..
         } => {
-            let unit_model = match indexes.by_id.get(replenishing_unit_id) {
+            let unit_model = match indexes.by_id.get(&replenishing_unit_id) {
                 None => {
                     return Err("could not finding replenishing unit".to_string());
                 }
@@ -302,7 +304,7 @@ fn process_action(
 
             let replenishment = Replenishment::calculate(
                 &unit_model.owner,
-                replenishing_unit_id,
+                &replenishing_unit_id,
                 replenishment_pos,
                 indexes,
             )?;
@@ -330,7 +332,13 @@ fn process_action(
                 path: path.clone(),
             });
         }
-        Action::Attack(_) => {}
+        Action::Attack(attack) => {
+            if let Some((index_of_closest_path_action, loc_unit_closest_path)) =
+                Action::closest_crossing_path(&attack.path, remaining_actions)
+            {
+                //
+            };
+        }
         Action::Batch(_) => {}
     }
 
