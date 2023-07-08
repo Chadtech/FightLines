@@ -335,9 +335,7 @@ fn process_action(
         Action::Attack(attack) => {
             if let Some((index_of_closest_path_action, loc_unit_closest_path)) =
                 Action::closest_crossing_path(&attack.path, remaining_actions)
-            {
-                //
-            };
+            {};
         }
         Action::Batch(_) => {}
     }
@@ -736,12 +734,7 @@ mod test_events {
         }
 
         let player_1_drop_actions = vec![Action::DropOff {
-            transport_id: truck_id.clone(),
-            cargo_unit_loc: Located {
-                x: 2,
-                y: 4,
-                value: (FacingDirection::Left, supply_crate_id.clone()),
-            },
+            cargo_id: supply_crate_id.clone(),
         }];
 
         let mut actions = vec![(player_1.clone(), player_1_drop_actions)];

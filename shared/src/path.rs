@@ -70,6 +70,17 @@ impl Path {
             .collect::<Vec<Direction>>()
     }
 
+    pub fn to_loc_directions(&self) -> Vec<Located<Direction>> {
+        self.steps
+            .iter()
+            .map(|step_loc| Located {
+                x: step_loc.x,
+                y: step_loc.y,
+                value: step_loc.value.direction.clone(),
+            })
+            .collect::<Vec<Located<Direction>>>()
+    }
+
     pub fn with_arrows(&self) -> Vec<(Direction, Arrow)> {
         path_with_arrows(self.to_directions().as_slice())
     }

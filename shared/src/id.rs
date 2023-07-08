@@ -72,6 +72,10 @@ impl Id {
         }
     }
 
+    pub fn test(s: &str) -> Id {
+        Id::from_string(s.to_string(), true).unwrap()
+    }
+
     pub fn from_int_test_only(n: u8) -> Id {
         Id::Bytes {
             bytes: [n, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
