@@ -7,6 +7,7 @@ use crate::located::Located;
 use crate::map::Map;
 use crate::path::Path;
 use crate::rng::{RandGen, RandSeed};
+use crate::unit;
 use crate::unit::{Place, UnitId};
 use serde::{Deserialize, Serialize};
 
@@ -227,6 +228,14 @@ fn delete_actions_for_deleted_unit(deleted_unit_id: UnitId, actions: &mut Vec<Ac
     }
 }
 
+enum AttackCondition {
+    NoEnemies,
+    Enemies {
+        loc: Located<Vec<(UnitId, unit::Model)>>,
+        encountered_enemies_traveling: Option<(usize, Action)>,
+    },
+}
+
 fn process_action(
     action: Action,
     remaining_actions: &mut Vec<Action>,
@@ -333,6 +342,11 @@ fn process_action(
             });
         }
         Action::Attack(attack) => {
+            let origin = match attack.path.first_pos() {
+                None => return Ok(()),
+                Some(l) => l,
+            };
+
             let player_id = match indexes.by_id.get(&attack.unit_id) {
                 Some(unit_model) => unit_model.owner.clone(),
                 None => {
@@ -340,20 +354,59 @@ fn process_action(
                 }
             };
 
-            if let Some((
-                index_of_closest_path_action,
-                crossing_enemy_action,
-                loc_enemy_closest_path,
-            )) = Action::closest_crossing_enemy_path(
+            let maybe_closest_enemy_path = Action::closest_crossing_enemy_path(
                 &indexes.by_id,
                 &attack.path,
                 player_id.clone(),
                 remaining_actions,
-            )? {
-                let closest_stationary_enemy = indexes
-                    .by_location
-                    .closest_enemy_units_in_path(player_id, &attack.path);
-            };
+            )?;
+
+            let maybe_closest_stationary_enemy = indexes
+                .by_location
+                .closest_enemy_units_in_path(player_id, &attack.path);
+
+            let attack_conditions: AttackCondition =
+                match (maybe_closest_enemy_path, maybe_closest_stationary_enemy) {
+                    (Some((action_index, enemy_action, moving_enemy_loc)), None) => {
+                        let unit_id = moving_enemy_loc.value.0.clone();
+                        AttackCondition::Enemies {
+                            loc: moving_enemy_loc
+                                .with_value(vec![(unit_id, moving_enemy_loc.value.1)]),
+                            encountered_enemies_traveling: Some((
+                                action_index,
+                                enemy_action.clone(),
+                            )),
+                        }
+                    }
+                    (None, Some(loc_enemies)) => AttackCondition::Enemies {
+                        loc: loc_enemies,
+                        encountered_enemies_traveling: None,
+                    },
+                    (
+                        Some((action_index, enemy_action, moving_enemy_loc)),
+                        Some(stationary_enemies),
+                    ) => {
+                        if origin.distance_from(&moving_enemy_loc)
+                            > origin.distance_from(&stationary_enemies)
+                        {
+                            AttackCondition::Enemies {
+                                loc: loc_enemies,
+                                encountered_enemies_traveling: None,
+                            }
+                        } else {
+                            let unit_id = moving_enemy_loc.value.0.clone();
+                            AttackCondition::Enemies {
+                                loc: moving_enemy_loc
+                                    .with_value(vec![(unit_id, moving_enemy_loc.value.1)]),
+                                encountered_enemies_traveling: Some((
+                                    action_index,
+                                    enemy_action.clone(),
+                                )),
+                            }
+                        }
+                    }
+                    (None, None) => AttackCondition::NoEnemies,
+                };
         }
         Action::Batch(_) => {}
     }

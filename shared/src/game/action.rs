@@ -3,6 +3,7 @@ use crate::id::Id;
 use crate::located::Located;
 use crate::path::Path;
 use crate::rng::RandGen;
+use crate::unit;
 use crate::unit::UnitId;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -168,8 +169,12 @@ impl Action {
         path: &Path,
         player_id: Id,
         actions: &'a [Action],
-    ) -> Result<Option<(usize, &'a Action, Located<&'a UnitId>)>, String> {
-        let mut closest_crossing_path: Option<(usize, &'a Action, Located<&'a UnitId>)> = None;
+    ) -> Result<Option<(usize, &'a Action, Located<(&'a UnitId, unit::Model)>)>, String> {
+        let mut closest_crossing_path: Option<(
+            usize,
+            &'a Action,
+            Located<(&'a UnitId, unit::Model)>,
+        )> = None;
 
         if let Some(origin) = path.first_pos() {
             let mut i = 0;
@@ -185,15 +190,17 @@ impl Action {
                     break;
                 };
 
-                match by_id.get(unit_id) {
+                let unit_model = match by_id.get(unit_id) {
                     None => return Err("could not find unit referenced by action".to_string()),
                     Some(unit_model) => {
                         if player_id == unit_model.owner {
                             i += 1;
                             continue;
                         }
+
+                        unit_model
                     }
-                }
+                };
 
                 let cross_loc = match path.crosses(action_path) {
                     None => {
@@ -205,7 +212,11 @@ impl Action {
 
                 match closest_crossing_path.clone() {
                     None => {
-                        closest_crossing_path = Some((i, action, cross_loc.with_value(unit_id)))
+                        closest_crossing_path = Some((
+                            i,
+                            action,
+                            cross_loc.with_value((unit_id, unit_model.clone())),
+                        ))
                     }
                     Some((_, _, existing)) => {
                         if origin.distance_from(&existing) > origin.distance_from(&cross_loc) {
@@ -215,7 +226,7 @@ impl Action {
                                 Located {
                                     x: cross_loc.x,
                                     y: cross_loc.y,
-                                    value: unit_id,
+                                    value: (unit_id, unit_model.clone()),
                                 },
                             ));
                         }
