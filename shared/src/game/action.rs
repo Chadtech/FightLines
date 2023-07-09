@@ -709,7 +709,7 @@ mod test_game_actions {
             &TeamColor::Blue,
         );
 
-        units.insert(blue_infantry_id.clone(), blue_infantry);
+        units.insert(blue_infantry_id.clone(), blue_infantry.clone());
 
         let by_id_index = by_id::Index::from_hash_map(units);
 
@@ -749,13 +749,13 @@ mod test_game_actions {
         )
         .unwrap();
 
-        let want: Option<(usize, &Action, Located<&UnitId>)> = Some((
+        let want: Option<(usize, &Action, Located<(&UnitId, unit::Model)>)> = Some((
             1,
             &blue_infantry_travel_action,
             Located {
                 x: 3,
                 y: 2,
-                value: &blue_infantry_id,
+                value: (&blue_infantry_id, blue_infantry),
             },
         ));
 

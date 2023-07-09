@@ -371,7 +371,7 @@ fn process_action(
                         let unit_id = moving_enemy_loc.value.0.clone();
                         AttackCondition::Enemies {
                             loc: moving_enemy_loc
-                                .with_value(vec![(unit_id, moving_enemy_loc.value.1)]),
+                                .with_value(vec![(unit_id, moving_enemy_loc.value.1.clone())]),
                             encountered_enemies_traveling: Some((
                                 action_index,
                                 enemy_action.clone(),
@@ -384,20 +384,20 @@ fn process_action(
                     },
                     (
                         Some((action_index, enemy_action, moving_enemy_loc)),
-                        Some(stationary_enemies),
+                        Some(stationary_enemies_loc),
                     ) => {
                         if origin.distance_from(&moving_enemy_loc)
-                            > origin.distance_from(&stationary_enemies)
+                            > origin.distance_from(&stationary_enemies_loc)
                         {
                             AttackCondition::Enemies {
-                                loc: loc_enemies,
+                                loc: stationary_enemies_loc,
                                 encountered_enemies_traveling: None,
                             }
                         } else {
                             let unit_id = moving_enemy_loc.value.0.clone();
                             AttackCondition::Enemies {
                                 loc: moving_enemy_loc
-                                    .with_value(vec![(unit_id, moving_enemy_loc.value.1)]),
+                                    .with_value(vec![(unit_id, moving_enemy_loc.value.1.clone())]),
                                 encountered_enemies_traveling: Some((
                                     action_index,
                                     enemy_action.clone(),
