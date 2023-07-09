@@ -40,7 +40,7 @@ impl Index {
 
     pub fn closest_enemy_units_in_path(
         &self,
-        player_id: &Id,
+        player_id: Id,
         path: &Path,
     ) -> Option<Located<Vec<(UnitId, unit::Model)>>> {
         let origin = match path.first_pos() {
@@ -51,8 +51,6 @@ impl Index {
         };
 
         let mut ret: Option<Located<Vec<(UnitId, unit::Model)>>> = None;
-
-        let player_id = player_id.clone();
 
         for step in path.to_loc_directions() {
             if let Some(units_at_loc) = self.get(&step.to_unit()) {
@@ -206,7 +204,7 @@ mod test_by_location_index {
             tank_id,
             unit::Model::new(
                 Unit::Tank,
-                &red_player_id,
+                &red_player_id.clone(),
                 Place::OnMap(tank_loc.clone()),
                 &TeamColor::Red,
             ),
@@ -217,7 +215,7 @@ mod test_by_location_index {
         let location_index = by_location::make(&by_id);
 
         let got = location_index.closest_enemy_units_in_path(
-            &red_player_id,
+            red_player_id,
             &Path::from_directions_test_only(
                 &tank_loc.to_unit(),
                 &vec![

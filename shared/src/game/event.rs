@@ -290,7 +290,7 @@ fn process_action(
         } => {
             let unit_model = match indexes.by_id.get(&replenishing_unit_id) {
                 None => {
-                    return Err("could not finding replenishing unit".to_string());
+                    return Err("could not find replenishing unit".to_string());
                 }
                 Some(u) => u,
             };
@@ -333,9 +333,27 @@ fn process_action(
             });
         }
         Action::Attack(attack) => {
-            if let Some((index_of_closest_path_action, loc_unit_closest_path)) =
-                Action::closest_crossing_path(&attack.path, remaining_actions)
-            {};
+            let player_id = match indexes.by_id.get(&attack.unit_id) {
+                Some(unit_model) => unit_model.owner.clone(),
+                None => {
+                    return Err("could not find attacking unit".to_string());
+                }
+            };
+
+            if let Some((
+                index_of_closest_path_action,
+                crossing_enemy_action,
+                loc_enemy_closest_path,
+            )) = Action::closest_crossing_enemy_path(
+                &indexes.by_id,
+                &attack.path,
+                player_id.clone(),
+                remaining_actions,
+            )? {
+                let closest_stationary_enemy = indexes
+                    .by_location
+                    .closest_enemy_units_in_path(player_id, &attack.path);
+            };
         }
         Action::Batch(_) => {}
     }

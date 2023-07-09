@@ -1,3 +1,5 @@
+use crate::game::unit_index::by_id;
+use crate::id::Id;
 use crate::located::Located;
 use crate::path::Path;
 use crate::rng::RandGen;
@@ -161,11 +163,13 @@ impl Action {
         }
     }
 
-    pub fn closest_crossing_path<'a>(
+    pub fn closest_crossing_enemy_path<'a>(
+        by_id: &by_id::Index,
         path: &Path,
+        player_id: Id,
         actions: &'a [Action],
-    ) -> Option<(usize, Located<&'a UnitId>)> {
-        let mut closest_crossing_path: Option<(usize, Located<&'a UnitId>)> = None;
+    ) -> Result<Option<(usize, &'a Action, Located<&'a UnitId>)>, String> {
+        let mut closest_crossing_path: Option<(usize, &'a Action, Located<&'a UnitId>)> = None;
 
         if let Some(origin) = path.first_pos() {
             let mut i = 0;
@@ -173,26 +177,47 @@ impl Action {
             while i < actions.len() {
                 let action = actions.get(i).unwrap();
 
-                if let (Some(unit_id), Some(path)) = (action.moving_unit(), action.path()) {
-                    if let Some(cross_loc) = path.crosses(path) {
-                        match closest_crossing_path.clone() {
-                            None => {
-                                closest_crossing_path = Some((i, cross_loc.with_value(unit_id)))
-                            }
-                            Some((_, existing)) => {
-                                if origin.distance_from(&existing)
-                                    > origin.distance_from(&cross_loc)
-                                {
-                                    closest_crossing_path = Some((
-                                        i,
-                                        Located {
-                                            x: cross_loc.x,
-                                            y: cross_loc.y,
-                                            value: unit_id,
-                                        },
-                                    ));
-                                }
-                            }
+                let (unit_id, action_path) = if let (Some(unit_id), Some(action_path)) =
+                    (action.moving_unit(), action.path())
+                {
+                    (unit_id, action_path)
+                } else {
+                    break;
+                };
+
+                match by_id.get(unit_id) {
+                    None => return Err("could not find unit referenced by action".to_string()),
+                    Some(unit_model) => {
+                        if player_id == unit_model.owner {
+                            i += 1;
+                            continue;
+                        }
+                    }
+                }
+
+                let cross_loc = match path.crosses(action_path) {
+                    None => {
+                        i += 1;
+                        continue;
+                    }
+                    Some(l) => l,
+                };
+
+                match closest_crossing_path.clone() {
+                    None => {
+                        closest_crossing_path = Some((i, action, cross_loc.with_value(unit_id)))
+                    }
+                    Some((_, _, existing)) => {
+                        if origin.distance_from(&existing) > origin.distance_from(&cross_loc) {
+                            closest_crossing_path = Some((
+                                i,
+                                action,
+                                Located {
+                                    x: cross_loc.x,
+                                    y: cross_loc.y,
+                                    value: unit_id,
+                                },
+                            ));
                         }
                     }
                 }
@@ -201,7 +226,7 @@ impl Action {
             }
         }
 
-        closest_crossing_path
+        Ok(closest_crossing_path)
     }
 
     pub fn closest_crossing_attack_path<'a>(
@@ -397,12 +422,18 @@ pub fn order(rng: &mut RandGen, actions: &mut Vec<Action>) {
 #[cfg(test)]
 mod test_game_actions {
     use crate::direction::Direction;
-    use crate::game::action::{order, unbatch, Action};
-    use crate::located;
+    use crate::facing_direction::FacingDirection;
+    use crate::game::action::{order, unbatch, Action, Attack};
+    use crate::game::unit_index::by_id;
+    use crate::id::Id;
+    use crate::located::Located;
     use crate::path::Path;
     use crate::rng::RandGen;
-    use crate::unit::UnitId;
+    use crate::team_color::TeamColor;
+    use crate::unit::{Place, Unit, UnitId};
+    use crate::{located, unit};
     use pretty_assertions::assert_eq;
+    use std::collections::HashMap;
 
     #[test]
     fn units_loaded_into_trucks_load_before_truck_moves() {
@@ -634,5 +665,89 @@ mod test_game_actions {
                 },
             ])]
         )
+    }
+
+    #[test]
+    fn closest_crossing_enemy_path() {
+        let mut units = HashMap::new();
+
+        let red_player_id = Id::test("red player");
+        let blue_player_id = Id::test("blue player");
+
+        let red_tank_id = UnitId::test("red tank");
+
+        let red_tank_loc = located::unit(2, 2);
+
+        let red_tank = unit::Model::new(
+            Unit::Tank,
+            &red_player_id,
+            Place::OnMap(red_tank_loc.with_value(FacingDirection::Right)),
+            &TeamColor::Red,
+        );
+
+        units.insert(red_tank_id.clone(), red_tank);
+
+        let blue_infantry_id = UnitId::test("blue infantry");
+
+        let blue_infantry_loc = located::unit(3, 1);
+
+        let blue_infantry = unit::Model::new(
+            Unit::Infantry,
+            &blue_player_id,
+            Place::OnMap(blue_infantry_loc.with_value(FacingDirection::Right)),
+            &TeamColor::Blue,
+        );
+
+        units.insert(blue_infantry_id.clone(), blue_infantry);
+
+        let by_id_index = by_id::Index::from_hash_map(units);
+
+        let blue_infantry_travel_action = Action::Travel {
+            unit_id: blue_infantry_id.clone(),
+            path: Path::from_directions_test_only(
+                &blue_infantry_loc,
+                &vec![Direction::South, Direction::South],
+            ),
+            dismounted_from: None,
+        };
+
+        let actions = vec![
+            Action::Attack(Attack {
+                unit_id: red_tank_id,
+                path: Path::from_directions_test_only(
+                    &red_tank_loc,
+                    &vec![
+                        Direction::East,
+                        Direction::East,
+                        Direction::East,
+                        Direction::East,
+                    ],
+                ),
+            }),
+            blue_infantry_travel_action.clone(),
+        ];
+
+        let got = Action::closest_crossing_enemy_path(
+            &by_id_index,
+            &Path::from_directions_test_only(
+                &located::unit(2, 2),
+                &vec![Direction::East, Direction::East, Direction::East],
+            ),
+            red_player_id,
+            actions.as_slice(),
+        )
+        .unwrap();
+
+        let want: Option<(usize, &Action, Located<&UnitId>)> = Some((
+            1,
+            &blue_infantry_travel_action,
+            Located {
+                x: 3,
+                y: 2,
+                value: &blue_infantry_id,
+            },
+        ));
+
+        assert_eq!(want, got)
     }
 }
