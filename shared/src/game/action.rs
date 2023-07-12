@@ -169,12 +169,9 @@ impl Action {
         path: &Path,
         player_id: Id,
         actions: &'a [Action],
-    ) -> Result<Option<(usize, &'a Action, Located<(&'a UnitId, unit::Model)>)>, String> {
-        let mut closest_crossing_path: Option<(
-            usize,
-            &'a Action,
-            Located<(&'a UnitId, unit::Model)>,
-        )> = None;
+    ) -> Result<Option<(usize, &'a Action, Located<(UnitId, unit::Model)>)>, String> {
+        let mut closest_crossing_path: Option<(usize, &'a Action, Located<(UnitId, unit::Model)>)> =
+            None;
 
         if let Some(origin) = path.first_pos() {
             let mut i = 0;
@@ -215,7 +212,7 @@ impl Action {
                         closest_crossing_path = Some((
                             i,
                             action,
-                            cross_loc.with_value((unit_id, unit_model.clone())),
+                            cross_loc.with_value((unit_id.clone(), unit_model.clone())),
                         ))
                     }
                     Some((_, _, existing)) => {
@@ -226,7 +223,7 @@ impl Action {
                                 Located {
                                     x: cross_loc.x,
                                     y: cross_loc.y,
-                                    value: (unit_id, unit_model.clone()),
+                                    value: (unit_id.clone(), unit_model.clone()),
                                 },
                             ));
                         }
@@ -749,13 +746,13 @@ mod test_game_actions {
         )
         .unwrap();
 
-        let want: Option<(usize, &Action, Located<(&UnitId, unit::Model)>)> = Some((
+        let want: Option<(usize, &Action, Located<(UnitId, unit::Model)>)> = Some((
             1,
             &blue_infantry_travel_action,
             Located {
                 x: 3,
                 y: 2,
-                value: (&blue_infantry_id, blue_infantry),
+                value: (blue_infantry_id, blue_infantry),
             },
         ));
 

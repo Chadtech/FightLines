@@ -1,5 +1,7 @@
+mod battle;
+
 use crate::facing_direction::FacingDirection;
-use crate::game::action::Action;
+use crate::game::action::{Action, Attack};
 use crate::game::replenishment::Replenishment;
 use crate::game::{action, unit_index};
 use crate::id::Id;
@@ -230,10 +232,64 @@ fn delete_actions_for_deleted_unit(deleted_unit_id: UnitId, actions: &mut Vec<Ac
 
 enum AttackCondition {
     NoEnemies,
-    Enemies {
-        loc: Located<Vec<(UnitId, unit::Model)>>,
-        encountered_enemies_traveling: Option<(usize, Action)>,
+    StationaryEnemies(Located<Vec<(UnitId, unit::Model)>>),
+    MovingEnemy {
+        enemy_loc: Located<(UnitId, unit::Model)>,
+        action_index: usize,
+        action: Action,
     },
+}
+
+impl AttackCondition {
+    pub fn determine(
+        indexes: &unit_index::Indexes,
+        attack: Attack,
+        player_id: Id,
+        origin: Located<()>,
+        actions: &Vec<Action>,
+    ) -> Result<AttackCondition, String> {
+        let maybe_closest_enemy_path = Action::closest_crossing_enemy_path(
+            &indexes.by_id,
+            &attack.path,
+            player_id.clone(),
+            actions,
+        )?;
+
+        let maybe_closest_stationary_enemy = indexes
+            .by_location
+            .closest_enemy_units_in_path(player_id, &attack.path);
+
+        let attack_conditions: AttackCondition =
+            match (maybe_closest_enemy_path, maybe_closest_stationary_enemy) {
+                (Some((action_index, enemy_action, moving_enemy_loc)), None) => {
+                    AttackCondition::MovingEnemy {
+                        action_index,
+                        enemy_loc: moving_enemy_loc,
+                        action: enemy_action.clone(),
+                    }
+                }
+                (None, Some(loc_enemies)) => AttackCondition::StationaryEnemies(loc_enemies),
+                (
+                    Some((action_index, enemy_action, moving_enemy_loc)),
+                    Some(stationary_enemies_loc),
+                ) => {
+                    if origin.distance_from(&moving_enemy_loc)
+                        > origin.distance_from(&stationary_enemies_loc)
+                    {
+                        AttackCondition::StationaryEnemies(stationary_enemies_loc)
+                    } else {
+                        AttackCondition::MovingEnemy {
+                            enemy_loc: moving_enemy_loc,
+                            action_index,
+                            action: enemy_action.clone(),
+                        }
+                    }
+                }
+                (None, None) => AttackCondition::NoEnemies,
+            };
+
+        Ok(attack_conditions)
+    }
 }
 
 fn process_action(
@@ -354,59 +410,20 @@ fn process_action(
                 }
             };
 
-            let maybe_closest_enemy_path = Action::closest_crossing_enemy_path(
-                &indexes.by_id,
-                &attack.path,
-                player_id.clone(),
-                remaining_actions,
-            )?;
+            let attack_conditions =
+                AttackCondition::determine(indexes, attack, player_id, origin, remaining_actions)?;
 
-            let maybe_closest_stationary_enemy = indexes
-                .by_location
-                .closest_enemy_units_in_path(player_id, &attack.path);
-
-            let attack_conditions: AttackCondition =
-                match (maybe_closest_enemy_path, maybe_closest_stationary_enemy) {
-                    (Some((action_index, enemy_action, moving_enemy_loc)), None) => {
-                        let unit_id = moving_enemy_loc.value.0.clone();
-                        AttackCondition::Enemies {
-                            loc: moving_enemy_loc
-                                .with_value(vec![(unit_id, moving_enemy_loc.value.1.clone())]),
-                            encountered_enemies_traveling: Some((
-                                action_index,
-                                enemy_action.clone(),
-                            )),
-                        }
-                    }
-                    (None, Some(loc_enemies)) => AttackCondition::Enemies {
-                        loc: loc_enemies,
-                        encountered_enemies_traveling: None,
-                    },
-                    (
-                        Some((action_index, enemy_action, moving_enemy_loc)),
-                        Some(stationary_enemies_loc),
-                    ) => {
-                        if origin.distance_from(&moving_enemy_loc)
-                            > origin.distance_from(&stationary_enemies_loc)
-                        {
-                            AttackCondition::Enemies {
-                                loc: stationary_enemies_loc,
-                                encountered_enemies_traveling: None,
-                            }
-                        } else {
-                            let unit_id = moving_enemy_loc.value.0.clone();
-                            AttackCondition::Enemies {
-                                loc: moving_enemy_loc
-                                    .with_value(vec![(unit_id, moving_enemy_loc.value.1.clone())]),
-                                encountered_enemies_traveling: Some((
-                                    action_index,
-                                    enemy_action.clone(),
-                                )),
-                            }
-                        }
-                    }
-                    (None, None) => AttackCondition::NoEnemies,
-                };
+            match attack_conditions {
+                AttackCondition::NoEnemies => {}
+                AttackCondition::StationaryEnemies(_) => {}
+                AttackCondition::MovingEnemy {
+                    action_index,
+                    action,
+                    enemy_loc,
+                } => {
+                    remaining_actions.remove(action_index);
+                }
+            }
         }
         Action::Batch(_) => {}
     }

@@ -1,3 +1,4 @@
+use crate::direction::Direction;
 use crate::facing_direction::FacingDirection;
 use crate::id::Id;
 use crate::located::Located;
@@ -18,6 +19,16 @@ pub struct Model {
     pub color: TeamColor,
     pub name: Option<String>,
     pub supplies: i16,
+    pub entrenched_against: Option<Direction>,
+    pub health: Health,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub enum Health {
+    Full,
+    High,
+    Medium,
+    Low,
 }
 
 impl Model {
@@ -33,6 +44,8 @@ impl Model {
             color: color.clone(),
             name: None,
             supplies: unit.max_supplies(),
+            entrenched_against: None,
+            health: Health::Full,
         }
     }
 }
