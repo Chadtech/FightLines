@@ -1,7 +1,7 @@
 mod battle;
 
 use crate::facing_direction::FacingDirection;
-use crate::game::action::{Action, Attack};
+use crate::game::action::{Action, Attack, ClosestCrossingEnemyPath};
 use crate::game::replenishment::Replenishment;
 use crate::game::{action, unit_index};
 use crate::id::Id;
@@ -246,7 +246,7 @@ impl AttackCondition {
         attack: Attack,
         player_id: Id,
         origin: Located<()>,
-        actions: &Vec<Action>,
+        actions: &[Action],
     ) -> Result<AttackCondition, String> {
         let maybe_closest_enemy_path = Action::closest_crossing_enemy_path(
             &indexes.by_id,
@@ -261,16 +261,25 @@ impl AttackCondition {
 
         let attack_conditions: AttackCondition =
             match (maybe_closest_enemy_path, maybe_closest_stationary_enemy) {
-                (Some((action_index, enemy_action, moving_enemy_loc)), None) => {
-                    AttackCondition::MovingEnemy {
+                (
+                    Some(ClosestCrossingEnemyPath {
                         action_index,
-                        enemy_loc: moving_enemy_loc,
-                        action: enemy_action.clone(),
-                    }
-                }
+                        action: enemy_action,
+                        unit_loc: moving_enemy_loc,
+                    }),
+                    None,
+                ) => AttackCondition::MovingEnemy {
+                    action_index,
+                    enemy_loc: moving_enemy_loc,
+                    action: enemy_action.clone(),
+                },
                 (None, Some(loc_enemies)) => AttackCondition::StationaryEnemies(loc_enemies),
                 (
-                    Some((action_index, enemy_action, moving_enemy_loc)),
+                    Some(ClosestCrossingEnemyPath {
+                        action_index,
+                        action: enemy_action,
+                        unit_loc: moving_enemy_loc,
+                    }),
                     Some(stationary_enemies_loc),
                 ) => {
                     if origin.distance_from(&moving_enemy_loc)
@@ -300,10 +309,7 @@ fn process_action(
 ) -> Result<(), String> {
     match action {
         Action::Travel { path, unit_id, .. } => {
-            events.push(Event::Travelled {
-                unit_id: unit_id.clone(),
-                path: path.clone(),
-            });
+            events.push(Event::Travelled { unit_id, path });
         }
         Action::LoadInto {
             unit_id,
@@ -311,9 +317,9 @@ fn process_action(
             path,
         } => {
             events.push(Event::Loaded {
-                cargo_id: unit_id.clone(),
-                transport_id: load_into.clone(),
-                path: path.clone(),
+                cargo_id: unit_id,
+                transport_id: load_into,
+                path,
             });
         }
         Action::PickUp {
@@ -322,9 +328,9 @@ fn process_action(
             path,
         } => {
             events.push(Event::PickedUp {
-                cargo_id: cargo_id.clone(),
-                transport_id: unit_id.clone(),
-                path: path.clone(),
+                cargo_id,
+                transport_id: unit_id,
+                path,
             });
         }
         Action::DropOff { cargo_id } => {
@@ -394,7 +400,7 @@ fn process_action(
             events.push(Event::ReplenishedUnits {
                 unit_id: replenishing_unit_id.clone(),
                 replenished_units: replenished_unit_ids,
-                path: path.clone(),
+                path,
             });
         }
         Action::Attack(attack) => {
@@ -418,8 +424,8 @@ fn process_action(
                 AttackCondition::StationaryEnemies(_) => {}
                 AttackCondition::MovingEnemy {
                     action_index,
-                    action,
-                    enemy_loc,
+                    action: _,
+                    enemy_loc: _,
                 } => {
                     remaining_actions.remove(action_index);
                 }

@@ -2,20 +2,22 @@ use crate::direction::Direction;
 use crate::unit;
 use crate::unit::UnitId;
 
-enum StationaryBattleOutcome {}
+enum StationaryBattleOutcome {
+    Todo,
+}
 
 fn stationary_battle(
-    attacker: unit::Model,
+    _attacker: unit::Model,
     attacking_from: Direction,
     possible_defenders: Vec<(UnitId, unit::Model)>,
-) -> Result<(), String> {
+) -> Result<StationaryBattleOutcome, String> {
     let defender = choose_defender(attacking_from, possible_defenders)?;
 
-    Ok(())
+    Ok(StationaryBattleOutcome::Todo)
 }
 
 fn choose_defender(
-    attacking_from: Direction,
+    _attacking_from: Direction,
     possible_defenders: Vec<(UnitId, unit::Model)>,
 ) -> Result<(UnitId, unit::Model), String> {
     let (first_defender, remaining_defenders) = match possible_defenders.split_first() {
@@ -23,9 +25,9 @@ fn choose_defender(
         Some(d) => d,
     };
 
-    let mut ret: (UnitId, unit::Model) = first_defender.clone();
+    let ret: (UnitId, unit::Model) = first_defender.clone();
 
-    for (defender_id, defender) in remaining_defenders {}
+    for (_defender_id, _defender) in remaining_defenders {}
 
     Ok(ret)
 }

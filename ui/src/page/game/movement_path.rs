@@ -282,7 +282,7 @@ mod test_movement_arrow {
         s.trim()
             .split('\n')
             .enumerate()
-            .map(|(ri, row)| {
+            .flat_map(|(ri, row)| {
                 let row_of_pos: Vec<Point<i32>> = row
                     .chars()
                     .enumerate()
@@ -300,7 +300,6 @@ mod test_movement_arrow {
 
                 row_of_pos
             })
-            .flatten()
             .collect::<HashSet<Point<i32>>>()
     }
 

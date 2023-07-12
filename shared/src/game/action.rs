@@ -44,6 +44,13 @@ pub struct Attack {
     pub path: Path,
 }
 
+#[derive(Clone)]
+pub struct ClosestCrossingEnemyPath<'a> {
+    pub action_index: usize,
+    pub action: &'a Action,
+    pub unit_loc: Located<(UnitId, unit::Model)>,
+}
+
 impl Action {
     // None means no delete
     // Some means delete, and the vec is of the actions to replace the action with.
@@ -169,9 +176,8 @@ impl Action {
         path: &Path,
         player_id: Id,
         actions: &'a [Action],
-    ) -> Result<Option<(usize, &'a Action, Located<(UnitId, unit::Model)>)>, String> {
-        let mut closest_crossing_path: Option<(usize, &'a Action, Located<(UnitId, unit::Model)>)> =
-            None;
+    ) -> Result<Option<ClosestCrossingEnemyPath<'a>>, String> {
+        let mut closest_crossing_path: Option<ClosestCrossingEnemyPath> = None;
 
         if let Some(origin) = path.first_pos() {
             let mut i = 0;
@@ -207,25 +213,22 @@ impl Action {
                     Some(l) => l,
                 };
 
-                match closest_crossing_path.clone() {
+                match closest_crossing_path.clone().map(|c| c.unit_loc) {
                     None => {
-                        closest_crossing_path = Some((
-                            i,
+                        closest_crossing_path = Some(ClosestCrossingEnemyPath {
+                            action_index: i,
                             action,
-                            cross_loc.with_value((unit_id.clone(), unit_model.clone())),
-                        ))
+                            unit_loc: cross_loc.with_value((unit_id.clone(), unit_model.clone())),
+                        });
                     }
-                    Some((_, _, existing)) => {
+                    Some(existing) => {
                         if origin.distance_from(&existing) > origin.distance_from(&cross_loc) {
-                            closest_crossing_path = Some((
-                                i,
+                            closest_crossing_path = Some(ClosestCrossingEnemyPath {
+                                action_index: i,
                                 action,
-                                Located {
-                                    x: cross_loc.x,
-                                    y: cross_loc.y,
-                                    value: (unit_id.clone(), unit_model.clone()),
-                                },
-                            ));
+                                unit_loc: cross_loc
+                                    .with_value((unit_id.clone(), unit_model.clone())),
+                            });
                         }
                     }
                 }

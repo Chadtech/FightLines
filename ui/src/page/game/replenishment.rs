@@ -638,7 +638,7 @@ mod test_replenishment {
             (red_infantry_2_id.clone(), red_infantry_2),
             (red_truck_id.clone(), red_truck),
             (supply_crate_1_id.clone(), supply_crate_1),
-            (supply_crate_2_id.clone(), supply_crate_2),
+            (supply_crate_2_id, supply_crate_2),
         ];
 
         let indexes = Indexes::make(units);
