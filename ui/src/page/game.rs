@@ -8,6 +8,7 @@ mod stage;
 mod unit_change;
 mod unit_selected;
 mod view;
+pub mod view_style;
 
 use crate::assets::MiscSpriteRow;
 use crate::error::Error;
@@ -18,6 +19,7 @@ use crate::page::game::replenishment::Replenishment;
 use crate::page::game::stage::animating_moves;
 use crate::page::game::stage::taking_turn::Sidebar;
 use crate::page::game::unit_change::UnitChange;
+use crate::page::game::view_style::ViewStyle;
 use crate::view::button::Button;
 use crate::view::card::Card;
 use crate::view::cell::Cell;
@@ -121,6 +123,7 @@ pub struct Model {
     stage: Stage,
     dialog: Option<Dialog>,
     status: Status,
+    view_style: ViewStyle,
     #[allow(dead_code)]
     key_press_stream: StreamHandle,
 }
@@ -181,7 +184,7 @@ impl Model {
 
         taking_turn_model.move_completed();
 
-        clear_canvas(&self.mode_canvas, &self.game_pixel_size)
+        clear_canvas(&self.mode_canvas, &self.game_pixel_size, &self.view_style)
             .map_err(|msg| Error::new("clear mode canvas".to_string(), msg))?;
 
         Ok(())
@@ -195,7 +198,7 @@ impl Model {
         if let Stage::TakingTurn(sub_model) = &mut self.stage {
             sub_model.move_completed();
 
-            clear_canvas(&self.mode_canvas, &self.game_pixel_size)
+            clear_canvas(&self.mode_canvas, &self.game_pixel_size, &self.view_style)
                 .map_err(|msg| Error::new("clear mode canvas".to_string(), msg))?
         }
 
@@ -282,6 +285,8 @@ pub fn init(
 
     let game_pixel_width = flags.game.map.width * tile::PIXEL_WIDTH;
     let game_pixel_height = flags.game.map.height * tile::PIXEL_HEIGHT;
+
+    let view_style = ViewStyle::TinyUnits;
 
     let game_pixel_size = GamePixelSize {
         width: game_pixel_width,
@@ -403,6 +408,7 @@ pub fn init(
         stage,
         dialog: None,
         status: Status::Ready,
+        view_style,
         key_press_stream,
     };
 
@@ -1343,6 +1349,7 @@ fn draw(viewer_id: &Id, model: &Model) -> Result<(), Error> {
 fn clear_canvas(
     canvas_ref: &ElRef<HtmlCanvasElement>,
     game_pixel_size: &GamePixelSize,
+    view_style: &ViewStyle,
 ) -> Result<(), String> {
     let html_canvas = canvas_ref
         .get()
@@ -1350,10 +1357,28 @@ fn clear_canvas(
 
     let ctx = seed::canvas_context_2d(&html_canvas);
 
-    ctx.begin_path();
-    ctx.clear_rect(0., 0., game_pixel_size.width_fl, game_pixel_size.height_fl);
+    clear_ctx(&ctx, game_pixel_size, view_style);
 
     Ok(())
+}
+
+fn clear_ctx(
+    ctx: &web_sys::CanvasRenderingContext2d,
+    game_pixel_size: &GamePixelSize,
+    view_style: &ViewStyle,
+) {
+    let multiplier = match view_style {
+        ViewStyle::Normal => 1.0,
+        ViewStyle::TinyUnits => 2.0,
+    };
+
+    ctx.begin_path();
+    ctx.clear_rect(
+        0.,
+        0.,
+        game_pixel_size.width_fl * multiplier,
+        game_pixel_size.height_fl * multiplier,
+    );
 }
 
 fn draw_mode(model: &Model) -> Result<(), Error> {
@@ -1372,13 +1397,7 @@ fn draw_mode(model: &Model) -> Result<(), Error> {
 
     let ctx = seed::canvas_context_2d(&canvas);
 
-    ctx.begin_path();
-    ctx.clear_rect(
-        0.,
-        0.,
-        model.game_pixel_size.width_fl,
-        model.game_pixel_size.height_fl,
-    );
+    clear_ctx(&ctx, &model.game_pixel_size, &model.view_style);
 
     match &mode {
         Mode::None => {}
@@ -1418,19 +1437,6 @@ fn draw_mode(model: &Model) -> Result<(), Error> {
     Ok(())
 }
 
-fn draw_arrows(
-    ctx: &web_sys::CanvasRenderingContext2d,
-    model: &Model,
-    game_pos: &Located<()>,
-    arrows: &Vec<(Direction, Arrow)>,
-) {
-    let mut arrow_x = game_pos.x;
-    let mut arrow_y = game_pos.y;
-    for (dir, arrow) in arrows {
-        draw_arrow(ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y, true);
-    }
-}
-
 fn draw_arrow(
     ctx: &web_sys::CanvasRenderingContext2d,
     model: &Model,
@@ -1457,20 +1463,14 @@ fn draw_cursor(model: &Model) -> Result<(), String> {
         .ok_or_else(|| "could not get cursor canvas element".to_string())?;
     let ctx = seed::canvas_context_2d(&canvas);
 
-    ctx.begin_path();
-    ctx.clear_rect(
-        0.,
-        0.,
-        model.game_pixel_size.width_fl,
-        model.game_pixel_size.height_fl,
-    );
+    clear_ctx(&ctx, &model.game_pixel_size, &model.view_style);
 
     if let Some(mouse_game_pos) = &model.mouse_game_position {
         model
             .assets
             .draw_misc_sprite(
                 &ctx,
-                MiscSpriteRow::Cursor,
+                MiscSpriteRow::Cursor(model.view_style.clone()),
                 mouse_game_pos.x,
                 mouse_game_pos.y,
             )
@@ -1490,22 +1490,53 @@ fn draw_visibility(visibility: &HashSet<Located<()>>, model: &Model) {
 
     let ctx = seed::canvas_context_2d(&canvas);
 
-    ctx.begin_path();
-    ctx.clear_rect(
-        0.,
-        0.,
-        model.game_pixel_size.width_fl,
-        model.game_pixel_size.height_fl,
-    );
+    clear_ctx(&ctx, &model.game_pixel_size, &model.view_style);
 
-    for x in 0..model.game.map.width {
-        for y in 0..model.game.map.height {
-            let loc = located::unit(x, y);
+    match model.view_style {
+        ViewStyle::Normal => {
+            for x in 0..model.game.map.width {
+                for y in 0..model.game.map.height {
+                    let loc = located::unit(x, y);
 
-            if !visibility.contains(&loc) {
-                let _ = model
-                    .assets
-                    .draw_misc_sprite(&ctx, MiscSpriteRow::FogOfWar, x, y);
+                    if !visibility.contains(&loc) {
+                        let _ = model
+                            .assets
+                            .draw_misc_sprite(&ctx, MiscSpriteRow::FogOfWar, x, y);
+                    }
+                }
+            }
+        }
+        ViewStyle::TinyUnits => {
+            for x in 0..model.game.map.width {
+                for y in 0..model.game.map.height {
+                    let loc = located::unit(x, y);
+
+                    if !visibility.contains(&loc) {
+                        let x = x * 2;
+                        let y = y * 2;
+
+                        let _ = model
+                            .assets
+                            .draw_misc_sprite(&ctx, MiscSpriteRow::FogOfWar, x, y);
+
+                        let _ =
+                            model
+                                .assets
+                                .draw_misc_sprite(&ctx, MiscSpriteRow::FogOfWar, x + 1, y);
+
+                        let _ =
+                            model
+                                .assets
+                                .draw_misc_sprite(&ctx, MiscSpriteRow::FogOfWar, x, y + 1);
+
+                        let _ = model.assets.draw_misc_sprite(
+                            &ctx,
+                            MiscSpriteRow::FogOfWar,
+                            x + 1,
+                            y + 1,
+                        );
+                    }
+                }
             }
         }
     }
@@ -1520,13 +1551,7 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
     };
     let ctx = seed::canvas_context_2d(&canvas);
 
-    ctx.begin_path();
-    ctx.clear_rect(
-        0.,
-        0.,
-        model.game_pixel_size.width_fl,
-        model.game_pixel_size.height_fl,
-    );
+    clear_ctx(&ctx, &model.game_pixel_size, &model.view_style);
 
     let mini_units = match model.mini_units_canvas.get() {
         Some(c) => c,
@@ -1536,13 +1561,7 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
     };
     let mini_units_ctx = seed::canvas_context_2d(&mini_units);
 
-    mini_units_ctx.begin_path();
-    mini_units_ctx.clear_rect(
-        0.,
-        0.,
-        model.game_pixel_size.width_fl * 2.0,
-        model.game_pixel_size.height_fl * 2.0,
-    );
+    clear_ctx(&ctx, &model.game_pixel_size, &model.view_style);
 
     let indices = match &model.stage {
         Stage::AnimatingMoves(sub_model) => &sub_model.indices,
@@ -1553,25 +1572,12 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
         let location = located::unit(game_pos.x, game_pos.y);
 
         let draw_units_move = |maybe_units_move: Option<&Action>| {
-            if let Some(units_move) = maybe_units_move {
-                match units_move {
-                    Action::TraveledTo { arrows, .. } => {
-                        draw_arrows(&ctx, model, game_pos, arrows);
-                    }
-                    Action::LoadInto { arrows, .. } => {
-                        draw_arrows(&ctx, model, game_pos, arrows);
-                    }
-                    Action::PickUp { arrows, .. } => {
-                        draw_arrows(&ctx, model, game_pos, arrows);
-                    }
-                    Action::DropOff { .. } => {}
-                    Action::Replenish { arrows, .. } => {
-                        draw_arrows(&ctx, model, game_pos, arrows);
-                    }
-                    Action::Attack { arrows, .. } => {
-                        draw_arrows(&ctx, model, game_pos, arrows);
-                    }
-                };
+            if let Some(arrows) = maybe_units_move.and_then(|action| action.arrows()) {
+                let mut arrow_x = game_pos.x;
+                let mut arrow_y = game_pos.y;
+                for (dir, arrow) in arrows {
+                    draw_arrow(&ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y, true);
+                }
             }
         };
 
@@ -1652,7 +1658,14 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                     unit_model,
                 );
 
-                let _ = sheet_for_unit_draw.draw(&ctx, sprite_sheet_x, sprite_sheet_y, x, y);
+                let _ = sheet_for_unit_draw.draw(
+                    &ctx,
+                    &model.view_style,
+                    sprite_sheet_x,
+                    sprite_sheet_y,
+                    x,
+                    y,
+                );
 
                 draw_units_move(maybe_units_move);
 
@@ -1713,6 +1726,7 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
 
                     let _ = sheet_for_unit_draw.draw(
                         &mini_units_ctx,
+                        &model.view_style,
                         sprite_sheet_x,
                         sprite_sheet_y,
                         mini_x,
@@ -1741,10 +1755,14 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                     todo!("Sprite for game pos with multiple teams on it")
                 };
 
-                let _ = model
-                    .assets
-                    .sheet
-                    .draw(&ctx, 9.0 * tile::PIXEL_WIDTH_FL, sy, x, y);
+                let _ = model.assets.sheet.draw(
+                    &ctx,
+                    &model.view_style,
+                    9.0 * tile::PIXEL_WIDTH_FL,
+                    sy,
+                    x,
+                    y,
+                );
 
                 for (unit_id, _, _) in units {
                     draw_units_move(model.get_units_move(unit_id));
@@ -1764,24 +1782,46 @@ fn draw_terrain(model: &Model) {
     };
     let ctx = seed::canvas_context_2d(&canvas);
 
-    ctx.begin_path();
-    ctx.clear_rect(
-        0.,
-        0.,
-        model.game_pixel_size.width_fl,
-        model.game_pixel_size.height_fl,
-    );
+    clear_ctx(&ctx, &model.game_pixel_size, &model.view_style);
 
     let grid = &model.game.map.grid;
 
-    for row in grid {
-        for loc_tile in row {
-            let _ = model.assets.draw_misc_sprite(
-                &ctx,
-                (&loc_tile.value).into(),
-                loc_tile.x,
-                loc_tile.y,
-            );
+    match model.view_style {
+        ViewStyle::Normal => {
+            for row in grid {
+                for loc_tile in row {
+                    let _ = model.assets.draw_misc_sprite(
+                        &ctx,
+                        (&loc_tile.value).into(),
+                        loc_tile.x,
+                        loc_tile.y,
+                    );
+                }
+            }
+        }
+        ViewStyle::TinyUnits => {
+            for row in grid {
+                for loc_tile in row {
+                    let x = loc_tile.x * 2;
+                    let y = loc_tile.y * 2;
+
+                    let _ = model
+                        .assets
+                        .draw_misc_sprite(&ctx, (&loc_tile.value).into(), x, y);
+
+                    let _ = model
+                        .assets
+                        .draw_misc_sprite(&ctx, (&loc_tile.value).into(), x + 1, y);
+
+                    let _ = model
+                        .assets
+                        .draw_misc_sprite(&ctx, (&loc_tile.value).into(), x, y + 1);
+                    let _ =
+                        model
+                            .assets
+                            .draw_misc_sprite(&ctx, (&loc_tile.value).into(), x + 1, y + 1);
+                }
+            }
         }
     }
 }
@@ -1847,17 +1887,23 @@ const CANVAS_CONTAINER_HTML_ID: &str = "canvases_container";
 fn mode_canvas_cell(model: &Model) -> Cell<Msg> {
     Cell::from_html(
         vec![],
-        vec![game_canvas(model, &model.mode_canvas, "mode".to_string())],
+        vec![canvas_proto(
+            model,
+            &model.mode_canvas,
+            "mode".to_string(),
+            1,
+        )],
     )
 }
 
 fn cursor_canvas_cell(model: &Model) -> Cell<Msg> {
     Cell::from_html(
         vec![],
-        vec![game_canvas(
+        vec![canvas_proto(
             model,
             &model.cursor_canvas,
             "cursor".to_string(),
+            1,
         )],
     )
 }
@@ -1865,7 +1911,7 @@ fn cursor_canvas_cell(model: &Model) -> Cell<Msg> {
 fn visibility_canvas_cell(model: &Model) -> Cell<Msg> {
     Cell::from_html(
         vec![],
-        vec![game_canvas(
+        vec![canvas_view(
             model,
             &model.visibility_canvas,
             "visibility".to_string(),
@@ -1876,14 +1922,14 @@ fn visibility_canvas_cell(model: &Model) -> Cell<Msg> {
 fn units_canvas_cell(model: &Model) -> Cell<Msg> {
     Cell::from_html(
         vec![],
-        vec![game_canvas(model, &model.units_canvas, "units".to_string())],
+        vec![canvas_view(model, &model.units_canvas, "units".to_string())],
     )
 }
 
 fn mini_units_canvas_cell(model: &Model) -> Cell<Msg> {
     Cell::from_html(
         vec![],
-        vec![mini_game_canvas(
+        vec![mini_canvas_view(
             model,
             &model.mini_units_canvas,
             "mini units".to_string(),
@@ -1894,17 +1940,24 @@ fn mini_units_canvas_cell(model: &Model) -> Cell<Msg> {
 fn map_canvas_cell(model: &Model) -> Cell<Msg> {
     Cell::from_html(
         vec![],
-        vec![game_canvas(model, &model.map_canvas, "map".to_string())],
+        vec![canvas_view(model, &model.map_canvas, "map".to_string())],
     )
 }
 
-fn game_canvas(model: &Model, r: &ElRef<HtmlCanvasElement>, html_id: String) -> Node<Msg> {
-    canvas_proto(model, r, html_id, 1)
+fn canvas_view(model: &Model, r: &ElRef<HtmlCanvasElement>, html_id: String) -> Node<Msg> {
+    let scale = match model.view_style {
+        ViewStyle::Normal => 1,
+        ViewStyle::TinyUnits => 2,
+    };
+
+    canvas_proto(model, r, html_id, scale)
 }
 
-fn mini_game_canvas(model: &Model, r: &ElRef<HtmlCanvasElement>, html_id: String) -> Node<Msg> {
+fn mini_canvas_view(model: &Model, r: &ElRef<HtmlCanvasElement>, html_id: String) -> Node<Msg> {
     canvas_proto(model, r, html_id, 2)
 }
+
+// fn clear_canvas()
 
 fn canvas_proto(
     model: &Model,

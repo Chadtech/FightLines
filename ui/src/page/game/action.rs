@@ -113,4 +113,15 @@ impl Action {
 
         moves_ret
     }
+
+    pub fn arrows(&self) -> Option<&Vec<(Direction, Arrow)>> {
+        match self {
+            Action::TraveledTo { arrows, .. } => Some(arrows),
+            Action::LoadInto { arrows, .. } => Some(arrows),
+            Action::PickUp { arrows, .. } => Some(arrows),
+            Action::DropOff { .. } => None,
+            Action::Replenish { arrows, .. } => Some(arrows),
+            Action::Attack { arrows, .. } => Some(arrows),
+        }
+    }
 }

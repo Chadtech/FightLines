@@ -1,3 +1,4 @@
+use crate::page::game::view_style::ViewStyle;
 use crate::view::cell::Cell;
 use crate::Style;
 use seed::prelude::{El, JsValue, Node, Tag};
@@ -24,7 +25,7 @@ pub enum MiscSpriteRow {
     Forest,
     MobilitySpace,
     Arrow { arrow: ArrowRow, moved: bool },
-    Cursor,
+    Cursor(ViewStyle),
     PartiallyLoadedCargoIndicator,
     FullyLoadedCargoIndicator,
     LowSuppliesIndicator,
@@ -61,19 +62,35 @@ impl Sheet {
     pub fn draw(
         &self,
         ctx: &web_sys::CanvasRenderingContext2d,
+        view_style: &ViewStyle,
         sx: f64,
         sy: f64,
         x: f64,
         y: f64,
     ) -> Result<(), JsValue> {
+        let multiplier = match view_style {
+            ViewStyle::Normal => 1.0,
+            ViewStyle::TinyUnits => 2.0,
+        };
+
+        let adjustment_x = match view_style {
+            ViewStyle::Normal => 0.0,
+            ViewStyle::TinyUnits => tile::PIXEL_WIDTH_FL / 2.0,
+        };
+
+        let adjustment_y = match view_style {
+            ViewStyle::Normal => 0.0,
+            ViewStyle::TinyUnits => tile::PIXEL_HEIGHT_FL / 2.0,
+        };
+
         ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
             self.to_html(),
             sx,
             sy,
             tile::PIXEL_WIDTH_FL,
             tile::PIXEL_HEIGHT_FL,
-            x,
-            y,
+            x * multiplier + adjustment_x,
+            y * multiplier + adjustment_y,
             tile::PIXEL_WIDTH_FL,
             tile::PIXEL_HEIGHT_FL,
         )
@@ -122,14 +139,17 @@ impl Model {
         x: u16,
         y: u16,
     ) -> Result<(), JsValue> {
+        let x = x as f64 * tile::PIXEL_WIDTH_FL;
+        let y = y as f64 * tile::PIXEL_HEIGHT_FL;
+
         ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
             &self.sheet.0,
             MISC_SPRITE_SHEET_COLUMN,
             misc_sprite_row.row_number() * tile::PIXEL_HEIGHT_FL,
             tile::PIXEL_WIDTH_FL,
             tile::PIXEL_HEIGHT_FL,
-            x as f64 * tile::PIXEL_WIDTH_FL,
-            y as f64 * tile::PIXEL_HEIGHT_FL,
+            x,
+            y,
             tile::PIXEL_WIDTH_FL,
             tile::PIXEL_HEIGHT_FL,
         )
@@ -163,7 +183,7 @@ impl MiscSpriteRow {
 
                 r
             }
-            MiscSpriteRow::Cursor => 2.0,
+            MiscSpriteRow::Cursor(_) => 2.0,
             MiscSpriteRow::PartiallyLoadedCargoIndicator => 26.0,
             MiscSpriteRow::FullyLoadedCargoIndicator => 28.0,
             MiscSpriteRow::LowSuppliesIndicator => 27.0,
