@@ -29,7 +29,7 @@ pub enum Animation {
 }
 
 impl Animation {
-    fn subject_unit_id(self) -> UnitId {
+    pub fn subject_unit_id(&self) -> &UnitId {
         match self {
             Animation::Travel { unit_id, .. } => unit_id,
             Animation::Perish { unit_id } => unit_id,
@@ -38,6 +38,14 @@ impl Animation {
                 replenishing_unit_id,
                 ..
             } => replenishing_unit_id,
+        }
+    }
+    pub fn moving_subject_unit_id(&self) -> Option<Located<&UnitId>> {
+        match self {
+            Animation::Travel { unit_id, path, .. } => {
+                path.first_pos().map(|loc| loc.with_value(unit_id))
+            }
+            _ => None,
         }
     }
     pub fn sidebar_can_list_for_user(

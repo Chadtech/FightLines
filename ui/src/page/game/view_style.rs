@@ -1,5 +1,6 @@
 #[derive(Clone)]
 pub enum ViewStyle {
     Normal,
-    TinyUnits,
+    TinySpacedUnits,
+    SpacedUnits,
 }

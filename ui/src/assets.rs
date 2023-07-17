@@ -70,17 +70,20 @@ impl Sheet {
     ) -> Result<(), JsValue> {
         let multiplier = match view_style {
             ViewStyle::Normal => 1.0,
-            ViewStyle::TinyUnits => 2.0,
+            ViewStyle::TinySpacedUnits => 2.0,
+            ViewStyle::SpacedUnits => 2.0,
         };
 
         let adjustment_x = match view_style {
             ViewStyle::Normal => 0.0,
-            ViewStyle::TinyUnits => tile::PIXEL_WIDTH_FL / 2.0,
+            ViewStyle::TinySpacedUnits => tile::PIXEL_WIDTH_FL / 2.0,
+            ViewStyle::SpacedUnits => tile::PIXEL_WIDTH_FL / 2.0,
         };
 
         let adjustment_y = match view_style {
             ViewStyle::Normal => 0.0,
-            ViewStyle::TinyUnits => tile::PIXEL_HEIGHT_FL / 2.0,
+            ViewStyle::TinySpacedUnits => tile::PIXEL_HEIGHT_FL / 2.0,
+            ViewStyle::SpacedUnits => tile::PIXEL_HEIGHT_FL / 2.0,
         };
 
         ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(

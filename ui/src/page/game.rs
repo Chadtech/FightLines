@@ -40,6 +40,7 @@ use shared::frame_count::FrameCount;
 use shared::game::{calculate_player_visibility, mobility, unit_index, Game, GameId, Turn};
 use shared::id::Id;
 use shared::located::Located;
+use shared::map::Map;
 use shared::path::Path;
 use shared::point::Point;
 use shared::team_color::TeamColor;
@@ -107,6 +108,7 @@ pub struct Model {
     units_canvas: ElRef<HtmlCanvasElement>,
     mini_units_canvas: ElRef<HtmlCanvasElement>,
     visibility_canvas: ElRef<HtmlCanvasElement>,
+    move_arrows_canvas: ElRef<HtmlCanvasElement>,
     mode_canvas: ElRef<HtmlCanvasElement>,
     cursor_canvas: ElRef<HtmlCanvasElement>,
     assets: assets::Model,
@@ -136,6 +138,26 @@ struct GamePixelSize {
     height_fl: f64,
 }
 
+impl GamePixelSize {
+    pub fn init(map: &Map, view_style: &ViewStyle) -> GamePixelSize {
+        let multiplier = match view_style {
+            ViewStyle::Normal => 1,
+            ViewStyle::TinySpacedUnits => 1,
+            ViewStyle::SpacedUnits => 2,
+        };
+
+        let game_pixel_width = map.width * tile::PIXEL_WIDTH * multiplier;
+        let game_pixel_height = map.height * tile::PIXEL_HEIGHT * multiplier;
+
+        GamePixelSize {
+            width: game_pixel_width,
+            height: game_pixel_height,
+            width_fl: game_pixel_width as f64,
+            height_fl: game_pixel_height as f64,
+        }
+    }
+}
+
 #[derive(PartialEq, Eq, Debug)]
 pub enum Status {
     Ready,
@@ -147,6 +169,12 @@ enum Dialog {
 }
 
 impl Model {
+    fn currently_animating_unit(&self) -> Option<Located<&UnitId>> {
+        match &self.stage {
+            Stage::AnimatingMoves(sub_model) => sub_model.currently_animating_unit(),
+            _ => None,
+        }
+    }
     fn travel_unit(
         &mut self,
         unit_id: &UnitId,
@@ -248,9 +276,9 @@ enum Stage {
 #[derive(Clone, Debug)]
 pub enum Msg {
     RenderedFirstTime,
-    MouseDownOnScreen(Point<i16>),
-    MouseUpOnScreen(Point<i16>),
-    MouseMoveOnScreen(Point<i16>),
+    MousedDownOnScreen(Point<i16>),
+    MousedUpOnScreen(Point<i16>),
+    MouseMovedOnScreen(Point<i16>),
     MinimumRenderTimeExpired,
     ClickedSubmitTurn,
     ClickedSubmitTurnConfirm,
@@ -283,26 +311,20 @@ pub fn init(
 ) -> Result<Model, String> {
     let window_size = global.window_size();
 
-    let game_pixel_width = flags.game.map.width * tile::PIXEL_WIDTH;
-    let game_pixel_height = flags.game.map.height * tile::PIXEL_HEIGHT;
+    let view_style = ViewStyle::SpacedUnits;
 
-    let view_style = ViewStyle::TinyUnits;
+    let game = flags.game;
 
-    let game_pixel_size = GamePixelSize {
-        width: game_pixel_width,
-        height: game_pixel_height,
-        width_fl: game_pixel_width as f64,
-        height_fl: game_pixel_height as f64,
-    };
+    let game_pixel_size = GamePixelSize::init(&game.map, &view_style);
 
     let game_x = cmp::max(
         0,
-        (((window_size.width - 384.0) / 2.0) - (game_pixel_width as f64)) as i16,
+        (((window_size.width - 384.0) / 2.0) - game_pixel_size.width_fl) as i16,
     );
 
     let game_y = cmp::max(
         0,
-        ((window_size.height / 2.0) - (game_pixel_height as f64)) as i16,
+        ((window_size.height / 2.0) - game_pixel_size.height_fl) as i16,
     );
 
     orders.after_next_render(|_| Msg::RenderedFirstTime);
@@ -317,8 +339,6 @@ pub fn init(
     }));
 
     let assets = assets::Model::init()?;
-
-    let game = flags.game;
 
     let stage = if game.waiting_on_player(&global.viewer_id()) {
         Stage::TakingTurn(stage::taking_turn::Model::init())
@@ -392,6 +412,7 @@ pub fn init(
         visibility_canvas: ElRef::<HtmlCanvasElement>::default(),
         mode_canvas: ElRef::<HtmlCanvasElement>::default(),
         cursor_canvas: ElRef::<HtmlCanvasElement>::default(),
+        move_arrows_canvas: ElRef::<HtmlCanvasElement>::default(),
         assets,
         game_pos: Point {
             x: game_x,
@@ -416,11 +437,17 @@ pub fn init(
 }
 
 fn mouse_screen_pos_to_game_pos(page_pos: Point<i16>, model: &Model) -> Point<i16> {
+    let multiplier = match model.view_style {
+        ViewStyle::Normal => 2,
+        ViewStyle::TinySpacedUnits => 2,
+        ViewStyle::SpacedUnits => 4,
+    };
+
     let x_on_game = page_pos.x + model.scroll_pos.x - model.game_pos.x - 384;
-    let x = x_on_game / ((tile::PIXEL_WIDTH * 2) as i16);
+    let x = x_on_game / ((tile::PIXEL_WIDTH * multiplier) as i16);
 
     let y_on_game = page_pos.y + model.scroll_pos.y - model.game_pos.y;
-    let y = y_on_game / ((tile::PIXEL_HEIGHT * 2) as i16);
+    let y = y_on_game / ((tile::PIXEL_HEIGHT * multiplier) as i16);
 
     Point { x, y }
 }
@@ -476,8 +503,8 @@ pub fn update(
                 global.toast_error(error);
             }
         }
-        Msg::MouseDownOnScreen(_page_pos) => {}
-        Msg::MouseUpOnScreen(page_pos) => {
+        Msg::MousedDownOnScreen(_page_pos) => {}
+        Msg::MousedUpOnScreen(page_pos) => {
             if let Stage::TakingTurn { .. } = model.stage {
                 if let Err(error) = handle_click_on_screen_during_turn(
                     global.viewer_id(),
@@ -488,7 +515,7 @@ pub fn update(
                 }
             }
         }
-        Msg::MouseMoveOnScreen(page_pos) => {
+        Msg::MouseMovedOnScreen(page_pos) => {
             if let Err(error) = handle_mouse_move_on_screen(model, page_pos) {
                 global.toast_error(error)
             }
@@ -1369,7 +1396,8 @@ fn clear_ctx(
 ) {
     let multiplier = match view_style {
         ViewStyle::Normal => 1.0,
-        ViewStyle::TinyUnits => 2.0,
+        ViewStyle::TinySpacedUnits => 2.0,
+        ViewStyle::SpacedUnits => 2.0,
     };
 
     ctx.begin_path();
@@ -1423,7 +1451,7 @@ fn draw_mode(model: &Model) -> Result<(), Error> {
             for arrow_step in &moving_model.arrows {
                 draw_arrow(
                     &ctx,
-                    model,
+                    &model.assets,
                     &arrow_step.arrow,
                     &arrow_step.direction,
                     &mut arrow_x,
@@ -1438,8 +1466,8 @@ fn draw_mode(model: &Model) -> Result<(), Error> {
 }
 
 fn draw_arrow(
-    ctx: &web_sys::CanvasRenderingContext2d,
-    model: &Model,
+    arrow_canvas_ctx: &web_sys::CanvasRenderingContext2d,
+    assets: &assets::Model,
     arrow: &Arrow,
     dir: &Direction,
     arrow_x: &mut u16,
@@ -1448,8 +1476,8 @@ fn draw_arrow(
 ) {
     dir.adjust_coord(arrow_x, arrow_y);
 
-    let _ = model.assets.draw_misc_sprite(
-        ctx,
+    let _ = assets.draw_misc_sprite(
+        arrow_canvas_ctx,
         assets::ArrowParams { arrow, moved }.into(),
         *arrow_x,
         *arrow_y,
@@ -1506,7 +1534,7 @@ fn draw_visibility(visibility: &HashSet<Located<()>>, model: &Model) {
                 }
             }
         }
-        ViewStyle::TinyUnits => {
+        ViewStyle::TinySpacedUnits | ViewStyle::SpacedUnits => {
             for x in 0..model.game.map.width {
                 for y in 0..model.game.map.height {
                     let loc = located::unit(x, y);
@@ -1543,13 +1571,12 @@ fn draw_visibility(visibility: &HashSet<Located<()>>, model: &Model) {
 }
 
 fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
-    let canvas = match model.units_canvas.get() {
-        Some(c) => c,
+    let ctx = match model.units_canvas.get() {
+        Some(c) => seed::canvas_context_2d(&c),
         None => {
             return;
         }
     };
-    let ctx = seed::canvas_context_2d(&canvas);
 
     clear_ctx(&ctx, &model.game_pixel_size, &model.view_style);
 
@@ -1563,6 +1590,15 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
 
     clear_ctx(&ctx, &model.game_pixel_size, &model.view_style);
 
+    let arrows_ctx = match model.move_arrows_canvas.get() {
+        Some(c) => seed::canvas_context_2d(&c),
+        None => {
+            return;
+        }
+    };
+
+    clear_ctx(&arrows_ctx, &model.game_pixel_size, &model.view_style);
+
     let indices = match &model.stage {
         Stage::AnimatingMoves(sub_model) => &sub_model.indices,
         _ => &model.game.indexes,
@@ -1575,8 +1611,17 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
             if let Some(arrows) = maybe_units_move.and_then(|action| action.arrows()) {
                 let mut arrow_x = game_pos.x;
                 let mut arrow_y = game_pos.y;
+
                 for (dir, arrow) in arrows {
-                    draw_arrow(&ctx, model, arrow, dir, &mut arrow_x, &mut arrow_y, true);
+                    draw_arrow(
+                        &arrows_ctx,
+                        &model.assets,
+                        arrow,
+                        dir,
+                        &mut arrow_x,
+                        &mut arrow_y,
+                        true,
+                    );
                 }
             }
         };
@@ -1799,7 +1844,31 @@ fn draw_terrain(model: &Model) {
                 }
             }
         }
-        ViewStyle::TinyUnits => {
+        ViewStyle::TinySpacedUnits => {
+            for row in grid {
+                for loc_tile in row {
+                    let x = loc_tile.x * 2;
+                    let y = loc_tile.y * 2;
+
+                    let _ = model
+                        .assets
+                        .draw_misc_sprite(&ctx, (&loc_tile.value).into(), x, y);
+
+                    let _ = model
+                        .assets
+                        .draw_misc_sprite(&ctx, (&loc_tile.value).into(), x + 1, y);
+
+                    let _ = model
+                        .assets
+                        .draw_misc_sprite(&ctx, (&loc_tile.value).into(), x, y + 1);
+                    let _ =
+                        model
+                            .assets
+                            .draw_misc_sprite(&ctx, (&loc_tile.value).into(), x + 1, y + 1);
+                }
+            }
+        }
+        ViewStyle::SpacedUnits => {
             for row in grid {
                 for loc_tile in row {
                     let x = loc_tile.x * 2;
@@ -1844,6 +1913,7 @@ pub fn view(viewer_id: Id, model: &Model) -> Vec<Cell<Msg>> {
             map_canvas_cell(model),
             units_canvas_cell(model),
             mini_units_canvas_cell(model),
+            move_arrows_canvas_cell(model),
             visibility_canvas_cell(model),
             mode_canvas_cell(model),
             cursor_canvas_cell(model),
@@ -1891,7 +1961,10 @@ fn mode_canvas_cell(model: &Model) -> Cell<Msg> {
             model,
             &model.mode_canvas,
             "mode".to_string(),
-            1,
+            Scale {
+                canvas_scale: 1,
+                html_scale: 1,
+            },
         )],
     )
 }
@@ -1903,7 +1976,10 @@ fn cursor_canvas_cell(model: &Model) -> Cell<Msg> {
             model,
             &model.cursor_canvas,
             "cursor".to_string(),
-            1,
+            Scale {
+                canvas_scale: 1,
+                html_scale: 1,
+            },
         )],
     )
 }
@@ -1923,6 +1999,21 @@ fn units_canvas_cell(model: &Model) -> Cell<Msg> {
     Cell::from_html(
         vec![],
         vec![canvas_view(model, &model.units_canvas, "units".to_string())],
+    )
+}
+
+fn move_arrows_canvas_cell(model: &Model) -> Cell<Msg> {
+    Cell::from_html(
+        vec![],
+        vec![canvas_proto(
+            model,
+            &model.move_arrows_canvas,
+            "move-arrows".to_string(),
+            Scale {
+                canvas_scale: 1,
+                html_scale: 1,
+            },
+        )],
     )
 }
 
@@ -1947,36 +2038,67 @@ fn map_canvas_cell(model: &Model) -> Cell<Msg> {
 fn canvas_view(model: &Model, r: &ElRef<HtmlCanvasElement>, html_id: String) -> Node<Msg> {
     let scale = match model.view_style {
         ViewStyle::Normal => 1,
-        ViewStyle::TinyUnits => 2,
+        ViewStyle::TinySpacedUnits => 2,
+        ViewStyle::SpacedUnits => 2,
     };
 
-    canvas_proto(model, r, html_id, scale)
+    canvas_proto(
+        model,
+        r,
+        html_id,
+        Scale {
+            canvas_scale: scale,
+            html_scale: 1,
+        },
+    )
 }
 
 fn mini_canvas_view(model: &Model, r: &ElRef<HtmlCanvasElement>, html_id: String) -> Node<Msg> {
-    canvas_proto(model, r, html_id, 2)
+    canvas_proto(
+        model,
+        r,
+        html_id,
+        Scale {
+            canvas_scale: 2,
+            html_scale: 1,
+        },
+    )
 }
 
-// fn clear_canvas()
+struct Scale {
+    canvas_scale: u16,
+    html_scale: u16,
+}
 
 fn canvas_proto(
     model: &Model,
     r: &ElRef<HtmlCanvasElement>,
     html_id: String,
-    scale: u16,
+    scale: Scale,
 ) -> Node<Msg> {
+    let Scale {
+        canvas_scale,
+        html_scale,
+    } = scale;
+
+    let html_scale = match model.view_style {
+        ViewStyle::Normal => 2,
+        ViewStyle::TinySpacedUnits => 2,
+        ViewStyle::SpacedUnits => 4,
+    };
+
     canvas![
         C![Style::Absolute.css_classes().concat()],
         attrs! {
-            At::Width => px_u16(model.game_pixel_size.width * scale).as_str(),
-            At::Height => px_u16(model.game_pixel_size.height * scale).as_str()
+            At::Width => px_u16(model.game_pixel_size.width * canvas_scale).as_str(),
+            At::Height => px_u16(model.game_pixel_size.height * canvas_scale).as_str()
             At::Id => html_id.as_str()
         },
         style! {
             St::Left => px_i16(model.game_pos.x).as_str(),
             St::Top => px_i16(model.game_pos.y).as_str(),
-            St::Width => px_u16(model.game_pixel_size.width * 2).as_str(),
-            St::Height => px_u16(model.game_pixel_size.height * 2).as_str()
+            St::Width => px_u16(model.game_pixel_size.width * html_scale).as_str(),
+            St::Height => px_u16(model.game_pixel_size.height * html_scale).as_str()
         },
         el_ref(r)
     ]
@@ -2024,19 +2146,19 @@ fn click_screen(model: &Model) -> Cell<Msg> {
         vec![screen],
     )
     .on_mouse_down(|event| {
-        Msg::MouseDownOnScreen(Point {
+        Msg::MousedDownOnScreen(Point {
             x: event.page_x() as i16,
             y: event.page_y() as i16,
         })
     })
     .on_mouse_up(|event| {
-        Msg::MouseUpOnScreen(Point {
+        Msg::MousedUpOnScreen(Point {
             x: event.page_x() as i16,
             y: event.page_y() as i16,
         })
     })
     .on_mouse_move(|event| {
-        Msg::MouseMoveOnScreen(Point {
+        Msg::MouseMovedOnScreen(Point {
             x: event.page_x() as i16,
             y: event.page_y() as i16,
         })

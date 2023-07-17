@@ -7,7 +7,7 @@ use shared::game::{calculate_player_visibility, unit_index};
 use shared::id::Id;
 use shared::located::Located;
 use shared::map::Map;
-use shared::unit::Place;
+use shared::unit::{Place, UnitId};
 use std::collections::HashSet;
 
 #[derive(Debug)]
@@ -31,6 +31,11 @@ impl Model {
             visibility,
             day,
         }
+    }
+    pub fn currently_animating_unit(&self) -> Option<Located<&UnitId>> {
+        self.animations
+            .first()
+            .and_then(|animation| animation.moving_subject_unit_id())
     }
     pub fn progress_animation(&mut self, viewer_id: &Id, map: &Map) -> Result<bool, String> {
         let ret = match self.animations.first_mut() {
