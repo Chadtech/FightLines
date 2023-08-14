@@ -142,8 +142,20 @@ impl Model {
         x: u16,
         y: u16,
     ) -> Result<(), JsValue> {
-        let x = x as f64 * tile::PIXEL_WIDTH_FL;
-        let y = y as f64 * tile::PIXEL_HEIGHT_FL;
+        self.draw_misc_sprite_precise(ctx, misc_sprite_row, x as f64, y as f64, 0.0, 0.0)
+    }
+
+    pub fn draw_misc_sprite_precise(
+        &self,
+        ctx: &web_sys::CanvasRenderingContext2d,
+        misc_sprite_row: MiscSpriteRow,
+        x: f64,
+        y: f64,
+        x_adjusmentt: f64,
+        y_adjustment: f64,
+    ) -> Result<(), JsValue> {
+        let x = x * tile::PIXEL_WIDTH_FL;
+        let y = y * tile::PIXEL_HEIGHT_FL;
 
         ctx.draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
             &self.sheet.0,
@@ -151,8 +163,8 @@ impl Model {
             misc_sprite_row.row_number() * tile::PIXEL_HEIGHT_FL,
             tile::PIXEL_WIDTH_FL,
             tile::PIXEL_HEIGHT_FL,
-            x,
-            y,
+            x + x_adjusmentt,
+            y + y_adjustment,
             tile::PIXEL_WIDTH_FL,
             tile::PIXEL_HEIGHT_FL,
         )

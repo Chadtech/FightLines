@@ -103,6 +103,7 @@ impl Games {
             DevGameId::ReplenishTest => {}
             DevGameId::ArrowTest => {}
             DevGameId::GamePlayTest => {}
+            DevGameId::SingleUnitTest => {}
         }
 
         for dev_game_id in game::ALL_DEV_IDS {
@@ -421,6 +422,30 @@ impl Games {
                     ]);
 
                     Game::try_from(game_init_flags).unwrap()
+                }
+                DevGameId::SingleUnitTest => {
+                    let mut lobby = Lobby::new(
+                        Id::Dev("red".to_string()),
+                        Player {
+                            name: Name::from_str("red").unwrap(),
+                            color: TeamColor::Red,
+                        },
+                    );
+
+                    let _ = lobby.add_guest(
+                        Id::Dev("blue".to_string()),
+                        Player {
+                            name: Name::from_str("blue").unwrap(),
+                            color: TeamColor::Blue,
+                        },
+                    );
+
+                    lobby.set_map_choice(MapOpt::SingleUnitTest);
+
+                    let new_seed: RandSeed = RandSeed::next(&mut rng);
+
+                    Game::try_from(GameInitFlags::new(lobby, &mut RandGen::from_seed(new_seed)))
+                        .unwrap()
                 }
             };
 

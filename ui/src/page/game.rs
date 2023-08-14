@@ -44,6 +44,7 @@ use shared::map::Map;
 use shared::path::Path;
 use shared::point::Point;
 use shared::team_color::TeamColor;
+use shared::tile::Tile;
 use shared::unit::{Place, Unit, UnitId};
 use shared::{game, located, tile, unit};
 use std::cmp;
@@ -1660,7 +1661,6 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                     }
                 };
 
-                // if maybe_units_move.is_some() {
                 if unit_moved {
                     match facing_dir {
                         FacingDirection::Left => {
@@ -1722,10 +1722,28 @@ fn draw_units(visibility: &HashSet<Located<()>>, model: &Model) {
                             MiscSpriteRow::PartiallyLoadedCargoIndicator
                         };
 
-                    let _ =
-                        model
-                            .assets
-                            .draw_misc_sprite(&ctx, misc_sheet_row, game_pos.x, game_pos.y);
+                    let multiplier = match model.view_style {
+                        ViewStyle::Normal => 1,
+                        ViewStyle::TinySpacedUnits => 1,
+                        ViewStyle::SpacedUnits => 2,
+                    };
+
+                    let (x_adjustment, y_adjustment) = match model.view_style {
+                        ViewStyle::Normal => (0.0, 0.0),
+                        ViewStyle::TinySpacedUnits => (0.0, 0.0),
+                        ViewStyle::SpacedUnits => {
+                            (tile::PIXEL_WIDTH_FL / 4.0, tile::PIXEL_HEIGHT_FL * 0.75)
+                        }
+                    };
+
+                    let _ = model.assets.draw_misc_sprite_precise(
+                        &ctx,
+                        misc_sheet_row,
+                        (game_pos.x * multiplier) as f64,
+                        (game_pos.y * multiplier) as f64,
+                        x_adjustment,
+                        y_adjustment,
+                    );
 
                     for (loaded_unit_id, _) in loaded_units {
                         draw_units_move(model.get_units_move(loaded_unit_id));
